@@ -8,12 +8,12 @@ import copy as cp
 def get_hubbard_params(n_site,beta,U):
 # {{{
     #gets the interactions for linear hubbard
-    print("-------------------------------------")
-    print("             Hubbard model")
-    print("-------------------------------------")
-    print("nsite:%6d"%n_site)
-    print("beta :%10.6f"%beta)
-    print("U    :%10.6f"%U)
+    print(" ---------------------------------------------------------")
+    print("                       Hubbard model")
+    print(" ---------------------------------------------------------")
+    print(" nsite:%6d"%n_site)
+    print(" beta :%10.6f"%beta)
+    print(" U    :%10.6f"%U)
 
     t = np.zeros((n_site,n_site))
 
@@ -36,7 +36,7 @@ def run_hubbard_scf(h_local,g_local,closed_shell_nel):
 # {{{
     print()
     print(" ---------------------------------------------------------")
-    print("              Delocalized Mean-Field")
+    print("                  Delocalized Mean-Field")
     print(" ---------------------------------------------------------")
     orb, C = np.linalg.eigh(h_local)
     #if np.sum(h_local) == 0:

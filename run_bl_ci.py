@@ -5,19 +5,16 @@ import time
 from math import factorial
 import copy as cp
 
-
-
 from hubbard_fn import *
 from ci_fn import *
 
 from Cluster import *
 
-
 np.set_printoptions(suppress=True, precision=3, linewidth=1500)
 
 ttt = time.time()
 
-n_orb = 5
+n_orb = 8
 U = 0
 beta = 1.
 n_a = n_orb//2
@@ -29,10 +26,10 @@ h, g = get_hubbard_params(n_orb,beta,U)
 if 1:
     Escf,orb,h,g,C = run_hubbard_scf(h,g,nel)
 
-blocks = [[0,1,2,3],[4,5,6,7]]
-blocks = [[0,1,2,3,4,5]]
+#blocks = [[0,1,2,3],[4,5,6,7]]
+#blocks = [[0,1,2,3,4,5]]
+#blocks = [[0,1,2,3]]
 blocks = [[0,1,2,3]]
-blocks = [[0,1,2,3,4]]
 #blocks = [[0,1,2,3,4,5],[6,7,8,9,10,11]]
 n_blocks = len(blocks)
 
@@ -79,7 +76,6 @@ def get_block_eri(block,Cluster,g_spin,a,b,c,d):
 # }}}
 
 cluster = {}
-cluster_ci_states = {}
 #initialize the cluster class
 for a in range(n_blocks):
 
@@ -101,12 +97,8 @@ for a in range(n_blocks):
             efci,evec = np.linalg.eigh(HH)
             for i in range(0,efci.shape[0]):
                 print(" E :%16.10f  Dim:%4d  Na:%4d Nb:%4d" %(efci[i],efci.shape[0],n_a,n_b))
-                cluster[a].read_block_states(efci[i],evec[:,i],n_a,n_b,i)
-            cluster[a].read_block_states_2(efci,evec,n_a,n_b)
+            cluster[a].read_block_states(efci,evec,n_a,n_b)
             print()
-
-
-            #cluster_ci_states[a,n_a,n_b] = evec
 
 
 if 0:
@@ -114,397 +106,6 @@ if 0:
     print(fci.cistring.gen_cre_str_index([0,1,2,3],3))
     print(fci.cistring.gen_des_str_index([0,1,2,3],4))
     #print(fci.cistring.addr2str(4, 2, [0,1,2]))
-
-
-
-
-def aI(n_orb,n_a,n_b,dna, dnb , cl_vec):
-# {{{
-    #####FULL CI
-    #n_a = n_a + dna
-    #n_b = n_b + dnb
-
-    dim_a = nCr(n_orb,n_a)
-    dim_b = nCr(n_orb,n_b)
-
-    dim_fci = dim_a * dim_b
-
-
-    dim_a_new = nCr(n_orb,n_a+dna)
-
-    aket = np.zeros((1,dim_a_new * dim_b))
-
-    #print("Number of Orbitals    :   %d" %n_orb)
-    #print("Number of a electrons :   %d" %n_a)
-    #print("Number of b electrons :   %d" %n_b)
-    #print("Full CI dimension     :   %d" %dim_fci)
-
-    #####STORED ALL THE BINOMIAL INDEX 
-    nCr_a = np.zeros((n_orb, n_orb))
-
-    for i in range(0, n_orb):
-        for j in range(0, n_orb):
-            nCr_a[i, j] = int(nCr(i, j))
-
-    nCr_b = np.zeros((n_orb, n_orb))
-
-    for i in range(0, n_orb):
-        for j in range(0, n_orb):
-            nCr_b[i, j] = int(nCr(i, j))
-
-    Det = np.zeros((dim_fci, dim_fci))
-
-    a_index = [i for i in range(n_a)]
-
-    #first config alpha string
-    a_site = np.zeros(n_orb)
-    for i in range(0, n_orb):
-        if i in a_index:
-            a_site[i] = 1
-    for aa in range(0,dim_a):
-
-        for i in range(0,n_orb):
-            if i in a_index:
-                a_site[i] = 1
-            else:
-                a_site[i] = 0
-
-        Ikaa = get_index(nCr_a, a_index, n_orb, n_a)
-        asite2 = cp.deepcopy(a_site)
-
-
-        b_index = [i for i in range(n_b)]
-
-        #first config beta string
-        b_site = np.zeros(n_orb)
-        for i in range(0, n_orb):
-            if i in b_index:
-                b_site[i] = 1
-
-        eaindex = []
-        for i in range(0,n_orb):
-            if i not in a_index:
-                eaindex.append(i)
-
-
-        for bb in range(0,dim_b):
-
-            for i in range(0,n_orb):
-                if i in b_index:
-                    b_site[i] = 1
-                else:
-                    b_site[i] = 0
-
-            Ikbb = get_index(nCr_b, b_index, n_orb, n_b)
-            bsite2 = cp.deepcopy(b_site)
-
-            #print(a_site,b_site)
-            
-            ### TYPE1: Form annihilation of alpha electron 
-            a2index = cp.deepcopy(a_index)
-            for ii in a_index:
-                if dna != -1:
-                    raise AssertionError("only for annihilation coded for now")
-
-                #print("HAVE TO ADD ANTISYMMETRY")
-                a2index.remove(ii)
-                #print(a2index)
-
-                Ijaa = get_index(nCr_a, a2index, n_orb, n_a + dna)
-                #print(Ijaa)
-                #print(Ijaa * dim_b + Ikbb )
-                aket[0,Ijaa * dim_b + Ikbb] = cl_vec[Ikaa * dim_b + Ikbb] 
-
-                a2index = cp.deepcopy(a_index)
-
-
-            #print(a_site,b_site)
-            next_index(b_index, n_orb, n_b) #imp
-
-
-        next_index(a_index, n_orb, n_a) #imp
-
-    print(cl_vec)
-    print(aket)
-    return aket
-# }}}
-
-#aI(4,3,3,cluster_ci_states[0,4,3])
-#aI(4,4,4, -1, 0,cluster_ci_states[0,4,3][:,2])
-
-
-def braJ_a_ketI(ci_vec, cj_vec, n_orb, n_a_i, n_b_i, n_a_j, n_b_j):
-# {{{
-    dna =  n_a_j - n_a_i
-    dnb =  n_b_j - n_b_i
-    assert(dna == -1)
-    assert(dnb == +0)
-    #####FULL CI
-    n_a = n_a_i
-    n_b = n_b_i
-
-    dim_a = nCr(n_orb,n_a)
-    dim_b = nCr(n_orb,n_b)
-
-    dim_fci = dim_a * dim_b
-
-
-    dim_a_new = nCr(n_orb,n_a_j)
-
-    aket = np.zeros((1,dim_a_new * dim_b))
-
-    des = np.zeros(n_orb)
-
-
-
-    assert(cj_vec.shape[0] == (dim_a_new * dim_b))
-
-    #print("Number of Orbitals    :   %d" %n_orb)
-    #print("Number of a electrons :   %d" %n_a)
-    #print("Number of b electrons :   %d" %n_b)
-    #print("Full CI dimension     :   %d" %dim_fci)
-
-    #####STORED ALL THE BINOMIAL INDEX 
-    nCr_a = np.zeros((n_orb, n_orb))
-
-    for i in range(0, n_orb):
-        for j in range(0, n_orb):
-            nCr_a[i, j] = int(nCr(i, j))
-
-    nCr_b = np.zeros((n_orb, n_orb))
-
-    for i in range(0, n_orb):
-        for j in range(0, n_orb):
-            nCr_b[i, j] = int(nCr(i, j))
-
-    Det = np.zeros((dim_fci, dim_fci))
-
-    a_index = [i for i in range(n_a)]
-
-    #first config alpha string
-    a_site = np.zeros(n_orb)
-    for i in range(0, n_orb):
-        if i in a_index:
-            a_site[i] = 1
-    for aa in range(0,dim_a):
-
-        for i in range(0,n_orb):
-            if i in a_index:
-                a_site[i] = 1
-            else:
-                a_site[i] = 0
-
-        Ikaa = get_index(nCr_a, a_index, n_orb, n_a)
-        asite2 = cp.deepcopy(a_site)
-
-
-        b_index = [i for i in range(n_b)]
-
-        #first config beta string
-        b_site = np.zeros(n_orb)
-        for i in range(0, n_orb):
-            if i in b_index:
-                b_site[i] = 1
-
-        eaindex = []
-        for i in range(0,n_orb):
-            if i not in a_index:
-                eaindex.append(i)
-
-
-        for bb in range(0,dim_b):
-
-            for i in range(0,n_orb):
-                if i in b_index:
-                    b_site[i] = 1
-                else:
-                    b_site[i] = 0
-
-            Ikbb = get_index(nCr_b, b_index, n_orb, n_b)
-            bsite2 = cp.deepcopy(b_site)
-
-            #print(a_site,b_site)
-
-            ### TYPE1: Form annihilation of alpha electron 
-            a2index = cp.deepcopy(a_index)
-            for ii in a_index:
-
-                #antisymmetry
-                sym = a2index.index(ii)
-                Sphase = (-1)** sym
-
-                #annihilate ii orbital
-                a2index.remove(ii)
-                #print(a2index)
-
-                #get index of the new CI space cj
-                Ijaa = get_index(nCr_a, a2index, n_orb, n_a + dna)
-
-                ##loop through elements of cj_vec and put elements
-                #for ijaa in range(0,cj_vec.shape[0]):
-                #    if Ijaa * dim_b + Ikbb == ijaa:
-                #        des[ii] += Sphase * ci_vec[Ikaa * dim_b + Ikbb] * cj_vec[ijaa] 
-
-                des[ii] += Sphase * ci_vec[Ikaa * dim_b + Ikbb] * cj_vec[Ijaa * dim_b + Ikbb] 
-
-                a2index = cp.deepcopy(a_index)
-
-            #print(a_site,b_site)
-            next_index(b_index, n_orb, n_b) #imp
-
-        next_index(a_index, n_orb, n_a) #imp
-
-    #print(ci_vec)
-    #print(cj_vec)
-    print("des")
-    print(des)
-    return des
-# }}}
-
-def braJ_A_ketI(ci_vec, cj_vec, n_orb, n_a_i, n_b_i, n_a_j, n_b_j):
-# {{{
-    dna =  n_a_j - n_a_i
-    dnb =  n_b_j - n_b_i
-    assert(dna == +1)
-    assert(dnb == +0)
-    #####FULL CI
-    n_a = n_a_i
-    n_b = n_b_i
-
-    dim_a = nCr(n_orb,n_a)
-    dim_b = nCr(n_orb,n_b)
-
-    dim_fci = dim_a * dim_b
-
-
-    dim_a_new = nCr(n_orb,n_a_j)
-
-    aket = np.zeros((1,dim_a_new * dim_b))
-
-    cre = np.zeros(n_orb)
-
-
-
-    assert(cj_vec.shape[0] == (dim_a_new * dim_b))
-
-    #print("Number of Orbitals    :   %d" %n_orb)
-    #print("Number of a electrons :   %d" %n_a)
-    #print("Number of b electrons :   %d" %n_b)
-    #print("Full CI dimension     :   %d" %dim_fci)
-
-    #####STORED ALL THE BINOMIAL INDEX 
-    nCr_a = np.zeros((n_orb, n_orb))
-
-    for i in range(0, n_orb):
-        for j in range(0, n_orb):
-            nCr_a[i, j] = int(nCr(i, j))
-
-    nCr_b = np.zeros((n_orb, n_orb))
-
-    for i in range(0, n_orb):
-        for j in range(0, n_orb):
-            nCr_b[i, j] = int(nCr(i, j))
-
-    Det = np.zeros((dim_fci, dim_fci))
-
-    a_index = [i for i in range(n_a)]
-
-    #first config alpha string
-    a_site = np.zeros(n_orb)
-    for i in range(0, n_orb):
-        if i in a_index:
-            a_site[i] = 1
-    for aa in range(0,dim_a):
-
-        for i in range(0,n_orb):
-            if i in a_index:
-                a_site[i] = 1
-            else:
-                a_site[i] = 0
-
-        Ikaa = get_index(nCr_a, a_index, n_orb, n_a)
-        asite2 = cp.deepcopy(a_site)
-
-
-        b_index = [i for i in range(n_b)]
-
-        #first config beta string
-        b_site = np.zeros(n_orb)
-        for i in range(0, n_orb):
-            if i in b_index:
-                b_site[i] = 1
-
-        eaindex = []
-        for i in range(0,n_orb):
-            if i not in a_index:
-                eaindex.append(i)
-
-
-        for bb in range(0,dim_b):
-
-            for i in range(0,n_orb):
-                if i in b_index:
-                    b_site[i] = 1
-                else:
-                    b_site[i] = 0
-
-            Ikbb = get_index(nCr_b, b_index, n_orb, n_b)
-            bsite2 = cp.deepcopy(b_site)
-
-            #print(a_site,b_site)
-
-            ### TYPE1: Form annihilation of alpha electron 
-            a2index = cp.deepcopy(a_index)
-            for ii in eaindex:
-
-                #annihilate ii orbital
-                a2index.append(ii)
-                a2index = sorted(a2index, reverse=False)
-                #print(a2index)
-
-                #antisymmetry
-                sym = a2index.index(ii)
-                Sphase = (-1)** sym
-
-
-                #get index of the new CI space cj
-                Ijaa = get_index(nCr_a, a2index, n_orb, n_a + dna)
-
-                ##loop through elements of cj_vec and put elements
-                #for ijaa in range(0,cj_vec.shape[0]):
-                #    if Ijaa * dim_b + Ikbb == ijaa:
-                #        des[ii] += Sphase * ci_vec[Ikaa * dim_b + Ikbb] * cj_vec[ijaa] 
-                cre[ii] += Sphase * ci_vec[Ikaa * dim_b + Ikbb] * cj_vec[Ijaa * dim_b + Ikbb] 
-
-                a2index = cp.deepcopy(a_index)
-
-            #print(a_site,b_site)
-            next_index(b_index, n_orb, n_b) #imp
-
-        next_index(a_index, n_orb, n_a) #imp
-
-    print("cre")
-    print(cre)
-    return cre
-# }}}
-
-
-n_a_i = 4
-n_b_i = 3
-
-n_a_j = 3
-n_b_j = 3
-
-braJ_a_ketI(cluster[0].block_states[n_a_i,n_b_i,1], cluster[0].block_states[n_a_j,n_b_j,1], cluster[0].n_orb, n_a_i, n_b_i, n_a_j, n_b_j)
-
-
-n_a_i = 3
-n_b_i = 3
-
-n_a_j = 4
-n_b_j = 3
-
-braJ_A_ketI(cluster[0].block_states[n_a_i,n_b_i,1], cluster[0].block_states[n_a_j,n_b_j,1], cluster[0].n_orb, n_a_i, n_b_i, n_a_j, n_b_j)
 
 
 # TODO: TDM matrices to compute
@@ -516,36 +117,30 @@ braJ_A_ketI(cluster[0].block_states[n_a_i,n_b_i,1], cluster[0].block_states[n_a_
 #           ABa, ABb,  Aab, Bab
 #           BBa, BBb,  Abb, Bbb
 
-def braJ_a_ketI(ci_vec, cj_vec, n_orb, n_a_i, n_b_i, n_a_j, n_b_j):
+def braJ_a_ketI(ci_vec, cj_vec, n_orb, n_a, n_b):
 # {{{
-    dna =  n_a_j - n_a_i
-    dnb =  n_b_j - n_b_i
+
+    n_a_j = n_a - 1
+    n_b_j = n_b
+
+    dna =  n_a_j - n_a
+    dnb =  n_b_j - n_b
     assert(dna == -1)
     assert(dnb == +0)
     #####FULL CI
-    n_a = n_a_i
-    n_b = n_b_i
 
     dim_a = nCr(n_orb,n_a)
     dim_b = nCr(n_orb,n_b)
 
-    dim_a_new = nCr(n_orb,n_a_j)
+    dim_a_j = nCr(n_orb,n_a_j)
 
     dim_fci = dim_a * dim_b
     dim_I = dim_fci
-    dim_J = dim_a_new * dim_b
-
-
-
-    aket = np.zeros((1,dim_a_new * dim_b))
+    dim_J = dim_a_j * dim_b
 
     des = np.zeros((n_orb,dim_I,dim_J))
 
-    print(ci_vec.shape)
-    print(cj_vec.shape)
-
-
-    assert(cj_vec.shape[0] == (dim_a_new * dim_b))
+    assert(cj_vec.shape[0] == (dim_J))
 
     #print("Number of Orbitals    :   %d" %n_orb)
     #print("Number of a electrons :   %d" %n_a)
@@ -554,45 +149,25 @@ def braJ_a_ketI(ci_vec, cj_vec, n_orb, n_a_i, n_b_i, n_a_j, n_b_j):
 
     #####STORED ALL THE BINOMIAL INDEX 
     nCr_a = np.zeros((n_orb, n_orb))
-
     for i in range(0, n_orb):
         for j in range(0, n_orb):
             nCr_a[i, j] = int(nCr(i, j))
 
     nCr_b = np.zeros((n_orb, n_orb))
-
     for i in range(0, n_orb):
         for j in range(0, n_orb):
             nCr_b[i, j] = int(nCr(i, j))
 
-    Det = np.zeros((dim_fci, dim_fci))
+
+    ###     start the loop in |I> space
 
     a_index = [i for i in range(n_a)]
 
-    #first config alpha string
-    a_site = np.zeros(n_orb)
-    for i in range(0, n_orb):
-        if i in a_index:
-            a_site[i] = 1
     for aa in range(0,dim_a):
 
-        for i in range(0,n_orb):
-            if i in a_index:
-                a_site[i] = 1
-            else:
-                a_site[i] = 0
-
         Ikaa = get_index(nCr_a, a_index, n_orb, n_a)
-        asite2 = cp.deepcopy(a_site)
-
 
         b_index = [i for i in range(n_b)]
-
-        #first config beta string
-        b_site = np.zeros(n_orb)
-        for i in range(0, n_orb):
-            if i in b_index:
-                b_site[i] = 1
 
         eaindex = []
         for i in range(0,n_orb):
@@ -602,16 +177,7 @@ def braJ_a_ketI(ci_vec, cj_vec, n_orb, n_a_i, n_b_i, n_a_j, n_b_j):
 
         for bb in range(0,dim_b):
 
-            for i in range(0,n_orb):
-                if i in b_index:
-                    b_site[i] = 1
-                else:
-                    b_site[i] = 0
-
             Ikbb = get_index(nCr_b, b_index, n_orb, n_b)
-            bsite2 = cp.deepcopy(b_site)
-
-            #print(a_site,b_site)
 
             ### TYPE1: Form annihilation of alpha electron 
             a2index = cp.deepcopy(a_index)
@@ -623,15 +189,9 @@ def braJ_a_ketI(ci_vec, cj_vec, n_orb, n_a_i, n_b_i, n_a_j, n_b_j):
 
                 #annihilate ii orbital
                 a2index.remove(ii)
-                #print(a2index)
 
-                #get index of the new CI space cj
+                #get index of the new space cj
                 Ijaa = get_index(nCr_a, a2index, n_orb, n_a + dna)
-
-                ##loop through elements of cj_vec and put elements
-                #for ijaa in range(0,cj_vec.shape[0]):
-                #    if Ijaa * dim_b + Ikbb == ijaa:
-                #        des[ii] += Sphase * ci_vec[Ikaa * dim_b + Ikbb] * cj_vec[ijaa] 
 
                 for CI in range(dim_I):
                     for CJ in range(dim_J):
@@ -644,41 +204,33 @@ def braJ_a_ketI(ci_vec, cj_vec, n_orb, n_a_i, n_b_i, n_a_j, n_b_j):
 
         next_index(a_index, n_orb, n_a) #imp
 
-    #print(ci_vec)
-    #print(cj_vec)
-    #print("des")
-    #print(des)
     return des
 # }}}
 
-def braJ_A_ketI(ci_vec, cj_vec, n_orb, n_a_i, n_b_i, n_a_j, n_b_j):
+def braJ_A_ketI(ci_vec, cj_vec, n_orb, n_a, n_b):
 # {{{
-    dna =  n_a_j - n_a_i
-    dnb =  n_b_j - n_b_i
+    n_a_j = n_a + 1
+    n_b_j = n_b
+
+    dna =  n_a_j - n_a
+    dnb =  n_b_j - n_b
     assert(dna == +1)
     assert(dnb == +0)
     #####FULL CI
-    n_a = n_a_i
-    n_b = n_b_i
 
     dim_a = nCr(n_orb,n_a)
     dim_b = nCr(n_orb,n_b)
 
-    dim_a_new = nCr(n_orb,n_a_j)
+    dim_a_j = nCr(n_orb,n_a_j)
 
     dim_fci = dim_a * dim_b
 
     dim_I = dim_fci
-    dim_J = dim_a_new * dim_b
-
-
-    aket = np.zeros((1,dim_a_new * dim_b))
+    dim_J = dim_a_j * dim_b
 
     cre = np.zeros((n_orb,dim_I,dim_J))
 
-
-
-    assert(cj_vec.shape[0] == (dim_a_new * dim_b))
+    assert(cj_vec.shape[0] == (dim_J))
 
     #print("Number of Orbitals    :   %d" %n_orb)
     #print("Number of a electrons :   %d" %n_a)
@@ -687,64 +239,33 @@ def braJ_A_ketI(ci_vec, cj_vec, n_orb, n_a_i, n_b_i, n_a_j, n_b_j):
 
     #####STORED ALL THE BINOMIAL INDEX 
     nCr_a = np.zeros((n_orb, n_orb))
-
     for i in range(0, n_orb):
         for j in range(0, n_orb):
             nCr_a[i, j] = int(nCr(i, j))
 
     nCr_b = np.zeros((n_orb, n_orb))
-
     for i in range(0, n_orb):
         for j in range(0, n_orb):
             nCr_b[i, j] = int(nCr(i, j))
 
-    Det = np.zeros((dim_fci, dim_fci))
+    ###     start the loop in |I> space
 
     a_index = [i for i in range(n_a)]
 
-    #first config alpha string
-    a_site = np.zeros(n_orb)
-    for i in range(0, n_orb):
-        if i in a_index:
-            a_site[i] = 1
     for aa in range(0,dim_a):
 
-        for i in range(0,n_orb):
-            if i in a_index:
-                a_site[i] = 1
-            else:
-                a_site[i] = 0
-
         Ikaa = get_index(nCr_a, a_index, n_orb, n_a)
-        asite2 = cp.deepcopy(a_site)
-
 
         b_index = [i for i in range(n_b)]
-
-        #first config beta string
-        b_site = np.zeros(n_orb)
-        for i in range(0, n_orb):
-            if i in b_index:
-                b_site[i] = 1
 
         eaindex = []
         for i in range(0,n_orb):
             if i not in a_index:
                 eaindex.append(i)
 
-
         for bb in range(0,dim_b):
 
-            for i in range(0,n_orb):
-                if i in b_index:
-                    b_site[i] = 1
-                else:
-                    b_site[i] = 0
-
             Ikbb = get_index(nCr_b, b_index, n_orb, n_b)
-            bsite2 = cp.deepcopy(b_site)
-
-            #print(a_site,b_site)
 
             ### TYPE1: Form annihilation of alpha electron 
             a2index = cp.deepcopy(a_index)
@@ -763,10 +284,6 @@ def braJ_A_ketI(ci_vec, cj_vec, n_orb, n_a_i, n_b_i, n_a_j, n_b_j):
                 #get index of the new CI space cj
                 Ijaa = get_index(nCr_a, a2index, n_orb, n_a + dna)
 
-                ##loop through elements of cj_vec and put elements
-                #for ijaa in range(0,cj_vec.shape[0]):
-                #    if Ijaa * dim_b + Ikbb == ijaa:
-                #        des[ii] += Sphase * ci_vec[Ikaa * dim_b + Ikbb] * cj_vec[ijaa] 
                 for CI in range(dim_I):
                     for CJ in range(dim_J):
                         cre[ii,CI,CJ] += Sphase * ci_vec[Ikaa * dim_b + Ikbb,CI] * cj_vec[Ijaa * dim_b + Ikbb,CJ] 
@@ -781,72 +298,42 @@ def braJ_A_ketI(ci_vec, cj_vec, n_orb, n_a_i, n_b_i, n_a_j, n_b_j):
     return cre
 # }}}
 
-n_a_i = 4
-n_b_i = 3
-
-n_a_j = 3
-n_b_j = 3
-
-#des = braJ_a_ketI(cluster[0].block_states_2[n_a_i,n_b_i], cluster[0].block_states_2[n_a_j,n_b_j], cluster[0].n_orb, n_a_i, n_b_i, n_a_j, n_b_j)
-#print(des[:,1,1])
-
 
 des_a = {}
 cre_a = {}
 for n_a in range(1,n_orb+1):
     for n_b in range(0,n_orb+1):
-        print("destroy a",n_a,n_b)
-        des_a[n_a,n_b] = braJ_a_ketI(cluster[0].block_states_2[n_a,n_b], cluster[0].block_states_2[n_a-1,n_b], cluster[0].n_orb, n_a, n_b, n_a-1, n_b)
-        print(des_a[n_a,n_b][:,0,0])
+        print("destroy  a:%4d %4d"%(n_a,n_b))
+        des_a[n_a,n_b] = braJ_a_ketI(cluster[0].block_states[n_a,n_b], cluster[0].block_states[n_a-1,n_b], cluster[0].n_orb, n_a, n_b)
 for n_a in range(0,n_orb):
     for n_b in range(0,n_orb+1):
-        print("create a",n_a,n_b)
-        cre_a[n_a,n_b] = braJ_A_ketI(cluster[0].block_states_2[n_a,n_b], cluster[0].block_states_2[n_a+1,n_b], cluster[0].n_orb, n_a, n_b, n_a+1, n_b)
+        print("create   a:%4d %4d"%(n_a,n_b))
+        cre_a[n_a,n_b] = braJ_A_ketI(cluster[0].block_states[n_a,n_b], cluster[0].block_states[n_a+1,n_b], cluster[0].n_orb, n_a, n_b)
 
 
-print(time.time() - ttt)
+print("Run Time %10.6f"%(time.time() - ttt))
 
 
+def get_energy_tight_binding(state_ind,n_a,n_b):
+# {{{
+    EE = 0
+    #confirm equal to FCI
+    for p in range(0,n_orb):
+        EE += h[p,p] *  np.dot(des_a[n_a,0][p,state_ind,:],des_a[n_a,0][p,state_ind,:])
+        for q in range(p+1,n_orb):
+            EE += h[p,q] *  np.dot(des_a[n_a,0][p,state_ind,:],des_a[n_a,0][q,state_ind,:])
+            EE += h[q,p] *  np.dot(des_a[n_a,0][q,state_ind,:],des_a[n_a,0][p,state_ind,:])
+    print("new    FCI: %16.10f na:%4d nb:%4d state_ind:%4d"%(EE,n_a,n_b,state_ind))
+    return EE
+# }}}
 
-EE = 0
-state = 9
-n_a = 2
-n_b = 0
-
-#confirm equal to FCI
-for p in range(0,n_orb):
-    EE += h[p,p] *  np.dot(des_a[n_a,0][p,state,:],des_a[n_a,0][p,state,:])
-    for q in range(p+1,n_orb):
-        EE += h[p,q] *  np.dot(des_a[n_a,0][p,state,:],des_a[n_a,0][q,state,:])
-        EE += h[q,p] *  np.dot(des_a[n_a,0][q,state,:],des_a[n_a,0][p,state,:])
-
-print(EE)
-
-HH = run_fci(n_orb,n_a,n_b,h,g)
-efci,evec = np.linalg.eigh(HH)
-print(efci)
-print(efci[state])
-
-EE = 0
-state = 9
 n_a = 3
-for p in range(0,n_orb):
-    EE += h[p,p] *  np.dot(des_a[n_a,0][p,state,:],des_a[n_a,0][p,state,:])
-    for q in range(p+1,n_orb):
-        EE += h[p,q] *  np.dot(des_a[n_a,0][p,state,:],des_a[n_a,0][q,state,:])
-        EE += h[q,p] *  np.dot(des_a[n_a,0][q,state,:],des_a[n_a,0][p,state,:])
-print(EE)
+n_b = 0
+state_ind = 0
+
+EE = get_energy_tight_binding(state_ind,n_a,n_b)
+
 HH = run_fci(n_orb,n_a,n_b,h,g)
 efci,evec = np.linalg.eigh(HH)
-print(efci)
-print(efci[state])
+print("actual FCI: %16.10f na:%4d nb:%4d state_ind:%4d"%(efci[state_ind],n_a,n_b,state_ind))
 
-
-#print(evec)
-#print(cluster[0].block_states_2[2,0])
-
-#for p in range(0,n_orb):
-#    for q in range(p+1,n_orb):
-#        for r in range(q+1,n_orb):
-#            for s in range(r+1,n_orb):
-#                EE += g[p,q,s,r] *  np.dot(des_a[n_a,0][p,state,:],des_a[n_a,0][q,state,:])

@@ -57,9 +57,6 @@ class Cluster(object):
         
         self.t_spin = np.kron(self.oei,np.eye(2))
 
-    def read_block_states(self,ci_eval,ci_vec,n_a,n_b,ind):
-        self.block_states[n_a,n_b,ind] = ci_vec
-
-    def read_block_states_2(self,ci_eval,ci_vec,n_a,n_b):
-        self.block_states_2[n_a,n_b] = ci_vec
+    def read_block_states(self,ci_eval,ci_vec,n_a,n_b):
+        self.block_states[n_a,n_b] = ci_vec
 
