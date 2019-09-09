@@ -29,7 +29,7 @@ if 1:
 #blocks = [[0,1,2,3],[4,5,6,7]]
 #blocks = [[0,1,2,3,4,5]]
 #blocks = [[0,1,2,3]]
-blocks = [[0,1,2,3]]
+blocks = [[0,1,2,3,4]]
 #blocks = [[0,1,2,3,4,5],[6,7,8,9,10,11]]
 n_blocks = len(blocks)
 
@@ -82,9 +82,9 @@ for a in range(n_blocks):
     ha, ga = get_cluster_eri(blocks[a],h,g)  #Form integrals within a cluster
     n_orb = ha.shape[0]
 
-    cluster[a] = Cluster(blocks[a],ha,ga)
+    cluster[a] = Cluster(blocks[a])
 
-    Cluster.init(cluster[a],blocks[a])
+    cluster[a].init(blocks[a])
 
     print("One electron integral for Cluster:%4d"%a)
     print(ha)
@@ -97,7 +97,9 @@ for a in range(n_blocks):
             efci,evec = np.linalg.eigh(HH)
             for i in range(0,efci.shape[0]):
                 print(" E :%16.10f  Dim:%4d  Na:%4d Nb:%4d" %(efci[i],efci.shape[0],n_a,n_b))
-            cluster[a].read_block_states(efci,evec,n_a,n_b)
+
+            #cluster[a].read_block_states(efci,evec,n_a,n_b)
+            cluster[a].read_block_states(efci,np.eye(efci.shape[0]),n_a,n_b)
             print()
 
 
@@ -337,3 +339,25 @@ HH = run_fci(n_orb,n_a,n_b,h,g)
 efci,evec = np.linalg.eigh(HH)
 print("actual FCI: %16.10f na:%4d nb:%4d state_ind:%4d"%(efci[state_ind],n_a,n_b,state_ind))
 
+
+def get_energy_tight_binding(state_ind1,state_ind2,n_a,n_b):
+# {{{
+    EE = 0
+    #confirm equal to FCI
+    for p in range(0,n_orb):
+        EE += h[p,p] *  np.dot(des_a[n_a,0][p,state_ind1,:],des_a[n_a,0][p,state_ind2,:])
+        for q in range(p+1,n_orb):
+            EE += h[p,q] *  np.dot(des_a[n_a,0][p,state_ind1,:],des_a[n_a,0][q,state_ind2,:])
+            EE += h[q,p] *  np.dot(des_a[n_a,0][q,state_ind1,:],des_a[n_a,0][p,state_ind2,:])
+    print("new    FCI: %16.10f na:%4d nb:%4d state_ind:%4d"%(EE,n_a,n_b,state_ind))
+    return EE
+# }}}
+Hnew = np.zeros((efci.shape[0],efci.shape[0]))
+for state_ind1 in range(0,efci.shape[0]):
+    for state_ind2 in range(0,efci.shape[0]):
+        Hnew[state_ind1,state_ind2] = get_energy_tight_binding(state_ind1,state_ind2,n_a,n_b)
+print(Hnew)
+print(HH)
+print(efci)
+        
+        
