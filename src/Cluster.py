@@ -5,24 +5,44 @@ import itertools as it
 
 class Cluster(object):
 
-    def __init__(self,bl):
+    def __init__(self,idx,bl):
         """
-        input: bl is a list of spatial orbital indices
+        input: 
+            bl  = a list of spatial orbital indices
+            idx = index of the cluster
 
         data:
-        self.block_states:      dict connecting (na,nb) quantum numbers to ndarray
-                                self.block_states[(3,4)] = ndarray(determinant, cluster state)
+            self.block_states:      dict connecting (na,nb) quantum numbers to ndarray
+                                    self.block_states[(3,4)] = ndarray(determinant, cluster state)
 
-        self.ops:               dict holding matrices of operators
-                                e.g., self.ops['Aab'][(Ina,Inb),(Jna,Jnb)] = ndarray(vecI,vecJ,p,q,r)
+            self.ops:               dict holding matrices of operators
+                                    e.g., self.ops['Aab'][(Ina,Inb),(Jna,Jnb)] = ndarray(vecI,vecJ,p,q,r)
         """
+        self.idx = idx 
         self.orb_list = bl
 
-        self.n_orb = len(bl)
-        self.dim_tot = 2**(2*self.n_orb)
+        self.n_orb = len(bl)    
+        self.dim_tot = 2**(2*self.n_orb)    # total size of hilbert space
+        self.dim = self.dim_tot             # size of basis         
         self.block_states = {}
         self.tdm_a = {}
         self.ops    = {}
+
+    def __len__(self):
+        return len(self.orb_list) 
+    def __str__(self):
+        has = ""
+        for si in self.orb_list:
+            has = has + "%03i|"%si
+        if len(self.orb_list) == 0:
+            has = "|"
+        return "IDX%03i:DIM%04i:%s" %(self.idx, self.dim, has)
+
+    def add_operator(self,op):
+        if op in self.ops:
+            return
+        else:
+            self.ops[op] = []
 
 
     def read_block_states(self, vecs, n_a, n_b):
@@ -46,4 +66,4 @@ class Cluster(object):
             Ina,Inb = quantum numbers for ket
             Jna,Jnb = quantum numbers for bra
         """
-        self.ops[string][(Ina,Inb),(Jna,Jnb))] = tens
+        self.ops[string][(Ina,Inb),(Jna,Jnb)] = tens
