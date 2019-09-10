@@ -2,6 +2,9 @@ import numpy as np
 import scipy
 import itertools as it
 
+from ci_python.ci_string import *
+from ci_python.Hamiltonian import *
+from ci_python.davidson import *
 
 class Cluster(object):
 
@@ -43,7 +46,28 @@ class Cluster(object):
             return
         else:
             self.ops[op] = []
+    
+    def build_op_matrices(self):
+        ci = ci_solver()
+        
+        H = Hamiltonian()
+        ci.algorithm = "direct"
+        na = 1
+        nb = 1
+        n_roots = 10
+        ci.init(H,na,nb,n_roots)
+        print(ci)
+        ci.run()
+ 
+        ob.tdms["ca_aa"] = tools.compute_tdm_ca_aa(ci,ci)
+        ob.tdms["ca_bb"] = tools.compute_tdm_ca_bb(ci,ci)
+        for op in self.ops:
+            print(op)
 
+        # start out by building a single annihilation operator
+
+        
+###################################################################################################################
 
     def read_block_states(self, vecs, n_a, n_b):
         self.block_states[n_a,n_b] = vecs

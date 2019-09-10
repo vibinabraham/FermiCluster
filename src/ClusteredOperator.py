@@ -11,6 +11,8 @@ class LocalOperator:
         self.terms = [] 
     def add_term(self,term):
         self.terms.append(term)
+    def build_matrix_dumb1(self):
+        np.zeros([self.cluster.dim_tot, self.cluster.dim_tot])
 
 class ClusteredTerm:
     def __init__(self, delta, ops, ints):
