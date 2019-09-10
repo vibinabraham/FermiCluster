@@ -42,3 +42,9 @@ print(" Build these local operators")
 for c in clusters:
     print(c)
     print(c.ops)
+
+for ci_idx, ci in enumerate(clusters):
+    assert(ci_idx == ci.idx)
+    print(" Extract local operator for cluster",ci.idx)
+    opi = clustered_ham.extract_local_operator(ci_idx)
+    [print(t) for t in opi.terms]

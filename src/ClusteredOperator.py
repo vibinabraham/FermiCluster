@@ -5,6 +5,12 @@ import copy as cp
 from collections import OrderedDict
 from helpers import *
 
+class LocalOperator:
+    def __init__(self, cluster):
+        self.cluster = cluster
+        self.terms = [] 
+    def add_term(self,term):
+        self.terms.append(term)
 
 class ClusteredTerm:
     def __init__(self, delta, ops, ints):
@@ -23,6 +29,7 @@ class ClusteredTerm:
         self.delta = delta
         self.ops = ops
         self.ints = ints
+        self.sign = 1
 
     def __str__(self):
         out = ""
@@ -32,12 +39,29 @@ class ClusteredTerm:
             out += " %2i"%d[2]
             out += ":"
         out += "|"
+        if self.sign == 1:
+            out += "+"
+        elif self.sign == -1:
+            out += "-"
+        else:
+            print("wtf?")
+            exit()
         for o in self.ops:
             if o == "":
                 out += " ____,"
             else:
                 out += " %4s,"%o
         return out
+
+    def get_active_clusters(self):
+        """
+        return list of clusters active in term
+        """
+        active = [] 
+        for di,d in enumerate(self.delta):
+            if d[2] == 1:
+                active.append(di)
+        return active 
 
 
 class ClusteredOperator:
@@ -92,20 +116,27 @@ class ClusteredOperator:
              
                 delta_a = tuple([tuple(i) for i in delta_a])
                 delta_b = tuple([tuple(i) for i in delta_b])
+                term_a = ClusteredTerm(delta_a, ops_a, hij)
+                term_b = ClusteredTerm(delta_b, ops_b, hij)
+
+                if cj.idx < ci.idx:
+                    term_a.sign *= -1
+                    term_b.sign *= -1
+
                 try:
-                    self.terms[delta_a].append(ClusteredTerm(delta_a, ops_a, hij))
+                    self.terms[delta_a].append(term_a)
                 except:
-                    self.terms[delta_a] = [ClusteredTerm(delta_a, ops_a, hij)]
+                    self.terms[delta_a] = [term_a]
                 try:
-                    self.terms[delta_b].append(ClusteredTerm(tuple(delta_b), ops_b, hij))
+                    self.terms[delta_b].append(term_b)
                 except:
-                    self.terms[delta_b] = [ClusteredTerm(tuple(delta_b), ops_b, hij)]
+                    self.terms[delta_b] = [term_b]
        
         print(self.print_terms_header())
         for ti,t in self.terms.items():
             for tt in t:
                 print(tt)
-                print_mat(tt.ints)
+                #print_mat(tt.ints)
     
     def print_terms_header(self):
         """
@@ -121,6 +152,7 @@ class ClusteredOperator:
             out += ":"
             out += "   "
         out += "|"
+        out += " "
         for oi,o in enumerate(self.clusters):
             out += " %4i,"%oi
         return out
@@ -135,6 +167,15 @@ class ClusteredOperator:
                 for opi,op in enumerate(tt.ops):
                     if op != "":
                         self.clusters[opi].add_operator(op)
+
+    def extract_local_operator(self,cluster_idx):
+        op = LocalOperator(self.clusters[cluster_idx])
+        for t in self.terms:
+            for tt in self.terms[t]:
+                active = tt.get_active_clusters()
+                if len(active) == 1 and active[0] == cluster_idx:
+                    op.add_term(tt)
+        return op
 
 if __name__== "__main__":
     term = ClusteredTerm()
