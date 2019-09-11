@@ -695,24 +695,22 @@ def compute_tdm_ca_bb(ci1,ci2):
     return tdm
 # }}}
 
-def compute_tdm_a_bb(ci1,ci2):
+def compute_tdm_a(no,bra_space,ket_space,basis):
     """# {{{
     Compute a(v1,v2,j) = <v1|a_j|v2>
 
-    v1 and v2 correspond to the current vectors in ci1 and ci2. 
+    no = n_orbs
+    bra_space = (n_alpha,n_beta) for bra
+    ket_space = (n_alpha,n_beta) for ket
 
-    We use multiple ci_string objects becauase want to compute transition densities between 
-    states with different numbers of electrons.
-
+    basis = dict of basis vectors
     """
 
-    H = ci1.H   # either ci1.H or ci2.H could be used as they must be the same
-    
-    #   Create local references to ci_strings
-    bra_a = ci1.bra_a
-    bra_b = ci1.bra_b
-    ket_a = ci2.ket_a
-    ket_b = ci2.ket_b
+   
+    bra_a = ci_string(no, bra_space[0])
+    bra_b = ci_string(no, bra_space[1])
+    ket_a = ci_string(no, ket_space[0])
+    ket_b = ci_string(no, ket_space[1])
    
     assert(ket_a.no == ket_b.no) 
     assert(bra_a.no == ket_a.no) 
@@ -723,20 +721,37 @@ def compute_tdm_a_bb(ci1,ci2):
     bra_a_max = bra_a.max()
     bra_b_max = bra_b.max()
     
-    range_ket_a_no = range(ket_a.no)
-    range_ket_b_no = range(ket_b.no)
+    range_no = range(no)
   
     _abs = abs
    
-    v1 = ci1.results_v
-    v2 = ci2.results_v
+    v1 = basis[bra_space] 
+    v2 = basis[ket_space] 
 
+    assert(v1.shape[0] == len(bra_a)*len(bra_b))
+    assert(v2.shape[0] == len(ket_a)*len(ket_b))
     nv1 = v1.shape[1]
     nv2 = v2.shape[1]
 
-    tdm = np.zeros((nv1,nv2,H.nmo(),H.nmo()))
+    tdm = np.zeros((nv1,nv2,no))
     
-    
+    #alpha term 
+    bra = ci_string(0,0)
+    ket = ket_a
+    ket.reset()
+    for K in range(ket.max()): 
+        for p in range_no:
+            bra.dcopy(ket)
+            bra.a(p)
+            if bra.sign() == 0:
+                continue
+            L = bra.linear_index()
+            #print(p,bra,ket,L,K)
+            sign = bra.sign()
+            tdm[:,:,p] += sign*v1[L,:].T.conj() @ v2[K,:]
+
+        ket.incr()
+    exit()
     ket_b.reset()
     for Kb in range(ket_b_max): 
         
@@ -763,9 +778,6 @@ def compute_tdm_a_bb(ci1,ci2):
                     tmp_KL.shape = (v1.shape[1],v2.shape[1])
                     tdm[:,:,p,r] += tmp_KL * sign_b
    
-    #for ni in range(nv1):
-    #    for nj in range(nv2):
-    #        print(" Trace P(%4i, %4i): %12.8f" %( ni, nj, np.trace(tdm[ni,nj,:,:])))
     return tdm
 # }}}
 
