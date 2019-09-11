@@ -5,7 +5,7 @@ import time
 from math import factorial
 import copy as cp
 
-def get_hubbard_params(n_site,beta,U):
+def get_hubbard_params(n_site,beta,U,pbc=True):
 # {{{
     #gets the interactions for linear hubbard
     print(" ---------------------------------------------------------")
@@ -20,8 +20,9 @@ def get_hubbard_params(n_site,beta,U):
     for i in range(0,n_site-1):
         t[i,i+1] = 1 
         t[i+1,i] = 1 
-    t[n_site-1,0] = 1 
-    t[0,n_site-1] = 1 
+    if pbc:
+        t[n_site-1,0] = 1 
+        t[0,n_site-1] = 1 
 
     h_local = -beta  * t 
 

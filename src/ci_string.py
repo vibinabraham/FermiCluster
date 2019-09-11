@@ -2,8 +2,8 @@ import numpy as np
 import scipy 
 import scipy.sparse
 import copy as cp
-from ci_python.Hamiltonian import *
-from ci_python.davidson import *
+from Hamiltonian import *
+from davidson import *
 
 
 class ci_string:
@@ -395,8 +395,8 @@ class ci_solver:
 
     def run_direct(self):
 # {{{
-        print(" self.H.e_core: %12.8f" %self.H.e_core)
-        print(" self.H.e_nuc : %12.8f" %self.H.e_nuc)
+        #print(" self.H.e_core: %12.8f" %self.H.e_core)
+        #print(" self.H.e_nuc : %12.8f" %self.H.e_nuc)
         Hci = np.zeros((self.full_dim,self.full_dim))
         #Hci = np.eye(self.full_dim)* (self.H.e_core + self.H.e_nuc)
 
@@ -415,15 +415,15 @@ class ci_solver:
         #print(" Hamiltonian Matrix:")
         #tools.printm(Hci)
         
-        #print(" Diagonalize Matrix for %i roots" %self.n_roots)
-        #l,C = scipy.sparse.linalg.eigsh(Hci,self.n_roots)
-        print(" Diagonalize Matrix")
-        l,C = np.linalg.eigh(Hci)
-        l = l[0:self.n_roots]
-        C = C[:,0:self.n_roots]
+        print(" Diagonalize Matrix for %i roots" %self.n_roots)
+        l,C = scipy.sparse.linalg.eigsh(Hci,self.n_roots,which='SA')
+        #print(" Diagonalize Matrix")
+        #l,C = np.linalg.eigh(Hci)
+        #l = l[0:self.n_roots]
+        #C = C[:,0:self.n_roots]
        
         print(" Eigenvalues of CI matrix:")
-        for i in range(min(30,len(l))):
+        for i,li in enumerate(l):
             print(" State: %4i     %12.8f"%(i,l[i]))
         
         self.results_e = l 
@@ -694,3 +694,81 @@ def compute_tdm_ca_bb(ci1,ci2):
     #        print(" Trace P(%4i, %4i): %12.8f" %( ni, nj, np.trace(tdm[ni,nj,:,:])))
     return tdm
 # }}}
+
+def compute_tdm_a_bb(ci1,ci2):
+    """# {{{
+    Compute a(v1,v2,j) = <v1|a_j|v2>
+
+    v1 and v2 correspond to the current vectors in ci1 and ci2. 
+
+    We use multiple ci_string objects becauase want to compute transition densities between 
+    states with different numbers of electrons.
+
+    """
+
+    H = ci1.H   # either ci1.H or ci2.H could be used as they must be the same
+    
+    #   Create local references to ci_strings
+    bra_a = ci1.bra_a
+    bra_b = ci1.bra_b
+    ket_a = ci2.ket_a
+    ket_b = ci2.ket_b
+   
+    assert(ket_a.no == ket_b.no) 
+    assert(bra_a.no == ket_a.no) 
+
+    # avoid python function call overhead
+    ket_a_max = ket_a.max()
+    ket_b_max = ket_b.max()
+    bra_a_max = bra_a.max()
+    bra_b_max = bra_b.max()
+    
+    range_ket_a_no = range(ket_a.no)
+    range_ket_b_no = range(ket_b.no)
+  
+    _abs = abs
+   
+    v1 = ci1.results_v
+    v2 = ci2.results_v
+
+    nv1 = v1.shape[1]
+    nv2 = v2.shape[1]
+
+    tdm = np.zeros((nv1,nv2,H.nmo(),H.nmo()))
+    
+    
+    ket_b.reset()
+    for Kb in range(ket_b_max): 
+        
+        ket_a.reset()
+        for Ka in range(ket_a_max): 
+    
+            K = Ka + Kb * ket_a_max
+            
+            #  <pq|rs> p'q'sr  --> (pr|qs) (a,b)
+            for r in range_ket_b_no:
+                for p in range_ket_b_no:
+                    Lb = ket_b._ca_lookup[Kb][p+r*ket_b.no]
+                    if Lb == 0:
+                        continue
+                    sign_b = 1
+                    if Lb < 0:
+                        sign_b = -1
+                        Lb = -Lb
+                    Lb = Lb - 1
+                                
+                    L = Ka + Lb * bra_a_max  # Lb doesn't change
+                
+                    tmp_KL = np.kron(v1[K,:].T,v2[L,:])
+                    tmp_KL.shape = (v1.shape[1],v2.shape[1])
+                    tdm[:,:,p,r] += tmp_KL * sign_b
+   
+    #for ni in range(nv1):
+    #    for nj in range(nv2):
+    #        print(" Trace P(%4i, %4i): %12.8f" %( ni, nj, np.trace(tdm[ni,nj,:,:])))
+    return tdm
+# }}}
+
+
+
+
