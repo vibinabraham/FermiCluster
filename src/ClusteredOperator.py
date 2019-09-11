@@ -176,7 +176,10 @@ class ClusteredOperator:
             for tt in self.terms[t]:
                 active = tt.get_active_clusters()
                 if len(active) == 1 and active[0] == cluster_idx:
-                    op.add_term(tt)
+                    term = cp.deepcopy(tt)
+                    term.ops = [term.ops[cluster_idx]]
+                    term.delta = [term.delta[cluster_idx]]
+                    op.add_term(term)
         return op
 
 if __name__== "__main__":

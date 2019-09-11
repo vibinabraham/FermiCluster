@@ -17,9 +17,9 @@ n_orb = 8
 U = 1.
 beta = 1.
 
-h, g = get_hubbard_params(n_orb,beta,U)
+h, g = get_hubbard_params(n_orb,beta,U,pbc=False)
 
-if 0:
+if 1:
     Escf,orb,h,g,C = run_hubbard_scf(h,g,n_orb//2)
 
 blocks = [[0,1,2,3],[4,5,6,7]]
@@ -37,17 +37,22 @@ clustered_ham = ClusteredOperator(clusters)
 print(" Add 1-body terms")
 clustered_ham.add_1b_terms(h)
 
+
+print(" Build cluster basis")
+for ci_idx, ci in enumerate(clusters):
+    assert(ci_idx == ci.idx)
+    print(" Extract local operator for cluster",ci.idx)
+    opi = clustered_ham.extract_local_operator(ci_idx)
+    print()
+    print()
+    print(" Form basis by diagonalize local Hamiltonian for cluster: ",ci_idx)
+    ci.form_eigbasis_from_local_operator(opi)
+    #opi.build_matrix_dumb1()
+
 clustered_ham.add_ops_to_clusters()
 print(" Build these local operators")
 for c in clusters:
     print(" Build mats for cluster ",c.idx)
     c.build_op_matrices()
 
-for ci_idx, ci in enumerate(clusters):
-    assert(ci_idx == ci.idx)
-    print(" Extract local operator for cluster",ci.idx)
-    opi = clustered_ham.extract_local_operator(ci_idx)
-    [print(t) for t in opi.terms]
-    
-    opi.build_matrix_dumb1()
 

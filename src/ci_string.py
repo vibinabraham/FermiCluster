@@ -621,81 +621,8 @@ def incr_comb(comb, Mend):
 
 #   
 #   Compute TDMs
-def compute_tdm_ca_bb(ci1,ci2):
-    """# {{{
-    Compute Pij(v1,v2) = <v1|a_i' a_j|v2>
 
-    v1 and v2 correspond to the current vectors in ci1 and ci2. 
-
-    We use multiple ci_string objects becauase want to compute transition densities between 
-    states with different numbers of electrons.
-
-    """
-
-    H = ci1.H   # either ci1.H or ci2.H could be used as they must be the same
-    
-    #   Create local references to ci_strings
-    bra_a = ci1.bra_a
-    bra_b = ci1.bra_b
-    ket_a = ci2.ket_a
-    ket_b = ci2.ket_b
-   
-    assert(ket_a.no == ket_b.no) 
-    assert(bra_a.no == ket_a.no) 
-
-    # avoid python function call overhead
-    ket_a_max = ket_a.max()
-    ket_b_max = ket_b.max()
-    bra_a_max = bra_a.max()
-    bra_b_max = bra_b.max()
-    
-    range_ket_a_no = range(ket_a.no)
-    range_ket_b_no = range(ket_b.no)
-  
-    _abs = abs
-   
-    v1 = ci1.results_v
-    v2 = ci2.results_v
-
-    nv1 = v1.shape[1]
-    nv2 = v2.shape[1]
-
-    tdm = np.zeros((nv1,nv2,H.nmo(),H.nmo()))
-    
-    
-    ket_b.reset()
-    for Kb in range(ket_b_max): 
-        
-        ket_a.reset()
-        for Ka in range(ket_a_max): 
-    
-            K = Ka + Kb * ket_a_max
-            
-            #  <pq|rs> p'q'sr  --> (pr|qs) (a,b)
-            for r in range_ket_b_no:
-                for p in range_ket_b_no:
-                    Lb = ket_b._ca_lookup[Kb][p+r*ket_b.no]
-                    if Lb == 0:
-                        continue
-                    sign_b = 1
-                    if Lb < 0:
-                        sign_b = -1
-                        Lb = -Lb
-                    Lb = Lb - 1
-                                
-                    L = Ka + Lb * bra_a_max  # Lb doesn't change
-                
-                    tmp_KL = np.kron(v1[K,:].T,v2[L,:])
-                    tmp_KL.shape = (v1.shape[1],v2.shape[1])
-                    tdm[:,:,p,r] += tmp_KL * sign_b
-   
-    #for ni in range(nv1):
-    #    for nj in range(nv2):
-    #        print(" Trace P(%4i, %4i): %12.8f" %( ni, nj, np.trace(tdm[ni,nj,:,:])))
-    return tdm
-# }}}
-
-def compute_tdm_a(no,bra_space,ket_space,basis):
+def build_annihilation(no,bra_space,ket_space,basis):
     """# {{{
     Compute a(v1,v2,j) = <v1|a_j|v2>
 
@@ -705,8 +632,7 @@ def compute_tdm_a(no,bra_space,ket_space,basis):
 
     basis = dict of basis vectors
     """
-
-   
+    
     bra_a = ci_string(no, bra_space[0])
     bra_b = ci_string(no, bra_space[1])
     ket_a = ci_string(no, ket_space[0])
@@ -714,9 +640,16 @@ def compute_tdm_a(no,bra_space,ket_space,basis):
    
     assert(ket_a.no == ket_b.no) 
     assert(bra_a.no == ket_a.no) 
+   
+    spin_case = ""
+    if (bra_space[0] == ket_space[0]-1) and (bra_space[1] == ket_space[1]):
+        spin_case = "alpha"
+    elif (bra_space[0] == ket_space[0]) and (bra_space[1] == ket_space[1]-1):
+        spin_case = "beta"
+    else:
+        print(" Incompatible transition")
+        assert(1==0) 
     
-    assert(bra_space[0] == ket_space[0]-1)
-    assert(bra_space[1] == ket_space[1])
     # avoid python function call overhead
     ket_a_max = ket_a.max()
     ket_b_max = ket_b.max()
@@ -735,12 +668,18 @@ def compute_tdm_a(no,bra_space,ket_space,basis):
     nv1 = v1.shape[1]
     nv2 = v2.shape[1]
 
-    tdm_1spin = np.zeros((bra_a.max(),ket_a.max(),no))
     
     #alpha term 
-    bra = ci_string(0,0)
-    ket = ket_a
+    if spin_case == "alpha":
+        ket = cp.deepcopy(ket_a)
+        bra = cp.deepcopy(bra_a)
+    elif spin_case == "beta":
+        ket = cp.deepcopy(ket_b)
+        bra = cp.deepcopy(bra_b)
+    
+    tdm_1spin = np.zeros((bra.max(),ket.max(),no))
     ket.reset()
+    bra.reset()
     for K in range(ket.max()): 
         for p in range_no:
             bra.dcopy(ket)
@@ -752,17 +691,24 @@ def compute_tdm_a(no,bra_space,ket_space,basis):
             tdm_1spin[L,K,p] += sign
 
         ket.incr()
-   
+  
     v2.shape = (ket_a_max,ket_b_max,nv2)
     v1.shape = (bra_a_max,bra_b_max,nv1)
-    # v1(La,Kb,v1) tdm(La,Ka,p) v2(Ka,Kb,v2)
-    #
-    # tmp(La,Kb,v2,p) = tdm(La,Ka,p) v2(Ka,Kb,v2)
-    tmp = np.einsum('abc,bde->adec',tdm_1spin,v2)
-    # tmp(v1,v2,p) = v1(La,Kb,v1) tmp(La,Kb,v2,p) 
-    tdm_a = np.einsum('abc,abfg->cfg',v1,tmp)
+    
+    if spin_case == "alpha":
+        # v(IJs) <IJ|p|KL> v(KLt)   = v(IJs) tdm(IKp) v(KJt) = A(stp)
+        tmp = np.einsum('ikp,kjt->ipjt',tdm_1spin,v2)
+        tdm = np.einsum('ijs,ipjt->stp',v1,tmp)
+    elif spin_case == "beta":
+        # v(IJs) <IJ|p|KL> v(KLt)   = v(IJs) tdm(JLp) v(ILt) = A(stp)
+        tmp = np.einsum('jlp,ilt->jpit',tdm_1spin,v2)
+        tdm = np.einsum('ijs,jpit->stp',v1,tmp) * (-1)**ket_a.ne
+
+    
+    v2.shape = (ket_a_max*ket_b_max,nv2)
+    v1.shape = (bra_a_max*bra_b_max,nv1)
    
-    return tdm_a
+    return tdm
 # }}}
 
 

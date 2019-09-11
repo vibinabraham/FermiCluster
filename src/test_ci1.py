@@ -43,4 +43,5 @@ for na in range(n_orb+1):
         ci.run()
         basis[(na,nb)] = ci.results_v
 
-a_IJp = compute_tdm_a(n_orb, (1,2),(2,2),basis)
+a_IJp = build_annihilation(n_orb, (1,2),(2,2),basis)
+b_IJp = build_annihilation(n_orb, (2,1),(2,2),basis)

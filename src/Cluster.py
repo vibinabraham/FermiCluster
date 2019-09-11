@@ -2,9 +2,9 @@ import numpy as np
 import scipy
 import itertools as it
 
-from ci_python.ci_string import *
-from ci_python.Hamiltonian import *
-from ci_python.davidson import *
+from ci_string import *
+from Hamiltonian import *
+from davidson import *
 
 class Cluster(object):
 
@@ -27,8 +27,8 @@ class Cluster(object):
         self.n_orb = len(bl)    
         self.dim_tot = 2**(2*self.n_orb)    # total size of hilbert space
         self.dim = self.dim_tot             # size of basis         
-        self.block_states = {}
-        self.tdm_a = {}
+        self.basis = {}                     # organized as basis = { (na,nb):v(IJ,s), (na',nb'):v(IJ,s), ...} 
+                                            #       where IJ is alpha,beta string indices
         self.ops    = {}
 
     def __len__(self):
@@ -47,25 +47,34 @@ class Cluster(object):
         else:
             self.ops[op] = []
     
-    def build_op_matrices(self):
-        ci = ci_solver()
+    def form_eigbasis_from_local_operator(self,local_op):
+        h = np.zeros([self.n_orb]*2)
+        v = np.zeros([self.n_orb]*4)
+        for t in local_op.terms:
+            if t.ops[0] == "Aa":
+                h = t.ints 
+            if t.ops[0] == "AAaa":
+                v = t.ints 
         
         H = Hamiltonian()
-        ci.algorithm = "direct"
-        na = 1
-        nb = 1
-        n_roots = 10
-        ci.init(H,na,nb,n_roots)
-        print(ci)
-        ci.run()
- 
-        ob.tdms["ca_aa"] = tools.compute_tdm_ca_aa(ci,ci)
-        ob.tdms["ca_bb"] = tools.compute_tdm_ca_bb(ci,ci)
-        for op in self.ops:
-            print(op)
-
-        # start out by building a single annihilation operator
-
+        H.S = np.eye(h.shape[0])
+        H.C = H.S
+        H.t = h
+        H.V = v
+        self.basis = {}
+        print(" Do CI for each particle number block")
+        for na in range(self.n_orb+1):
+            for nb in range(self.n_orb+1):
+                n_roots = 100 
+                ci = ci_solver()
+                ci.algorithm = "direct"
+                ci.init(H,na,nb,n_roots)
+                print(ci)
+                ci.run()
+                self.basis[(na,nb)] = ci.results_v
+         
+    def build_op_matrices(self):
+        pass
         
 ###################################################################################################################
 
