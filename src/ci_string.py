@@ -736,18 +736,19 @@ def compute_tdm_a(no,bra_space,ket_space,basis):
     tdm = np.zeros((nv1,nv2,no))
     
     #alpha term 
-    bra = ci_string(0,0)
-    ket = ket_a
-    ket.reset()
-    for K in range(ket.max()): 
+    ket_a.reset()
+    for Ka in range(ket_a_max): 
         for p in range_no:
-            bra.dcopy(ket)
-            bra.a(p)
-            if bra.sign() == 0:
+            bra_a.dcopy(ket_a)
+            bra_a.a(p)
+            if bra_a.sign() == 0:
                 continue
-            L = bra.linear_index()
-            #print(p,bra,ket,L,K)
-            sign = bra.sign()
+            La = bra_a.linear_index()
+            sign_a = bra_a.sign()
+            
+            K = Ka + Kb * ket_a_max
+            L = La + Lb * bra_a_max
+
             tdm[:,:,p] += sign*v1[L,:].T.conj() @ v2[K,:]
 
         ket.incr()
