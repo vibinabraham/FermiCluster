@@ -35,7 +35,7 @@ basis = {}
 print(" do CI for each particle number block")
 for na in range(n_orb+1):
     for nb in range(n_orb+1):
-        n_roots = 4 
+        n_roots = 100 
         ci = ci_solver()
         ci.algorithm = "direct"
         ci.init(H,na,nb,n_roots)

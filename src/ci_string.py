@@ -714,7 +714,9 @@ def compute_tdm_a(no,bra_space,ket_space,basis):
    
     assert(ket_a.no == ket_b.no) 
     assert(bra_a.no == ket_a.no) 
-
+    
+    assert(bra_space[0] == ket_space[0]-1)
+    assert(bra_space[1] == ket_space[1])
     # avoid python function call overhead
     ket_a_max = ket_a.max()
     ket_b_max = ket_b.max()
@@ -733,53 +735,34 @@ def compute_tdm_a(no,bra_space,ket_space,basis):
     nv1 = v1.shape[1]
     nv2 = v2.shape[1]
 
-    tdm = np.zeros((nv1,nv2,no))
+    tdm_1spin = np.zeros((bra_a.max(),ket_a.max(),no))
     
     #alpha term 
-    ket_a.reset()
-    for Ka in range(ket_a_max): 
+    bra = ci_string(0,0)
+    ket = ket_a
+    ket.reset()
+    for K in range(ket.max()): 
         for p in range_no:
-            bra_a.dcopy(ket_a)
-            bra_a.a(p)
-            if bra_a.sign() == 0:
+            bra.dcopy(ket)
+            bra.a(p)
+            if bra.sign() == 0:
                 continue
-            La = bra_a.linear_index()
-            sign_a = bra_a.sign()
-            
-            K = Ka + Kb * ket_a_max
-            L = La + Lb * bra_a_max
-
-            tdm[:,:,p] += sign*v1[L,:].T.conj() @ v2[K,:]
+            L = bra.linear_index()
+            sign = bra.sign()
+            tdm_1spin[L,K,p] += sign
 
         ket.incr()
-    exit()
-    ket_b.reset()
-    for Kb in range(ket_b_max): 
-        
-        ket_a.reset()
-        for Ka in range(ket_a_max): 
-    
-            K = Ka + Kb * ket_a_max
-            
-            #  <pq|rs> p'q'sr  --> (pr|qs) (a,b)
-            for r in range_ket_b_no:
-                for p in range_ket_b_no:
-                    Lb = ket_b._ca_lookup[Kb][p+r*ket_b.no]
-                    if Lb == 0:
-                        continue
-                    sign_b = 1
-                    if Lb < 0:
-                        sign_b = -1
-                        Lb = -Lb
-                    Lb = Lb - 1
-                                
-                    L = Ka + Lb * bra_a_max  # Lb doesn't change
-                
-                    tmp_KL = np.kron(v1[K,:].T,v2[L,:])
-                    tmp_KL.shape = (v1.shape[1],v2.shape[1])
-                    tdm[:,:,p,r] += tmp_KL * sign_b
    
-    return tdm
+    v2.shape = (ket_a_max,ket_b_max,nv2)
+    v1.shape = (bra_a_max,bra_b_max,nv1)
+    # v1(La,Kb,v1) tdm(La,Ka,p) v2(Ka,Kb,v2)
+    #
+    # tmp(La,Kb,v2,p) = tdm(La,Ka,p) v2(Ka,Kb,v2)
+    tmp = np.einsum('abc,bde->adec',tdm_1spin,v2)
+    # tmp(v1,v2,p) = v1(La,Kb,v1) tmp(La,Kb,v2,p) 
+    tdm_a = np.einsum('abc,abfg->cfg',v1,tmp)
+   
+    return tdm_a
 # }}}
 
 
