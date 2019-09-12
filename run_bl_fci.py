@@ -22,14 +22,27 @@ n_b = n_orb//2
 nel = n_a
 
 h, g = get_hubbard_params(n_orb,beta,U)
+if n_orb == 6:
+    h[2,3] = 0.8*h[2,3]
+    h[3,2] = 0.8*h[3,2]
+    h[0,5] = 0.5*h[0,5]
+    h[5,0] = 0.5*h[5,0]
+    blocks = [[0,1,2],[3,4,5]]
+
+if n_orb == 4:
+    h[0,3] = 0.8*h[0,3]
+    h[3,0] = 0.8*h[3,0]
+    h[1,2] = 0.5*h[1,2]
+    h[2,1] = 0.5*h[2,1]
+    blocks = [[0,1],[2,3]]
+
+print(h)
 
 if 0:
     Escf,orb,h,g,C = run_hubbard_scf(h,g,nel)
 
 #blocks = [[0,1,2,3],[4,5,6,7]]
 #blocks = [[0,1,2,3,4,5]]
-#blocks = [[0,1,2,3]]
-blocks = [[0,1],[2,3]]
 #blocks = [[0,1,2,3,4,5],[6,7,8,9,10,11]]
 n_blocks = len(blocks)
 
@@ -339,10 +352,6 @@ state_ind = 0
 
 #EE = get_energy_tight_binding(state_ind,n_a,n_b)
 #
-HH = run_fci(n_orb,2,0,h,g)
-efci,evec = np.linalg.eigh(HH)
-print("actual FCI: %16.10f na:%4d nb:%4d state_ind:%4d"%(efci[state_ind],n_a,n_b,state_ind))
-
 
 def get_energy_tight_binding(h,state_ind1,state_ind2,n_a,n_b):
 # {{{
@@ -381,8 +390,6 @@ for a in range(n_blocks):
     ha, ga = get_cluster_eri(blocks[a],h,g)  #Form integrals within a cluster
     Hnew = ketHbra(ha,cluster[a].tdm_a,n_a,0)
 
-print("THE FCI Matrix:")
-print(HH)
 
 
 #CAUTION: A and B are cluster index and not spin a b
@@ -390,6 +397,12 @@ print("-----------------------------------------------------------")
 print("                 Cluster FCI")
 print("-----------------------------------------------------------")
 nel = 2
+HH = run_fci(n_orb,nel,0,h,g)
+efci,evec = np.linalg.eigh(HH)
+print("actual FCI: %16.10f na:%4d nb:%4d state_ind:%4d"%(efci[state_ind],nel,n_b,state_ind))
+print("THE FCI Matrix:")
+print(HH)
+
 print("dim",nCr(n_orb,nel))
 Hfci = np.zeros((nCr(n_orb,nel),nCr(n_orb,nel)))
 print(Hfci.shape)
@@ -417,8 +430,8 @@ for a in range(n_blocks):
 
             Hfci[curr:dim+curr,curr:dim+curr] += H0
             curr += dim
+            print(Hfci)
             
-        print(Hfci)
 
         ##CASE 2: 
         print("CASE2: I x H_b")
@@ -442,22 +455,96 @@ for a in range(n_blocks):
             Hfci[curr:dim+curr,curr:dim+curr] += H0
             curr += dim
 
-        print(Hfci)
+            print(Hfci)
 
 
 
         print("CASE3: H_ab")
 
-        for nA in range(0,nel):
+        FTEMP = {}
+
+        curr = 0
+        for nA in range(0,nel+1):
             nB = nel - nA
-            temp = 0
+            temp1 = 0
+            temp2 = 0
 
-            temp = np.kron(cluster[a].tdm_a["A",nA,0][1,0,:], cluster[b].tdm_a["a",nB,0][1,0,:])
-            #for p in range(cluster[a].n_orb):
-            #    for q in range(cluster[b].n_orb):
-            #        print("temp",nel,p,q)
-            #        temp += h[p,q] * np.kron(cluster[a].tdm_a["A",nA,0][p,:,:], cluster[b].tdm_a["a",nB,0][a,:,:])
-            #        print(temp.shape)
-            print(temp.shape)
+            ket_dim = nCr(bn_orb,nA) * nCr(bn_orb,nB)
+            ket_start = curr
+            ket_stop = curr + ket_dim
+            print("ks", ket_start,ket_stop)
 
+            #temp = np.kron(cluster[a].tdm_a["A",nA,0][1,0,:], cluster[b].tdm_a["a",nB,0][1,0,:])
+            Sigma1 = (-1)**(nA+nB-1)
+            Sigma2 = (-1)**(nA+nB+1)
+            #Sigma1 = 1
+            #Sigma2 = 1
+            for p in range(cluster[a].n_orb):
+                for q in range(cluster[b].n_orb):
+                    if nA != nel:
+                        temp1 += Sigma1 * h[p,bn_orb+q] * np.kron(cluster[a].tdm_a["A",nA,0][p,:,:], cluster[b].tdm_a["a",nB,0][q,:,:])
+                        #temp1 += Sigma1 * h[p,q] * np.kron(cluster[a].tdm_a["a",nA+1,0][p,:,:].T, cluster[b].tdm_a["a",nB,0][q,:,:])
+                        print(np.kron(cluster[a].tdm_a["A",nA,0][p,:,:], cluster[b].tdm_a["a",nB,0][q,:,:]))
+                    if nA != 0:
+                        temp2 -= Sigma1 * h[p,bn_orb+q] * np.kron(cluster[a].tdm_a["a",nA,0][p,:,:], cluster[b].tdm_a["A",nB,0][q,:,:])
+                        #temp2 -= Sigma1 * h[p,q] * np.kron(cluster[a].tdm_a["a",nA,0][p,:,:], cluster[b].tdm_a["a",nB+1,0][q,:,:].T)
+            #print("temp",nA,nB)
+            print(nA,0,"\n",temp1)
+            #print("temp")
+            #print(nA,1,"",temp2)
+            FTEMP[(nA,0)] = temp1
+            FTEMP[(nA,1)] = temp2
+
+            curr += ket_dim
+
+        print(FTEMP.keys())
             
+        start0 = 0
+        start1 = nCr(bn_orb,2) 
+        start2 = start1 + nCr(bn_orb,1)  * nCr(bn_orb,1)
+        start3 = start2 + nCr(bn_orb,2) 
+
+        #Hfci[start0:start1,start1:start2] = FTEMP[(0,0)]
+        #Hfci[start1:start2,start0:start1] = FTEMP[(1,0)]
+        #Hfci[start1:start2,start2:start3] = FTEMP[(1,1)]
+        #Hfci[start2:start3,start1:start2] = FTEMP[(2,1)]
+
+        Hfci[start0:start1,start1:start2] = FTEMP[(1,0)].T
+        Hfci[start1:start2,start2:start3] = FTEMP[(1,1)]
+        Hfci[start1:start2,start0:start1] = FTEMP[(1,0)]
+        Hfci[start2:start3,start1:start2] = FTEMP[(1,1)].T
+
+        #Hfci[start0:start1,start1:start2] = FTEMP[(0,0)]
+        #Hfci[start1:start2,start0:start1] = FTEMP[(0,0)].T
+        #Hfci[start1:start2,start2:start3] = FTEMP[(1,1)]
+        #Hfci[start2:start3,start1:start2] = FTEMP[(1,1)].T
+
+        #Hfci[start0:start1,start1:start2] =  FTEMP[(1,0)].T
+        #Hfci[start1:start2,start0:start1] =  FTEMP[(1,0)]
+        #Hfci[start1:start2,start2:start3] =  FTEMP[(2,1)].T
+        #Hfci[start2:start3,start1:start2] =  FTEMP[(2,1)]
+
+        #Hfci[start0:start1,start1:start2] =  FTEMP[(0,0)]
+        #Hfci[start1:start2,start0:start1] =  FTEMP[(0,0)].T
+        #Hfci[start1:start2,start2:start3] =  FTEMP[(0,0)].T
+        #Hfci[start2:start3,start1:start2] =  FTEMP[(0,0)]
+
+        print("key (0,0)")
+        print(FTEMP[(0,0)].T)
+        print()
+        print("key (1,0)")
+        print(FTEMP[(1,0)])
+        print()
+        print("key (1,1)")
+        print(FTEMP[(1,1)])
+        print()
+        print("key (2,1)")
+        print(FTEMP[(2,1)].T)
+        print("\n\n\n\n\n")
+
+
+        print(Hfci)
+        print(Hfci - Hfci.T)
+        print(np.linalg.eigvalsh(Hfci))
+        print(efci)
+        print(HH)
