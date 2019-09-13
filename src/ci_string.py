@@ -367,7 +367,7 @@ class ci_solver:
 # }}}
 
     def run(self):
-        print(" Compute spin diagonals")
+        #print(" Compute spin diagonals")
         self.Hdiag_s[0] = self.precompute_spin_diagonal_block(self.nea)
         self.Hdiag_s[1] = self.precompute_spin_diagonal_block(self.neb)
         
@@ -405,11 +405,11 @@ class ci_solver:
        
         #   
         #   Add spin diagonal components
-        print(" Add spin diagonals")
+        #print(" Add spin diagonals")
         Hci += np.kron(np.eye(ket_b.max()), self.Hdiag_s[0])
         Hci += np.kron(self.Hdiag_s[1],np.eye(ket_a.max()))
 
-        print(" Do alpha/beta terms")
+        #print(" Do alpha/beta terms")
         self.compute_ab_terms_direct(Hci)
    
         #print(" Hamiltonian Matrix:")

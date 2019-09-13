@@ -19,7 +19,24 @@ class Cluster(object):
                                     self.block_states[(3,4)] = ndarray(determinant, cluster state)
 
             self.ops:               dict holding matrices of operators
-                                    e.g., self.ops['Aab'][(Ina,Inb),(Jna,Jnb)] = ndarray(vecI,vecJ,p,q,r)
+                                    keys = strings denoting operator A/B creation a/b annihilation
+                                    values = dicts of keys=(Na_bra, Nb_bra, Na_ket, Nb_ket) 
+                                                      with values being the tensor representation
+                                    e.g., self.ops = {
+                                            'Aab':{  [(0,0),(0,1)]:D(I,J,p,q,r) 
+                                                     [(0,1),(0,2)]:D(I,J,p,q,r) 
+                                                     ...
+                                                  }
+                                            'Aa' :{  [(0,0),(0,0)]:D(I,J,p,q,r) 
+                                                     [(0,1),(0,1)]:D(I,J,p,q,r) 
+                                                     ...
+                                                  }
+                                            'aa' :{  [(0,0),(3,0)]:D(I,J,p,q,r) 
+                                                     [(1,1),(3,1)]:D(I,J,p,q,r) 
+                                                     ...
+                                                  }
+                                            ...
+
         """
         self.idx = idx 
         self.orb_list = bl
@@ -45,7 +62,7 @@ class Cluster(object):
         if op in self.ops:
             return
         else:
-            self.ops[op] = []
+            self.ops[op] = {}
     
     def form_eigbasis_from_local_operator(self,local_op):
         h = np.zeros([self.n_orb]*2)
@@ -74,8 +91,47 @@ class Cluster(object):
                 self.basis[(na,nb)] = ci.results_v
          
     def build_op_matrices(self):
-        pass
+        """
+        build all operators needed
+        """
+
+        #  a, A 
+        for na in range(1,self.n_orb+1):
+            for nb in range(0,self.n_orb+1):
+                self.ops['a'][(na-1,nb),(na,nb)] = build_annihilation(self.n_orb, (na-1,nb),(na,nb),self.basis)
+                self.ops['A'][(na,nb),(na-1,nb)] = cp.deepcopy(np.swapaxes(self.ops['a'][(na-1,nb),(na,nb)],0,1))
+                # note:
+                #   I did a deepcopy instead of reference. This increases memory requirements and 
+                #   basis transformation costs, but simplifies later manipulations. Later I need to 
+                #   remove the redundant storage by manually handling the transpositions from a to A
         
+        #  b, B 
+        for na in range(0,self.n_orb+1):
+            for nb in range(1,self.n_orb+1):
+                self.ops['b'][(na,nb-1),(na,nb)] = build_annihilation(self.n_orb, (na,nb-1),(na,nb),self.basis)
+                self.ops['B'][(na,nb),(na,nb-1)] = cp.deepcopy(np.swapaxes(self.ops['b'][(na,nb-1),(na,nb)],0,1))
+                # note:
+                #   I did a deepcopy instead of reference. This increases memory requirements and 
+                #   basis transformation costs, but simplifies later manipulations. Later I need to 
+                #   remove the redundant storage by manually handling the transpositions from a to A
+
+        #  Aa 
+        for na in range(1,self.n_orb+1):
+            for nb in range(0,self.n_orb+1):
+                A = self.ops['A'][(na,nb),(na-1,nb)]  # B[ I(N,N'),J(N,N-1'), p]
+                a = self.ops['a'][(na-1,nb),(na,nb)]  # b[ K(N-1,N'),L(N,N'), q]
+                self.ops['Aa'][(na,nb),(na,nb)] = np.einsum('ijp,jlq->ilpq',A,a)
+        #  Bb 
+        for na in range(0,self.n_orb+1):
+            for nb in range(1,self.n_orb+1):
+                B = self.ops['B'][(na,nb),(na,nb-1)]  # B[ I(N,N'),J(N,N'-1), p]
+                b = self.ops['b'][(na,nb-1),(na,nb)]  # b[ K(N,N'-1),L(N,N'), q]
+                self.ops['Bb'][(na,nb),(na,nb)] = np.einsum('ijp,jlq->ilpq',B,b)
+
+        #Add remaining operators ....
+
+
+
 ###################################################################################################################
 
     def read_block_states(self, vecs, n_a, n_b):

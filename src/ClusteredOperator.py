@@ -8,37 +8,51 @@ from helpers import *
 class LocalOperator:
     def __init__(self, cluster):
         self.cluster = cluster
-        self.terms = [] 
+        self.terms = []
     def add_term(self,term):
         self.terms.append(term)
     def build_matrix_dumb1(self):
         np.zeros([self.cluster.dim_tot, self.cluster.dim_tot])
 
 class ClusteredTerm:
-    def __init__(self, delta, ops, ints):
+    def __init__(self, delta, ops, ints, clusters):
         """
         input:
             delta = list of change of Na,Nb,state
-                    e.g., [(-1,-1,1),(1,1,1),(0,0,0)] means alpha and beta transition 
-                        from cluster 1 to 2, cluster 3 is diagonal
+                    e.g., [(-1,-1),(1,1),(0,0)] means alpha and beta transition
+                        from cluster 1 to 2, cluster 3 is fock diagonal
             ops   = list of operators
                     e.g., ["ab","AB",""]
-            
+
             ints  = tensor containing the integrals for this block
                     e.g., ndarray([p,q,r,s]) where p,q are in 1 and r,s are in 2
+
+        data:
+            active: list of clusters which have non-identity operators
+                    this includes fock-diagonal couplings,
+                    e.g., ["Aa","","Bb"] would have active = [0,2]
         """
         assert(len(ops)==len(delta))
+        self.clusters = clusters
+        self.n_clusters = len(self.clusters)
         self.delta = delta
         self.ops = ops
         self.ints = ints
         self.sign = 1
+        self.active = [] 
+        assert(len(self.ints.shape) == 2 or len(self.ints.shape) == 4) 
+        if len(self.ints.shape) == 2:
+            self.ints_inds = 'ab'
+        elif len(self.ints.shape) == 4:
+            self.ints_inds = 'abcd'
+
 
     def __str__(self):
+        #assert(len(self.delta)==2)
         out = ""
         for d in self.delta:
             out += " %2i"%d[0]
             out += " %2i"%d[1]
-            out += " %2i"%d[2]
             out += ":"
         out += "|"
         if self.sign == 1:
@@ -59,13 +73,47 @@ class ClusteredTerm:
         """
         return list of clusters active in term
         """
-        active = [] 
-        for di,d in enumerate(self.delta):
-            if d[2] == 1:
-                active.append(di)
-        return active 
+        return self.active
+    
+    def matrix_element(self,fock_bra,bra,fock_ket,ket):
+        for ci in range(self.n_clusters):
+            if (bra[ci]!=ket[ci]) and (ci not in self.active):
+                return 0
+        
+        # <bra|term|ket>    = <IJK|o1o2o3|K'J'I'>
+        #                   = <I|o1|I'><J|o2|J'><K|o3|K'> 
+        print(bra,ket,self)
+        #print(self.ints.shape)
 
-
+        mats = []
+        print(self.ints.shape)
+        for oi,o in enumerate(self.ops):
+            if o == "":
+                continue
+            try:
+                d = self.clusters[oi].ops[o][(fock_bra[oi],fock_ket[oi])][bra[oi],ket[oi]] #D(I,J,:,:...)
+                mats.append(d)
+            except:
+                pass
+            #print(self.clusters[oi].ops[o][tuple([].extend(fock_bra[oi])).extend(fock_ket[oi]))].shape)
+    
+        mats_inds = ""
+        idx = 0
+        for mi,m in enumerate(mats):
+            for i in range(len(m.shape)):
+                mats_inds += self.ints_inds[idx]
+                idx += 1
+            mats_inds += ","
+        string = mats_inds + self.ints_inds + "->"
+        if len(mats) == 1:
+            return np.einsum(string,mats[0],self.ints)
+        elif len(mats) == 2:
+            return np.einsum(string,mats[0],mats[1],self.ints)
+        elif len(mats) == 0:
+            return 0 
+        else:
+            print("NYI")
+            exit()
 class ClusteredOperator:
     """
     Defines a fermionic operator which can act on multiple clusters
@@ -77,9 +125,9 @@ class ClusteredOperator:
                 ^this needs cleaned up
     """
     def __init__(self,clusters):
-        self.n_clusters = 0
-        self.clusters = clusters 
-        self.terms = OrderedDict() 
+        self.n_clusters = len(clusters)
+        self.clusters = clusters
+        self.terms = OrderedDict()
         self.n_orb = 0
         for ci,c in enumerate(self.clusters):
             self.n_orb += c.n_orb
@@ -92,20 +140,16 @@ class ClusteredOperator:
         delta_tmp = []
         ops_tmp = []
         for ci in self.clusters:
-            delta_tmp.append([0,0,0])
+            delta_tmp.append([0,0])
             ops_tmp.append("")
-        
-        for ci in self.clusters: 
-            for cj in self.clusters: 
+
+        for ci in self.clusters:
+            for cj in self.clusters:
                 delta_a = list(cp.deepcopy(delta_tmp)) #alpha hopping
                 delta_b = list(cp.deepcopy(delta_tmp)) #beta hopping
                 ops_a = cp.deepcopy(ops_tmp) #alpha hopping
                 ops_b = cp.deepcopy(ops_tmp) #beta hopping
-                delta_a[ci.idx][2] = 1  #not diagonal
-                delta_a[cj.idx][2] = 1  #not diagonal
-                delta_b[ci.idx][2] = 1  #not diagonal
-                delta_b[cj.idx][2] = 1  #not diagonal
-                
+
                 delta_a[ci.idx][0] += 1  #not diagonal
                 delta_a[cj.idx][0] -= 1  #not diagonal
                 delta_b[ci.idx][1] += 1  #not diagonal
@@ -115,15 +159,24 @@ class ClusteredOperator:
                 ops_b[ci.idx] += "B"
                 ops_b[cj.idx] += "b"
                 hij = h[ci.orb_list,:][:,cj.orb_list]
-             
+
                 delta_a = tuple([tuple(i) for i in delta_a])
                 delta_b = tuple([tuple(i) for i in delta_b])
-                term_a = ClusteredTerm(delta_a, ops_a, hij)
-                term_b = ClusteredTerm(delta_b, ops_b, hij)
+                term_a = ClusteredTerm(delta_a, ops_a, hij, self.clusters)
+                term_b = ClusteredTerm(delta_b, ops_b, hij, self.clusters)
 
+                if ci.idx==cj.idx:
+                    term_a.active = [ci.idx]
+                    term_b.active = [ci.idx]
+                else:
+                    term_a.active = [ci.idx,cj.idx]
+                    term_b.active = [ci.idx,cj.idx]
                 if cj.idx < ci.idx:
                     term_a.sign *= -1
                     term_b.sign *= -1
+                    term_a.ints = np.transpose(term_a.ints, axes=(0,1))
+                    term_b.ints = np.transpose(term_b.ints, axes=(0,1))
+
 
                 try:
                     self.terms[delta_a].append(term_a)
@@ -133,26 +186,25 @@ class ClusteredOperator:
                     self.terms[delta_b].append(term_b)
                 except:
                     self.terms[delta_b] = [term_b]
-       
+
         print(self.print_terms_header())
         for ti,t in self.terms.items():
             for tt in t:
                 print(tt)
                 #print_mat(tt.ints)
-    
+
     def print_terms_header(self):
         """
         print header with labels for printing term
         """
         out = ""
         for di,d in enumerate(self.clusters):
-            out += "%2i________"%di
+            out += "%2i_____"%di
         out += "\n"
         for di,d in enumerate(self.clusters):
             out += " Δa"
             out += " Δb"
             out += ":"
-            out += "   "
         out += "|"
         out += " "
         for oi,o in enumerate(self.clusters):
@@ -176,11 +228,14 @@ class ClusteredOperator:
             for tt in self.terms[t]:
                 active = tt.get_active_clusters()
                 if len(active) == 1 and active[0] == cluster_idx:
+
                     term = cp.deepcopy(tt)
                     term.ops = [term.ops[cluster_idx]]
                     term.delta = [term.delta[cluster_idx]]
                     op.add_term(term)
         return op
+
+
 
 if __name__== "__main__":
     term = ClusteredTerm()
