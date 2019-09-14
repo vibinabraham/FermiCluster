@@ -76,6 +76,21 @@ class ClusteredTerm:
         return self.active
     
     def matrix_element(self,fock_bra,bra,fock_ket,ket):
+        """
+        Compute the matrix element between <fock1,config1|H|fock2,config2>
+        where fock is the 'fock-block' of bra. This is just a specification
+        of the particle number space of each cluster. Eg., 
+        ((2,3),(4,3),(2,2)) would have 3 clusters with 2(3), 4(3), 2(2) 
+        alpha(beta) electrons, respectively. 
+
+        :input fock_bra: fock-block for bra
+        :input bra: cluster state configuration within specified fock block
+        :input fock_ket: fock-block for ket 
+        :input ket: cluster state configuration within specified fock block
+        :return: Returns <IJK...|Hterm|LMN...>, where IJK, and LMN
+        are the state indices for clusters 1, 2, and 3, respectively, in the 
+        particle number blocks specified by fock_bra and fock_ket.
+        """
         for ci in range(self.n_clusters):
             if (bra[ci]!=ket[ci]) and (ci not in self.active):
                 return 0
