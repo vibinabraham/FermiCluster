@@ -83,13 +83,15 @@ class ClusteredTerm:
         ((2,3),(4,3),(2,2)) would have 3 clusters with 2(3), 4(3), 2(2) 
         alpha(beta) electrons, respectively. 
 
-        :input fock_bra: fock-block for bra
-        :input bra: cluster state configuration within specified fock block
-        :input fock_ket: fock-block for ket 
-        :input ket: cluster state configuration within specified fock block
-        :return: Returns <IJK...|Hterm|LMN...>, where IJK, and LMN
-        are the state indices for clusters 1, 2, and 3, respectively, in the 
-        particle number blocks specified by fock_bra and fock_ket.
+        Args:
+            fock_bra (tuple(tuple)): fock-block for bra
+            bra (tuple): cluster state configuration within specified fock block
+            fock_ket (tuple(tuple)): fock-block for ket 
+            ket (tuple): cluster state configuration within specified fock block
+        Returns:
+            matrix element. <IJK...|Hterm|LMN...>, where IJK, and LMN
+            are the state indices for clusters 1, 2, and 3, respectively, in the 
+            particle number blocks specified by fock_bra and fock_ket.
         """
         for ci in range(self.n_clusters):
             if (bra[ci]!=ket[ci]) and (ci not in self.active):
@@ -101,7 +103,7 @@ class ClusteredTerm:
         #print(self.ints.shape)
 
         mats = []
-        print(self.ints.shape)
+        #print(self.ints.shape)
         for oi,o in enumerate(self.ops):
             if o == "":
                 continue
