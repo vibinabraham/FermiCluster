@@ -99,7 +99,7 @@ class ClusteredTerm:
         
         # <bra|term|ket>    = <IJK|o1o2o3|K'J'I'>
         #                   = <I|o1|I'><J|o2|J'><K|o3|K'> 
-        print(bra,ket,self)
+        #print(bra,ket,self)
         #print(self.ints.shape)
 
         mats = []
