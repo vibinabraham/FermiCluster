@@ -99,21 +99,25 @@ class ClusteredTerm:
         
         # <bra|term|ket>    = <IJK|o1o2o3|K'J'I'>
         #                   = <I|o1|I'><J|o2|J'><K|o3|K'> 
-        #print(bra,ket,self)
+        print(bra,ket,self)
         #print(self.ints.shape)
 
         mats = []
         #print(self.ints.shape)
         for oi,o in enumerate(self.ops):
-            if o == "":
-                continue
             try:
+                #print(self.clusters[oi].ops[o][(fock_bra[oi],fock_ket[oi])][:,:,0])
+                #print("dens:")
+                #print(self.clusters[oi].ops[o][(fock_bra[oi],fock_ket[oi])][bra[oi],ket[oi],:])
+                #print("ints:")
+                #print(self.ints)
                 d = self.clusters[oi].ops[o][(fock_bra[oi],fock_ket[oi])][bra[oi],ket[oi]] #D(I,J,:,:...)
                 mats.append(d)
             except:
                 pass
             #print(self.clusters[oi].ops[o][tuple([].extend(fock_bra[oi])).extend(fock_ket[oi]))].shape)
-    
+  
+        me = 0.0
         mats_inds = ""
         idx = 0
         for mi,m in enumerate(mats):
@@ -123,14 +127,23 @@ class ClusteredTerm:
             mats_inds += ","
         string = mats_inds + self.ints_inds + "->"
         if len(mats) == 1:
-            return np.einsum(string,mats[0],self.ints)
+            #print('huh: ', huh, self.sign*np.einsum(string,mats[0],self.ints))
+            #return self.sign*np.einsum(string,mats[0],self.ints)
+            me = self.sign*np.einsum(string,mats[0],self.ints)
         elif len(mats) == 2:
-            return np.einsum(string,mats[0],mats[1],self.ints)
+            #print('mats: ', mats)
+            #print('ints: ', self.ints)
+            #print('huh: ', huh, self.sign*np.einsum(string,mats[0],mats[1],self.ints))
+            me = self.sign*np.einsum(string,mats[0],mats[1],self.ints)
+            #return self.sign*np.einsum(string,mats[0],mats[1],self.ints)
         elif len(mats) == 0:
             return 0 
         else:
             print("NYI")
             exit()
+        #print(" huh: %2i"%huh, "<",fock_bra, bra, "|H|", (fock_ket,ket), ">", "%12.8f"%me, self.active)
+        #print(self)
+        return me
 class ClusteredOperator:
     """
     Defines a fermionic operator which can act on multiple clusters
@@ -189,8 +202,8 @@ class ClusteredOperator:
                     term_a.active = [ci.idx,cj.idx]
                     term_b.active = [ci.idx,cj.idx]
                 if cj.idx < ci.idx:
-                    term_a.sign *= -1
-                    term_b.sign *= -1
+                    term_a.sign = -1
+                    term_b.sign = -1
                     term_a.ints = np.transpose(term_a.ints, axes=(0,1))
                     term_b.ints = np.transpose(term_b.ints, axes=(0,1))
 
