@@ -48,7 +48,8 @@ class ClusteredTerm:
         elif len(self.ints.shape) == 4:
             self.ints_inds = 'abcd'
 
-
+        self.contract_string = ""
+        
     def __str__(self):
         #assert(len(self.delta)==2)
         out = ""
@@ -69,6 +70,7 @@ class ClusteredTerm:
                 out += " ____,"
             else:
                 out += " %4s,"%o
+        #out += "    "+self.contract_string
         return out
 
     def get_active_clusters(self):
@@ -141,10 +143,13 @@ class ClusteredTerm:
             mats_inds += ","
         string = mats_inds + self.ints_inds + "->"
         if len(mats) == 1:
-            me = self.sign*np.einsum(string,mats[0],self.ints) * state_sign
+            me = self.sign*np.einsum(self.contract_string,mats[0],self.ints) * state_sign
         elif len(mats) == 2:
-            me = self.sign*np.einsum(string,mats[0],mats[1],self.ints) * state_sign
-            #return self.sign*np.einsum(string,mats[0],mats[1],self.ints)
+            me = self.sign*np.einsum(self.contract_string,mats[0],mats[1],self.ints) * state_sign
+        elif len(mats) == 3:
+            me = self.sign*np.einsum(self.contract_string,mats[0],mats[1],mats[2],self.ints) * state_sign
+        elif len(mats) == 4:
+            me = self.sign*np.einsum(self.contract_string,mats[0],mats[1],mats[2],mats[3],self.ints) * state_sign
         elif len(mats) == 0:
             return 0 
         else:
@@ -227,6 +232,12 @@ class ClusteredOperator:
                     #term_a.ints = np.transpose(term_a.ints, axes=(0,1))
                     #term_b.ints = np.transpose(term_b.ints, axes=(0,1))
 
+                if cj.idx == ci.idx:
+                    term_a.contract_string = "pq,pq->"
+                    term_b.contract_string = "pq,pq->"
+                else:
+                    term_a.contract_string = "p,q,pq->"
+                    term_b.contract_string = "p,q,pq->"
 
                 try:
                     self.terms[delta_a].append(term_a)
@@ -261,7 +272,7 @@ class ClusteredOperator:
         delta_tmp = []
         ops_tmp = []
         for ci in self.clusters:
-            delta_tmp.append([0,0,0,0])
+            delta_tmp.append([0,0])
             ops_tmp.append("")
 
         for ci in self.clusters:
@@ -316,9 +327,26 @@ class ClusteredOperator:
                         ops_bb[cj.idx] += "B"
                         ops_bb[ck.idx] += "b"
                         ops_bb[cl.idx] += "b"
+                        
+                        clusters_idx = [ci.idx,cj.idx,ck.idx,cl.idx]
+                        indices = ['p','q','r','s']
+                        sorted_idx = np.argsort(clusters_idx)
+                        sorted_clusters_idx = [clusters_idx[s] for s in sorted_idx]
+                        #print(sorted_clusters_idx) 
 
                         vijkl = v[ci.orb_list,:,:,:][:,cj.orb_list,:,:][:,:,ck.orb_list,:][:,:,:,cl.orb_list]
+                        vijkl = 1*np.transpose(vijkl,axes=sorted_idx)
                         
+                        contract_string = indices[0]
+                        for si in range(1,4):
+                            if sorted_clusters_idx[si] == sorted_clusters_idx[si-1]:
+                                contract_string += indices[si]
+                            else:
+                                contract_string += ","+indices[si]
+                        contract_string += ",pqrs->"
+                        #print("contract_string",contract_string)
+
+
                         delta_aa = tuple([tuple(i) for i in delta_aa])
                         delta_ab = tuple([tuple(i) for i in delta_ab])
                         delta_ba = tuple([tuple(i) for i in delta_ba])
@@ -342,35 +370,52 @@ class ClusteredOperator:
                
                         
                         nswaps = countswaps.countSwaps([ci.idx,cj.idx,ck.idx,cl.idx],4)
+
                         if nswaps%2==0:
                             sign = 1
                         else: 
                             sign = -1
+                       
                         term_aa.sign = sign
                         term_ab.sign = sign
                         term_ba.sign = sign
                         term_bb.sign = sign
                         
-                        
+                        term_aa.contract_string = contract_string
+                        term_ab.contract_string = contract_string
+                        term_ba.contract_string = contract_string
+                        term_bb.contract_string = contract_string
+                       
+                        #print(term_bb, [ci.idx,cj.idx,ck.idx,cl.idx])
+                       
+                        #todo:
+                        #   create einsum contraction strings here and store for each term
+
                         try:
                             self.terms[delta_aa].append(term_aa)
                         except:
                             self.terms[delta_aa] = [term_aa]
+                        
                         try:
                             self.terms[delta_ab].append(term_ab)
                         except:
                             self.terms[delta_ab] = [term_ab]
+                        
                         try:
                             self.terms[delta_ba].append(term_ba)
                         except:                
                             self.terms[delta_ba] = [term_ba]
+                        
                         try:
                             self.terms[delta_bb].append(term_bb)
                         except:                
                             self.terms[delta_bb] = [term_bb]
+                        
+
 
         print(self.print_terms_header())
         for ti,t in self.terms.items():
+            print(ti)
             for tt in t:
                 print(tt)
                 #print_mat(tt.ints)

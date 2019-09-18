@@ -17,8 +17,8 @@ import pyscf
 ttt = time.time()
 
 n_orb = 4
-U = .1
-beta = 1.
+U = 1.0
+beta = 1.0
 
 h, g = get_hubbard_params(n_orb,beta,U,pbc=False)
 np.random.seed(2)
@@ -79,7 +79,6 @@ print(" Add 1-body terms")
 clustered_ham.add_1b_terms(h)
 clustered_ham.add_2b_terms(g)
 
-exit()
 
 print(" Build cluster basis")
 for ci_idx, ci in enumerate(clusters):
