@@ -143,6 +143,34 @@ if 1:
 ci_vector.print_configs()
 
 
+
+
+
+term_aA = clustered_ham.terms[((-1,0),(1,0))][0]
+term_Aa = clustered_ham.terms[((1,0),(-1,0))][0]
+
+fock_l = ((1,0),(1,0))
+fock_r = ((2,0),(0,0))
+conf_l = (0,0)
+conf_r = (0,0)
+me = term_aA.matrix_element(fock_l, conf_l, fock_r, conf_r)
+print(me)
+print('adjoint')
+
+
+fock_l = ((2,0),(0,0))
+fock_r = ((1,0),(1,0))
+conf_l = (0,0)
+conf_r = (0,0)
+me = term_Aa.matrix_element(fock_l, conf_l, fock_r, conf_r)
+print(me)
+#exit()
+
+
+
+
+
+
 print(" Build full Hamiltonian")
 H = np.zeros((len(ci_vector),len(ci_vector)))
 
@@ -183,7 +211,7 @@ for fock_li, fock_l in enumerate(ci_vector.data):
 
 print_mat(H)
 print()
-print_mat(H-H.T)
+print_mat(H+H.T)
 print(" Diagonalize Hamiltonian Matrix:")
 e,v = np.linalg.eigh(H)
 idx = e.argsort()   
@@ -200,12 +228,12 @@ a1 = clusters[1].ops['a'][((1,0),(2,0))][0,0,:]
 print("h:\n",h12)
 print("a0:\n",a0)
 print("a1:\n",a1)
-print(np.einsum('pq,p,q->',h12,a0,a1))
+print(np.einsum('pq,p,q->',h12,a0,a1) * (-1)**0)
 a0 = clusters[0].ops['a'][((0,0),(1,0))][0,0,:]
 a1 = clusters[1].ops['A'][((2,0),(1,0))][0,0,:]
 print("a0:\n",a0)
 print("a1:\n",a1)
-print(-np.einsum('pq,p,q->',h12,a0,a1))
+print(np.einsum('pq,p,q->',h12,a0,a1) * (-1)**0)
 exit()
 #for c in clusters:
 #        for fspace,mat in c.ops['a'].items():

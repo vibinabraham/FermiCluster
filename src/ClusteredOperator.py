@@ -99,24 +99,34 @@ class ClusteredTerm:
         
         # <bra|term|ket>    = <IJK|o1o2o3|K'J'I'>
         #                   = <I|o1|I'><J|o2|J'><K|o3|K'> 
-        print(bra,ket,self)
+        #print(bra,ket,self)
         #print(self.ints.shape)
-
+    
         mats = []
+        state_sign = 1
         #print(self.ints.shape)
         for oi,o in enumerate(self.ops):
+            #print(self.clusters[oi].ops[o][(fock_bra[oi],fock_ket[oi])][:,:,0])
+            #print("dens:")
+            #print(self.clusters[oi].ops[o][(fock_bra[oi],fock_ket[oi])][bra[oi],ket[oi],:])
+            #print("ints:")
+            #print(self.ints)
+            if o == '':
+                continue
+            if len(o) == 1 or len(o) == 3:
+                for cj in range(self.n_clusters,oi):
+                    state_sign *= (-1)**(fock_ket[cj][0]+fock_ket[cj][1])
+            print(o) 
+            print(self.clusters[oi].ops[o].keys())
             try:
-                #print(self.clusters[oi].ops[o][(fock_bra[oi],fock_ket[oi])][:,:,0])
-                #print("dens:")
-                #print(self.clusters[oi].ops[o][(fock_bra[oi],fock_ket[oi])][bra[oi],ket[oi],:])
-                #print("ints:")
-                #print(self.ints)
                 d = self.clusters[oi].ops[o][(fock_bra[oi],fock_ket[oi])][bra[oi],ket[oi]] #D(I,J,:,:...)
-                mats.append(d)
             except:
-                pass
+                return 0
+            mats.append(d)
             #print(self.clusters[oi].ops[o][tuple([].extend(fock_bra[oi])).extend(fock_ket[oi]))].shape)
-  
+
+        print("ints:")
+        print(self.ints)
         me = 0.0
         mats_inds = ""
         idx = 0
@@ -129,12 +139,12 @@ class ClusteredTerm:
         if len(mats) == 1:
             #print('huh: ', huh, self.sign*np.einsum(string,mats[0],self.ints))
             #return self.sign*np.einsum(string,mats[0],self.ints)
-            me = self.sign*np.einsum(string,mats[0],self.ints)
+            me = self.sign*np.einsum(string,mats[0],self.ints) * state_sign
         elif len(mats) == 2:
             #print('mats: ', mats)
             #print('ints: ', self.ints)
             #print('huh: ', huh, self.sign*np.einsum(string,mats[0],mats[1],self.ints))
-            me = self.sign*np.einsum(string,mats[0],mats[1],self.ints)
+            me = self.sign*np.einsum(string,mats[0],mats[1],self.ints) * state_sign
             #return self.sign*np.einsum(string,mats[0],mats[1],self.ints)
         elif len(mats) == 0:
             return 0 
@@ -150,7 +160,9 @@ class ClusteredOperator:
 
     data:
     self.terms = dict of operators: transition list -> operator list -> integral tensor
-                self.ints[[(delNa, delNb, I==J), (delNa, delNb, I==J), ...]["","","Aab","",B,...] = ndarray(p,q,r,s)
+                self.ints[[(delNa, delNb), (delNa, delNb), ...]["","","Aab","",B,...] = ndarray(p,q,r,s)
+
+                delNa = bra(Na) - ket(Na)
                 with p,q,r on cluster 2, and s on cluster 4
                 ^this needs cleaned up
     """
@@ -204,8 +216,10 @@ class ClusteredOperator:
                 if cj.idx < ci.idx:
                     term_a.sign = -1
                     term_b.sign = -1
-                    term_a.ints = np.transpose(term_a.ints, axes=(0,1))
-                    term_b.ints = np.transpose(term_b.ints, axes=(0,1))
+                    term_a.ints = 1.0*np.transpose(term_a.ints, axes=(1,0))
+                    term_b.ints = 1.0*np.transpose(term_b.ints, axes=(1,0))
+                    #term_a.ints = np.transpose(term_a.ints, axes=(0,1))
+                    #term_b.ints = np.transpose(term_b.ints, axes=(0,1))
 
 
                 try:
