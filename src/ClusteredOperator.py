@@ -218,8 +218,8 @@ class ClusteredOperator:
                     term_a.active = [ci.idx,cj.idx]
                     term_b.active = [ci.idx,cj.idx]
                 if cj.idx < ci.idx:
-                    term_a.sign = -1
-                    term_b.sign = -1
+                    #term_a.sign = -1
+                    #term_b.sign = -1
                     term_a.ints = 1.0*np.transpose(term_a.ints, axes=(1,0))
                     term_b.ints = 1.0*np.transpose(term_b.ints, axes=(1,0))
                     #term_a.ints = np.transpose(term_a.ints, axes=(0,1))

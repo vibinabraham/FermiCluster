@@ -89,7 +89,7 @@ ci_vector = ClusteredState(clusters)
 #ci_vector.init(((2,2),(2,2),(0,0)))
 #ci_vector.init(((2,2),(2,2),(0,0),(0,0)))
 #ci_vector.init(((3,3),(0,0)))
-ci_vector.init(((1,0),(1,0)))
+ci_vector.init(((1,1),(1,1)))
 #ci_vector.init(((1,1),(1,1),(1,1)))
 
 # add single particle transfers
@@ -116,7 +116,7 @@ for ref_fblock in fblocks:
                         continue
                     new_fblock = tuple([(b[0],b[1]) for b in new_fblock])
                     ci_vector[new_fblock] = OrderedDict()
-                if 0:
+                if 1:
                     # spin_flip 
                     new_fblock = [[b[0],b[1]] for b in ref_fblock]
                     new_fblock[ci.idx][0] -= 1
@@ -128,6 +128,17 @@ for ref_fblock in fblocks:
                     new_fblock = tuple([(b[0],b[1]) for b in new_fblock])
                     #ci_vector[new_fblock] = OrderedDict()
                     ci_vector.add_fockblock(new_fblock)
+                if 1:
+                    # alpha/beta transfer
+                    new_fblock = [[b[0],b[1]] for b in ref_fblock]
+                    new_fblock[ci.idx][0] += 1
+                    new_fblock[ci.idx][1] += 1
+                    new_fblock[cj.idx][0] -= 1
+                    new_fblock[cj.idx][1] -= 1
+                    if new_fblock[ci.idx][0] < 0 or  new_fblock[cj.idx][0] < 0:
+                        continue
+                    new_fblock = tuple([(b[0],b[1]) for b in new_fblock])
+                    ci_vector[new_fblock] = OrderedDict()
            
 ci_vector.print()
 print("\n Make each Fock-Block the full space")
