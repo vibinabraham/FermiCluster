@@ -64,7 +64,7 @@ class Cluster(object):
         else:
             self.ops[op] = {}
     
-    def form_eigbasis_from_local_operator(self,local_op):
+    def form_eigbasis_from_local_operator(self,local_op,max_roots=1000):
         h = np.zeros([self.n_orb]*2)
         v = np.zeros([self.n_orb]*4)
         for t in local_op.terms:
@@ -82,15 +82,14 @@ class Cluster(object):
         print(" Do CI for each particle number block")
         for na in range(self.n_orb+1):
             for nb in range(self.n_orb+1):
-                n_roots = 100 
                 ci = ci_solver()
                 ci.algorithm = "direct"
-                ci.init(H,na,nb,n_roots)
+                ci.init(H,na,nb,max_roots)
                 print(ci)
                 ci.run()
                 #self.basis[(na,nb)] = np.eye(ci.results_v.shape[0])
                 self.basis[(na,nb)] = ci.results_v
-         
+    
     def build_op_matrices(self):
         """
         build all operators needed
@@ -116,18 +115,12 @@ class Cluster(object):
                 #   basis transformation costs, but simplifies later manipulations. Later I need to 
                 #   remove the redundant storage by manually handling the transpositions from a to A
 
-        #  Aa 
-        for na in range(1,self.n_orb+1):
-            for nb in range(0,self.n_orb+1):
-                A = self.ops['A'][(na,nb),(na-1,nb)]  # B[ I(N,N'),J(N,N-1'), p]
-                a = self.ops['a'][(na-1,nb),(na,nb)]  # b[ K(N-1,N'),L(N,N'), q]
-                self.ops['Aa'][(na,nb),(na,nb)] = np.einsum('ijp,jlq->ilpq',A,a)
-        #  Bb 
+        #  Aa,Bb
         for na in range(0,self.n_orb+1):
-            for nb in range(1,self.n_orb+1):
-                B = self.ops['B'][(na,nb),(na,nb-1)]  # B[ I(N,N'),J(N,N'-1), p]
-                b = self.ops['b'][(na,nb-1),(na,nb)]  # b[ K(N,N'-1),L(N,N'), q]
-                self.ops['Bb'][(na,nb),(na,nb)] = np.einsum('ijp,jlq->ilpq',B,b)
+            for nb in range(0,self.n_orb+1):
+                self.ops['Aa'][(na,nb),(na,nb)] = build_ca(self.n_orb, (na,nb),(na,nb),self.basis,'alpha')
+                self.ops['Bb'][(na,nb),(na,nb)] = build_ca(self.n_orb, (na,nb),(na,nb),self.basis,'beta')
+               
 
         #Add remaining operators ....
 

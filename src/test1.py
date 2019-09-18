@@ -4,6 +4,7 @@ import itertools
 import time
 from math import factorial
 import copy as cp
+import sys
 
 from hubbard_fn import *
 from ci_fn import *
@@ -15,17 +16,17 @@ from ClusteredState import *
 import pyscf
 ttt = time.time()
 
-n_orb = 4
+n_orb = 8
 U = 0.
 beta = 1.
 
 h, g = get_hubbard_params(n_orb,beta,U,pbc=False)
 np.random.seed(2)
-tmp = np.random.rand(h.shape[0],h.shape[1])*0.1
+tmp = np.random.rand(h.shape[0],h.shape[1])*0.01
 h += tmp + tmp.T
 #h += .11
-#h[1,2] = 0
-#h[2,1] = 0
+#h[3,4] = 0
+#h[4,3] = 0
 
 if 0:
     Escf,orb,h,g,C = run_hubbard_scf(h,g,n_orb//2)
@@ -50,7 +51,8 @@ if do_fci:
     print(" FCI:        %12.8f"%e)
     #exit()
 
-blocks = [[0,1],[2,3]]
+#blocks = [[0,1],[2,3]]
+blocks = [[0,1,2,3],[4,5,6,7]]
 #blocks = [[0,1,2],[3,4,5]]
 #blocks = [[0,1],[2,3],[4,5]]
 #blocks = [[0,1,2,3],[4,5,6,7]]
@@ -58,6 +60,14 @@ blocks = [[0,1],[2,3]]
 n_blocks = len(blocks)
 clusters = []
 
+# check blocks
+seen = [0]*n_orb
+for b in blocks:
+    for bi in b:
+        seen[bi] += 1
+for b in seen:
+    assert(b==1) 
+        
 for ci,c in enumerate(blocks):
     clusters.append(Cluster(ci,c))
 
@@ -77,7 +87,7 @@ for ci_idx, ci in enumerate(clusters):
     print()
     print()
     print(" Form basis by diagonalize local Hamiltonian for cluster: ",ci_idx)
-    ci.form_eigbasis_from_local_operator(opi)
+    ci.form_eigbasis_from_local_operator(opi,max_roots=10)
 
 clustered_ham.add_ops_to_clusters()
 print(" Build these local operators")
@@ -85,11 +95,19 @@ for c in clusters:
     print(" Build mats for cluster ",c.idx)
     c.build_op_matrices()
 
+#print("a")
+#print(clusters[0].ops['a'][((1,2),(2,2))][0,0,:] )
+#print("A")
+#print(clusters[0].ops['A'][((2,2),(1,2))][0,0,:] )
+#print(np.trace(clusters[0].ops['Aa'][((2,2),(2,2))][0,0,:] ))
+#exit()
+
+
 ci_vector = ClusteredState(clusters)
 #ci_vector.init(((2,2),(2,2),(0,0)))
 #ci_vector.init(((2,2),(2,2),(0,0),(0,0)))
 #ci_vector.init(((3,3),(0,0)))
-ci_vector.init(((1,1),(1,1)))
+ci_vector.init(((2,2),(2,2)))
 #ci_vector.init(((1,1),(1,1),(1,1)))
 
 # add single particle transfers
@@ -151,7 +169,7 @@ if 1:
             dims.append(range(c.basis[fblock[c.idx]].shape[1]))
         for newconfig_idx, newconfig in enumerate(itertools.product(*dims)):
             ci_vector[fblock][newconfig] = 0 
-ci_vector.print_configs()
+ci_vector.print()
 
 
 
@@ -160,23 +178,22 @@ ci_vector.print_configs()
 #term_aA = clustered_ham.terms[((-1,0),(1,0))][0]
 #term_Aa = clustered_ham.terms[((1,0),(-1,0))][0]
 #
-#fock_l = ((0,0),(2,0))
-#fock_r = ((0,0),(2,0))
+#fock_l = ((2,1),(0,1))
+#fock_r = ((1,1),(1,1))
 #conf_l = (0,0)
 #conf_r = (0,0)
 ##me = term_aA.matrix_element(fock_l, conf_l, fock_r, conf_r)
-#me = clustered_ham.terms[((0,0),(0,0))][2].matrix_element(fock_l, conf_l, fock_r, conf_r)
+#me = clustered_ham.terms[((1,0),(-1,0))][0].matrix_element(fock_l, conf_l, fock_r, conf_r)
 #print(me)
-#print('adjoint')
 #
 #
-fock_l = ((2,0),(0,0))
-fock_r = ((1,0),(1,0))
-conf_l = (0,0)
-conf_r = (0,0)
-#me = term_Aa.matrix_element(fock_l, conf_l, fock_r, conf_r)
-me = clustered_ham.terms[((0,0),(0,0))][0].matrix_element(fock_l, conf_l, fock_r, conf_r)
-print(me)
+#fock_l = ((2,2),(2,2))
+#fock_r = ((2,2),(2,2))
+#conf_l = (0,0)
+#conf_r = (0,0)
+##me = term_Aa.matrix_element(fock_l, conf_l, fock_r, conf_r)
+#me = clustered_ham.terms[((0,0),(0,0))][0].matrix_element(fock_l, conf_l, fock_r, conf_r)
+#print(me)
 #exit()
 
 
@@ -185,6 +202,9 @@ print(me)
 
 
 print(" Build full Hamiltonian")
+print(" Total dimension of CI space", len(ci_vector))
+sys.stdout.flush()
+
 H = np.zeros((len(ci_vector),len(ci_vector)))
 
 #[print(c.ops.keys()) for c in clusters]
@@ -205,7 +225,7 @@ for fock_li, fock_l in enumerate(ci_vector.data):
             except KeyError:
                 shift_r += len(configs_r) 
                 continue 
-            print(" Get terms for fock block: ", fock_l,"|",fock_r)
+            #print(" Get terms for fock block: ", fock_l,"|",fock_r)
             #[print(t) for t in terms]
             
             for config_ri, config_r in enumerate(configs_r):        
@@ -218,14 +238,14 @@ for fock_li, fock_l in enumerate(ci_vector.data):
                 for term in terms:
                     me = term.matrix_element(fock_l,config_l,fock_r,config_r)
                     H[idx_l,idx_r] += me
-                    print(" %4i %4i = %12.8f"%(idx_l,idx_r,me),"  :  ",config_l,config_r, " :: ", term)
+                    #print(" %4i %4i = %12.8f"%(idx_l,idx_r,me),"  :  ",config_l,config_r, " :: ", term)
             shift_r += len(configs_r) 
     shift_l += len(configs_l)
    
 
-print_mat(H)
-print()
-print_mat(H-H.T)
+#print_mat(H)
+#print()
+#print_mat(H-H.T)
 print(" Diagonalize Hamiltonian Matrix:")
 e,v = np.linalg.eigh(H)
 idx = e.argsort()   

@@ -114,10 +114,9 @@ class ClusteredTerm:
             if o == '':
                 continue
             if len(o) == 1 or len(o) == 3:
-                print(o)
-                for cj in range(self.n_clusters,oi):
+                for cj in range(oi):
                     state_sign *= (-1)**(fock_ket[cj][0]+fock_ket[cj][1])
-                    print(state_sign)
+                    #print(state_sign)
                 #exit()
             #print(o) 
             #print(self.clusters[oi].ops[o].keys())
@@ -139,15 +138,9 @@ class ClusteredTerm:
                 idx += 1
             mats_inds += ","
         string = mats_inds + self.ints_inds + "->"
-        print("state_sign:", state_sign)
         if len(mats) == 1:
-            #print('huh: ', huh, self.sign*np.einsum(string,mats[0],self.ints))
-            #return self.sign*np.einsum(string,mats[0],self.ints)
             me = self.sign*np.einsum(string,mats[0],self.ints) * state_sign
         elif len(mats) == 2:
-            #print('mats: ', mats)
-            #print('ints: ', self.ints)
-            #print('huh: ', huh, self.sign*np.einsum(string,mats[0],mats[1],self.ints))
             me = self.sign*np.einsum(string,mats[0],mats[1],self.ints) * state_sign
             #return self.sign*np.einsum(string,mats[0],mats[1],self.ints)
         elif len(mats) == 0:
@@ -218,8 +211,8 @@ class ClusteredOperator:
                     term_a.active = [ci.idx,cj.idx]
                     term_b.active = [ci.idx,cj.idx]
                 if cj.idx < ci.idx:
-                    #term_a.sign = -1
-                    #term_b.sign = -1
+                    term_a.sign = -1
+                    term_b.sign = -1
                     term_a.ints = 1.0*np.transpose(term_a.ints, axes=(1,0))
                     term_b.ints = 1.0*np.transpose(term_b.ints, axes=(1,0))
                     #term_a.ints = np.transpose(term_a.ints, axes=(0,1))
