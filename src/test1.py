@@ -16,7 +16,7 @@ from ClusteredState import *
 import pyscf
 ttt = time.time()
 
-n_orb = 8
+n_orb = 6
 U = 0.
 beta = 1.
 
@@ -52,9 +52,9 @@ if do_fci:
     #exit()
 
 #blocks = [[0,1],[2,3]]
-blocks = [[0,1,2,3],[4,5,6,7]]
+#blocks = [[0,1,2,3],[4,5,6,7]]
 #blocks = [[0,1,2],[3,4,5]]
-#blocks = [[0,1],[2,3],[4,5]]
+blocks = [[0,1],[2,3],[4,5]]
 #blocks = [[0,1,2,3],[4,5,6,7]]
 #blocks = [[0,1],[2,3,4,5],[6],[7]]
 n_blocks = len(blocks)
@@ -87,7 +87,7 @@ for ci_idx, ci in enumerate(clusters):
     print()
     print()
     print(" Form basis by diagonalize local Hamiltonian for cluster: ",ci_idx)
-    ci.form_eigbasis_from_local_operator(opi,max_roots=10)
+    ci.form_eigbasis_from_local_operator(opi,max_roots=20)
 
 clustered_ham.add_ops_to_clusters()
 print(" Build these local operators")
@@ -107,8 +107,8 @@ ci_vector = ClusteredState(clusters)
 #ci_vector.init(((2,2),(2,2),(0,0)))
 #ci_vector.init(((2,2),(2,2),(0,0),(0,0)))
 #ci_vector.init(((3,3),(0,0)))
-ci_vector.init(((2,2),(2,2)))
-#ci_vector.init(((1,1),(1,1),(1,1)))
+#ci_vector.init(((2,2),(2,2)))
+ci_vector.init(((1,1),(1,1),(1,1)))
 
 # add single particle transfers
 print(" Add fock-blocks for single particle transfers and spin-flips")
@@ -157,6 +157,58 @@ for ref_fblock in fblocks:
                         continue
                     new_fblock = tuple([(b[0],b[1]) for b in new_fblock])
                     ci_vector[new_fblock] = OrderedDict()
+                if 1:
+                    # 3body alpha-beta
+                    for ck in clusters:
+                        if ck.idx != cj.idx:
+                            
+                            # alpha/beta transfer ci-(a)->cj-(b)->ck
+                            
+                            new_fblock = [[b[0],b[1]] for b in ref_fblock]
+                            new_fblock[ci.idx][0] -= 1
+                            new_fblock[cj.idx][0] += 1
+                            new_fblock[cj.idx][1] -= 1
+                            new_fblock[ck.idx][1] += 1
+                            if new_fblock[ci.idx][0] < 0 or  new_fblock[cj.idx][0] < 0  or  new_fblock[ck.idx][0] < 0:
+                                continue
+                            new_fblock = tuple([(b[0],b[1]) for b in new_fblock])
+                            ci_vector[new_fblock] = OrderedDict()
+                            
+                            
+                            new_fblock = [[b[0],b[1]] for b in ref_fblock]
+                            new_fblock[ci.idx][0] -= 1
+                            new_fblock[cj.idx][0] += 1
+                            new_fblock[cj.idx][1] += 1
+                            new_fblock[ck.idx][1] -= 1
+                            if new_fblock[ci.idx][0] < 0 or  new_fblock[cj.idx][0] < 0  or  new_fblock[ck.idx][0] < 0:
+                                continue
+                            new_fblock = tuple([(b[0],b[1]) for b in new_fblock])
+                            ci_vector[new_fblock] = OrderedDict()
+
+
+                            new_fblock = [[b[0],b[1]] for b in ref_fblock]
+                            new_fblock[ci.idx][0] -= 1
+                            new_fblock[ci.idx][1] += 1
+                            new_fblock[cj.idx][0] += 1
+                            new_fblock[ck.idx][1] -= 1
+                            if new_fblock[ci.idx][0] < 0 or  new_fblock[cj.idx][0] < 0  or  new_fblock[ck.idx][0] < 0:
+                                continue
+                            new_fblock = tuple([(b[0],b[1]) for b in new_fblock])
+                            ci_vector[new_fblock] = OrderedDict()
+
+
+                            new_fblock = [[b[0],b[1]] for b in ref_fblock]
+                            new_fblock[ci.idx][0] -= 1
+                            new_fblock[ci.idx][1] -= 1
+                            new_fblock[cj.idx][0] += 1
+                            new_fblock[ck.idx][1] += 1
+                            if new_fblock[ci.idx][0] < 0 or  new_fblock[cj.idx][0] < 0  or  new_fblock[ck.idx][0] < 0:
+                                continue
+                            new_fblock = tuple([(b[0],b[1]) for b in new_fblock])
+                            ci_vector[new_fblock] = OrderedDict()
+
+
+
            
 ci_vector.print()
 print("\n Make each Fock-Block the full space")
