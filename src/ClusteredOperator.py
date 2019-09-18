@@ -5,6 +5,8 @@ import copy as cp
 from collections import OrderedDict
 from helpers import *
 
+import countswaps
+
 class LocalOperator:
     def __init__(self, cluster):
         self.cluster = cluster
@@ -172,6 +174,13 @@ class ClusteredOperator:
             self.n_orb += c.n_orb
 
     def add_1b_terms(self,h):
+        """
+        Add terms of the form h_{pq}\hat{a}^\dagger_p\hat{a}_q
+
+        input:
+        h is a square matrix NxN, where N is the number of spatial orbitals
+        """
+# {{{
         assert(len(h.shape)==2)
         assert(h.shape[0]==self.n_orb)
         assert(h.shape[1]==self.n_orb)
@@ -233,6 +242,139 @@ class ClusteredOperator:
             for tt in t:
                 print(tt)
                 #print_mat(tt.ints)
+# }}}
+
+    def add_2b_terms(self,v):
+        """
+        Add terms of the form v_{pqrs}\hat{a}^\dagger_p\hat{a}^\dagger_q\hat{a}_s\hat{a}_r
+
+        input:
+        v is a square matrix NxNxNxN, where N is the number of spatial orbitals
+        """
+# {{{
+        assert(len(v.shape)==4)
+        assert(v.shape[0]==self.n_orb)
+        assert(v.shape[1]==self.n_orb)
+        assert(v.shape[2]==self.n_orb)
+        assert(v.shape[3]==self.n_orb)
+
+        delta_tmp = []
+        ops_tmp = []
+        for ci in self.clusters:
+            delta_tmp.append([0,0,0,0])
+            ops_tmp.append("")
+
+        for ci in self.clusters:
+            for cj in self.clusters:
+                for ck in self.clusters:
+                    for cl in self.clusters:
+                        delta_aa = list(cp.deepcopy(delta_tmp)) 
+                        delta_bb = list(cp.deepcopy(delta_tmp)) 
+                        delta_ab = list(cp.deepcopy(delta_tmp)) 
+                        delta_ba = list(cp.deepcopy(delta_tmp)) 
+                        ops_aa = cp.deepcopy(ops_tmp) #alpha hopping
+                        ops_ab = cp.deepcopy(ops_tmp) #beta hopping
+                        ops_ba = cp.deepcopy(ops_tmp) #alpha hopping
+                        ops_bb = cp.deepcopy(ops_tmp) #beta hopping
+                        
+                        delta_aa[ci.idx][0] += 1  #not diagonal
+                        delta_aa[cj.idx][0] += 1  #not diagonal
+                        delta_aa[ck.idx][0] -= 1  #not diagonal
+                        delta_aa[cl.idx][0] -= 1  #not diagonal
+
+                        delta_ab[ci.idx][0] += 1  #not diagonal
+                        delta_ab[cj.idx][1] += 1  #not diagonal
+                        delta_ab[ck.idx][1] -= 1  #not diagonal
+                        delta_ab[cl.idx][0] -= 1  #not diagonal
+
+                        delta_ba[ci.idx][1] += 1  #not diagonal
+                        delta_ba[cj.idx][0] += 1  #not diagonal
+                        delta_ba[ck.idx][0] -= 1  #not diagonal
+                        delta_ba[cl.idx][1] -= 1  #not diagonal
+
+                        delta_bb[ci.idx][1] += 1  #not diagonal
+                        delta_bb[cj.idx][1] += 1  #not diagonal
+                        delta_bb[ck.idx][1] -= 1  #not diagonal
+                        delta_bb[cl.idx][1] -= 1  #not diagonal
+
+                        ops_aa[ci.idx] += "A"
+                        ops_aa[cj.idx] += "A"
+                        ops_aa[ck.idx] += "a"
+                        ops_aa[cl.idx] += "a"
+                        
+                        ops_ab[ci.idx] += "A"
+                        ops_ab[cj.idx] += "B"
+                        ops_ab[ck.idx] += "b"
+                        ops_ab[cl.idx] += "a"
+                        
+                        ops_ba[ci.idx] += "B"
+                        ops_ba[cj.idx] += "A"
+                        ops_ba[ck.idx] += "a"
+                        ops_ba[cl.idx] += "b"
+                        
+                        ops_bb[ci.idx] += "B"
+                        ops_bb[cj.idx] += "B"
+                        ops_bb[ck.idx] += "b"
+                        ops_bb[cl.idx] += "b"
+
+                        vijkl = v[ci.orb_list,:,:,:][:,cj.orb_list,:,:][:,:,ck.orb_list,:][:,:,:,cl.orb_list]
+                        
+                        delta_aa = tuple([tuple(i) for i in delta_aa])
+                        delta_ab = tuple([tuple(i) for i in delta_ab])
+                        delta_ba = tuple([tuple(i) for i in delta_ba])
+                        delta_bb = tuple([tuple(i) for i in delta_bb])
+                        
+                        term_aa = ClusteredTerm(delta_aa, ops_aa, vijkl, self.clusters)
+                        term_ab = ClusteredTerm(delta_ab, ops_ab, vijkl, self.clusters)
+                        term_ba = ClusteredTerm(delta_ba, ops_ba, vijkl, self.clusters)
+                        term_bb = ClusteredTerm(delta_bb, ops_bb, vijkl, self.clusters)
+                       
+                        term_aa.active = list(set([ci.idx,cj.idx,ck.idx,cl.idx]))
+                        term_ab.active = list(set([ci.idx,cj.idx,ck.idx,cl.idx]))
+                        term_ba.active = list(set([ci.idx,cj.idx,ck.idx,cl.idx]))
+                        term_bb.active = list(set([ci.idx,cj.idx,ck.idx,cl.idx]))
+                        
+#                        if cj.idx < ci.idx:
+#                            term_a.sign = -1
+#                            term_b.sign = -1
+#                            term_a.ints = 1.0*np.transpose(term_a.ints, axes=(1,0))
+#                            term_b.ints = 1.0*np.transpose(term_b.ints, axes=(1,0))
+               
+                        
+                        nswaps = countswaps.countSwaps([ci.idx,cj.idx,ck.idx,cl.idx],4)
+                        if nswaps%2==0:
+                            sign = 1
+                        else: 
+                            sign = -1
+                        term_aa.sign = sign
+                        term_ab.sign = sign
+                        term_ba.sign = sign
+                        term_bb.sign = sign
+                        
+                        
+                        try:
+                            self.terms[delta_aa].append(term_aa)
+                        except:
+                            self.terms[delta_aa] = [term_aa]
+                        try:
+                            self.terms[delta_ab].append(term_ab)
+                        except:
+                            self.terms[delta_ab] = [term_ab]
+                        try:
+                            self.terms[delta_ba].append(term_ba)
+                        except:                
+                            self.terms[delta_ba] = [term_ba]
+                        try:
+                            self.terms[delta_bb].append(term_bb)
+                        except:                
+                            self.terms[delta_bb] = [term_bb]
+
+        print(self.print_terms_header())
+        for ti,t in self.terms.items():
+            for tt in t:
+                print(tt)
+                #print_mat(tt.ints)
+# }}}
 
     def print_terms_header(self):
         """

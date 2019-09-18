@@ -16,8 +16,8 @@ from ClusteredState import *
 import pyscf
 ttt = time.time()
 
-n_orb = 6
-U = 0.
+n_orb = 4
+U = .1
 beta = 1.
 
 h, g = get_hubbard_params(n_orb,beta,U,pbc=False)
@@ -51,10 +51,10 @@ if do_fci:
     print(" FCI:        %12.8f"%e)
     #exit()
 
-#blocks = [[0,1],[2,3]]
+blocks = [[0,1],[2,3]]
 #blocks = [[0,1,2,3],[4,5,6,7]]
 #blocks = [[0,1,2],[3,4,5]]
-blocks = [[0,1],[2,3],[4,5]]
+#blocks = [[0,1],[2,3],[4,5]]
 #blocks = [[0,1,2,3],[4,5,6,7]]
 #blocks = [[0,1],[2,3,4,5],[6],[7]]
 n_blocks = len(blocks)
@@ -77,7 +77,9 @@ print(" Clusters:")
 clustered_ham = ClusteredOperator(clusters)
 print(" Add 1-body terms")
 clustered_ham.add_1b_terms(h)
+clustered_ham.add_2b_terms(g)
 
+exit()
 
 print(" Build cluster basis")
 for ci_idx, ci in enumerate(clusters):
@@ -108,7 +110,7 @@ ci_vector = ClusteredState(clusters)
 #ci_vector.init(((2,2),(2,2),(0,0),(0,0)))
 #ci_vector.init(((3,3),(0,0)))
 #ci_vector.init(((2,2),(2,2)))
-ci_vector.init(((1,1),(1,1),(1,1)))
+ci_vector.init(((1,1),(1,1)))
 
 # add single particle transfers
 print(" Add fock-blocks for single particle transfers and spin-flips")
