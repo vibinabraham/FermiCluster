@@ -146,23 +146,25 @@ ci_vector.print_configs()
 
 
 
-term_aA = clustered_ham.terms[((-1,0),(1,0))][0]
-term_Aa = clustered_ham.terms[((1,0),(-1,0))][0]
-
-fock_l = ((1,0),(1,0))
-fock_r = ((2,0),(0,0))
-conf_l = (0,0)
-conf_r = (0,0)
-me = term_aA.matrix_element(fock_l, conf_l, fock_r, conf_r)
-print(me)
-print('adjoint')
-
-
+#term_aA = clustered_ham.terms[((-1,0),(1,0))][0]
+#term_Aa = clustered_ham.terms[((1,0),(-1,0))][0]
+#
+#fock_l = ((0,0),(2,0))
+#fock_r = ((0,0),(2,0))
+#conf_l = (0,0)
+#conf_r = (0,0)
+##me = term_aA.matrix_element(fock_l, conf_l, fock_r, conf_r)
+#me = clustered_ham.terms[((0,0),(0,0))][2].matrix_element(fock_l, conf_l, fock_r, conf_r)
+#print(me)
+#print('adjoint')
+#
+#
 fock_l = ((2,0),(0,0))
 fock_r = ((1,0),(1,0))
 conf_l = (0,0)
 conf_r = (0,0)
-me = term_Aa.matrix_element(fock_l, conf_l, fock_r, conf_r)
+#me = term_Aa.matrix_element(fock_l, conf_l, fock_r, conf_r)
+me = clustered_ham.terms[((0,0),(0,0))][0].matrix_element(fock_l, conf_l, fock_r, conf_r)
 print(me)
 #exit()
 
@@ -190,6 +192,7 @@ for fock_li, fock_l in enumerate(ci_vector.data):
             try:
                 terms = clustered_ham.terms[delta_fock]
             except KeyError:
+                shift_r += len(configs_r) 
                 continue 
             print(" Get terms for fock block: ", fock_l,"|",fock_r)
             #[print(t) for t in terms]
@@ -211,7 +214,7 @@ for fock_li, fock_l in enumerate(ci_vector.data):
 
 print_mat(H)
 print()
-print_mat(H+H.T)
+print_mat(H-H.T)
 print(" Diagonalize Hamiltonian Matrix:")
 e,v = np.linalg.eigh(H)
 idx = e.argsort()   
@@ -221,25 +224,3 @@ v0 = v[:,0]
 print(" Ground state of CI:                 %12.8f  CI Dim: %4i "%(e[0].real,len(ci_vector)))
 
 
-print(1)
-h12 = h[0:2,:][:,2:4]
-a0 = clusters[0].ops['A'][((1,0),(0,0))][0,0,:]
-a1 = clusters[1].ops['a'][((1,0),(2,0))][0,0,:]
-print("h:\n",h12)
-print("a0:\n",a0)
-print("a1:\n",a1)
-print(np.einsum('pq,p,q->',h12,a0,a1) * (-1)**0)
-a0 = clusters[0].ops['a'][((0,0),(1,0))][0,0,:]
-a1 = clusters[1].ops['A'][((2,0),(1,0))][0,0,:]
-print("a0:\n",a0)
-print("a1:\n",a1)
-print(np.einsum('pq,p,q->',h12,a0,a1) * (-1)**0)
-exit()
-#for c in clusters:
-#        for fspace,mat in c.ops['a'].items():
-#            a = c.ops['a'][(fspace[0],fspace[1])]
-#            A = c.ops['A'][(fspace[1],fspace[0])]
-#            for i1 in range(a.shape[0]):
-#                for i2 in range(a.shape[1]):
-#                    for i3 in range(a.shape[2]):
-#                        print(a[i1,i2,i3] - A[i2,i1,i3])

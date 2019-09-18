@@ -114,10 +114,13 @@ class ClusteredTerm:
             if o == '':
                 continue
             if len(o) == 1 or len(o) == 3:
+                print(o)
                 for cj in range(self.n_clusters,oi):
                     state_sign *= (-1)**(fock_ket[cj][0]+fock_ket[cj][1])
-            print(o) 
-            print(self.clusters[oi].ops[o].keys())
+                    print(state_sign)
+                #exit()
+            #print(o) 
+            #print(self.clusters[oi].ops[o].keys())
             try:
                 d = self.clusters[oi].ops[o][(fock_bra[oi],fock_ket[oi])][bra[oi],ket[oi]] #D(I,J,:,:...)
             except:
@@ -125,8 +128,8 @@ class ClusteredTerm:
             mats.append(d)
             #print(self.clusters[oi].ops[o][tuple([].extend(fock_bra[oi])).extend(fock_ket[oi]))].shape)
 
-        print("ints:")
-        print(self.ints)
+        #print("ints:")
+        #print(self.ints)
         me = 0.0
         mats_inds = ""
         idx = 0
@@ -136,6 +139,7 @@ class ClusteredTerm:
                 idx += 1
             mats_inds += ","
         string = mats_inds + self.ints_inds + "->"
+        print("state_sign:", state_sign)
         if len(mats) == 1:
             #print('huh: ', huh, self.sign*np.einsum(string,mats[0],self.ints))
             #return self.sign*np.einsum(string,mats[0],self.ints)
