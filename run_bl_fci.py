@@ -10,11 +10,11 @@ from ci_fn import *
 
 from Cluster import *
 
-np.set_printoptions(suppress=True, precision=6, linewidth=1500)
+np.set_printoptions(suppress=True, precision=3, linewidth=1500)
 
 ttt = time.time()
 
-n_orb = 4
+n_orb = 8
 U = 1
 beta = 1.
 n_a = n_orb//2
@@ -353,7 +353,7 @@ if 1:
     print("-----------------------------------------------------------")
     print("                 Cluster FCI")
     print("-----------------------------------------------------------")
-    nel = 2
+    nel = 3
     HH = run_fci(n_orb,nel,0,h,g)
     efci,evec = np.linalg.eigh(HH)
     print("THE FCI Matrix:")
@@ -364,15 +364,24 @@ if 1:
     print("dim",dim_fci)
     Hfci = np.zeros((dim_fci,dim_fci))
 
+    fbl = {}   # initialize fock block
     for a in range(n_blocks):
         for b in range(a+1,n_blocks):
             curr = 0
             for nA in range(0,nel+1):
                 nB = nel - nA
 
+
+                fbl[nA,nB] = FockBlock(nA,nB)
                 dim = nCr(bn_orb,nA) * nCr(bn_orb,nB)
                 strt = curr
-                stop = curr + dim
+                stop = strt + dim
+
+                fbl[nA,nB].init(strt,stop)
+                print("start %4d stop%4d"%(strt,stop))
+
+                curr += dim
+
 
 
     for a in range(n_blocks):
@@ -429,6 +438,7 @@ if 1:
 
             FTEMP = {}
 
+            Hfci2 = 1* Hfci
             curr = 0
             for nA in range(0,nel+1):
                 nB = nel - nA
@@ -460,36 +470,20 @@ if 1:
                             temp2 -= Sigma2 * h[p,bn_orb+q] * np.kron(cluster[a].ops["a", nA-1, 0, nA, 0][p,:,:], cluster[b].ops["A", nB+1, 0, nB, 0][q,:,:])
                             #temp2 -= Sigma2 * h[p,bn_orb+q] * np.kron(cluster[b].ops["A", nB+1, 0, nB, 0][q,:,:], cluster[a].ops["a", nA-1, 0, nA, 0][p,:,:])
 
-                FTEMP[(nA+1,nB-1,nA,nB)] = temp1
-                FTEMP[(nA-1,nB+1,nA,nB)] = temp2
-                print(tuple([nA+1,nB-1,nA,nB]))
-                print(temp1)
-                print(tuple([nA-1,nB+1,nA,nB]))
-                print(temp2)
+                if nA > -1 and nB > -1 and nA-1 > -1 and nB+1 > -1:
+                    #print(tuple([nA-1,nB+1,nA,nB]))
+                    Hfci[fbl[nA-1,nB+1].strt: fbl[nA-1,nB+1].stop,fbl[nA,nB].strt: fbl[nA,nB].stop] = temp2
+
+                if nA > -1 and nB > -1 and nA+1 > -1 and nB-1 > -1:
+                    #print(tuple([nA+1,nB-1,nA,nB]))
+                    Hfci[fbl[nA+1,nB-1].strt: fbl[nA+1,nB-1].stop,fbl[nA,nB].strt: fbl[nA,nB].stop] = temp1
 
                 curr += ket_dim
-
-            print(FTEMP.keys())
                 
-            start0 = 0
-            start1 = nCr(bn_orb,2) 
-            start2 = start1 + nCr(bn_orb,1)  * nCr(bn_orb,1)
-            start3 = start2 + nCr(bn_orb,2) 
 
             print(Hfci)
-            Hfci[start0:start1,start1:start2] = FTEMP[(0,2,1,1)]
-            Hfci[start1:start2,start0:start1] = FTEMP[(1,1,0,2)]
-            Hfci[start1:start2,start2:start3] = FTEMP[(1,1,2,0)]
-            Hfci[start2:start3,start1:start2] = FTEMP[(2,0,1,1)]
-
 
             print(Hfci)
             print(Hfci - Hfci.T)
             print(np.linalg.eigvalsh(Hfci))
             print(efci)
-            print(HH)
-
-    #print(np.linalg.eigvalsh(Hfci))
-    #print(np.linalg.eigvalsh(HH))
-    #print(h)
-

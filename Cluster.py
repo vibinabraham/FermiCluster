@@ -31,3 +31,21 @@ class Cluster(object):
         tensor has dimension: p,J,I for <J|p|I>
         """
         self.ops[string,naj,nbj,nai,nbi] = tens
+
+
+
+class FockBlock:
+
+    def __init__(self,na,nb):
+        self.na = na
+        self.nb = nb
+
+        self.strt = 0
+        self.stop = 0
+
+        self.dim = 0
+
+    def init(self,strt,stop):
+        self.strt = strt
+        self.stop = stop
+        self.dim = stop - strt
