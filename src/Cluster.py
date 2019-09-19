@@ -89,11 +89,20 @@ class Cluster(object):
                 ci.run()
                 #self.basis[(na,nb)] = np.eye(ci.results_v.shape[0])
                 self.basis[(na,nb)] = ci.results_v
-    
+            
+                
     def build_op_matrices(self):
         """
         build all operators needed
         """
+        self.ops['A'] = {}
+        self.ops['a'] = {}
+        self.ops['B'] = {}
+        self.ops['b'] = {}
+        self.ops['Aa'] = {}
+        self.ops['Bb'] = {}
+        self.ops['Ab'] = {}
+        self.ops['Ba'] = {}
 
         #  a, A 
         for na in range(1,self.n_orb+1):
@@ -118,8 +127,14 @@ class Cluster(object):
         #  Aa,Bb
         for na in range(0,self.n_orb+1):
             for nb in range(0,self.n_orb+1):
-                self.ops['Aa'][(na,nb),(na,nb)] = build_ca(self.n_orb, (na,nb),(na,nb),self.basis,'alpha')
-                self.ops['Bb'][(na,nb),(na,nb)] = build_ca(self.n_orb, (na,nb),(na,nb),self.basis,'beta')
+                self.ops['Aa'][(na,nb),(na,nb)] = build_ss_ca(self.n_orb, (na,nb),(na,nb),self.basis,'alpha')
+                self.ops['Bb'][(na,nb),(na,nb)] = build_ss_ca(self.n_orb, (na,nb),(na,nb),self.basis,'beta')
+               
+        #  Ab,Ba
+        for na in range(1,self.n_orb+1):
+            for nb in range(1,self.n_orb+1):
+                self.ops['Ab'][(na,nb-1),(na-1,nb)] = build_os_ca(self.n_orb, (na,nb-1),(na-1,nb),self.basis,'ab')
+                self.ops['Ba'][(na-1,nb),(na,nb-1)] = build_os_ca(self.n_orb, (na-1,nb),(na,nb-1),self.basis,'ba')
                
 
         #Add remaining operators ....

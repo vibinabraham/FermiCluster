@@ -17,7 +17,7 @@ import pyscf
 ttt = time.time()
 
 n_orb = 4
-U = 0.0
+U = 1.0
 beta = 1.0
 
 h, g = get_hubbard_params(n_orb,beta,U,pbc=False)
@@ -25,8 +25,8 @@ np.random.seed(2)
 #tmp = np.random.rand(h.shape[0],h.shape[1])*0.01
 #h += tmp + tmp.T
 #h += .11
-#h[3,4] = 0
-#h[4,3] = 0
+#h[1,2] = 0
+#h[2,1] = 0
 
 if 0:
     Escf,orb,h,g,C = run_hubbard_scf(h,g,n_orb//2)
@@ -49,9 +49,9 @@ if do_fci:
     #e, ci = cisolver.kernel(h1, eri, h1.shape[1], 2, ecore=mol.energy_nuc())
     e, ci = cisolver.kernel(h, g, h.shape[1], mol.nelectron, ecore=0)
     print(" FCI:        %12.8f"%e)
-    #exit()
 
 blocks = [[0,1],[2,3]]
+#blocks = [[0,1,2,3]]
 #blocks = [[0,1,2,3],[4,5,6,7]]
 #blocks = [[0,1,2],[3,4,5]]
 #blocks = [[0,1],[2,3],[4,5]]
@@ -246,8 +246,11 @@ conf_l = (0,0)
 conf_r = (0,0)
 #me = term_Aa.matrix_element(fock_l, conf_l, fock_r, conf_r)
 me = clustered_ham.terms[((0,0),(0,0))][0].matrix_element(fock_l, conf_l, fock_r, conf_r)
+me += clustered_ham.terms[((0,0),(0,0))][1].matrix_element(fock_l, conf_l, fock_r, conf_r)
+me += clustered_ham.terms[((0,0),(0,0))][2].matrix_element(fock_l, conf_l, fock_r, conf_r)
+me += clustered_ham.terms[((0,0),(0,0))][3].matrix_element(fock_l, conf_l, fock_r, conf_r)
 print(me)
-exit()
+#exit()
 
 
 
@@ -296,7 +299,7 @@ for fock_li, fock_l in enumerate(ci_vector.data):
     shift_l += len(configs_l)
    
 
-#print_mat(H)
+print_mat(H)
 #print()
 #print_mat(H-H.T)
 print(" Diagonalize Hamiltonian Matrix:")

@@ -144,8 +144,12 @@ class ClusteredTerm:
         string = mats_inds + self.ints_inds + "->"
         if len(mats) == 1:
             me = self.sign*np.einsum(self.contract_string,mats[0],self.ints) * state_sign
+            if len(self.ints.shape)==4:
+                print(me)
         elif len(mats) == 2:
             me = self.sign*np.einsum(self.contract_string,mats[0],mats[1],self.ints) * state_sign
+            if len(self.ints.shape)==4:
+                print(me)
         elif len(mats) == 3:
             me = self.sign*np.einsum(self.contract_string,mats[0],mats[1],mats[2],self.ints) * state_sign
         elif len(mats) == 4:
@@ -155,9 +159,8 @@ class ClusteredTerm:
         else:
             print("NYI")
             exit()
-        #print(" huh: %2i"%huh, "<",fock_bra, bra, "|H|", (fock_ket,ket), ">", "%12.8f"%me, self.active)
-        #print(self)
         return me
+
 class ClusteredOperator:
     """
     Defines a fermionic operator which can act on multiple clusters
@@ -334,16 +337,21 @@ class ClusteredOperator:
                         sorted_clusters_idx = [clusters_idx[s] for s in sorted_idx]
                         #print(sorted_clusters_idx) 
 
-                        vijkl = v[ci.orb_list,:,:,:][:,cj.orb_list,:,:][:,:,ck.orb_list,:][:,:,:,cl.orb_list]
-                        vijkl = 1*np.transpose(vijkl,axes=sorted_idx)
-                       
+                        # i'j'kl<ij|lk> = i'j'kl(il|jk)
+                        vijkl = v[ci.orb_list,:,:,:][:,cl.orb_list,:,:][:,:,cj.orb_list,:][:,:,:,ck.orb_list]
+                        #vijkl = v[ci.orb_list,:,:,:][:,cj.orb_list,:,:][:,:,ck.orb_list,:][:,:,:,cl.orb_list]
+                        if  not np.any(vijkl):
+                            continue
+                        #vijkl = 1.0*np.transpose(vijkl,axes=sorted_idx)
+                     
+                        print(vijkl)
                         contract_string = indices[0]
                         for si in range(1,4):
                             if sorted_clusters_idx[si] == sorted_clusters_idx[si-1]:
                                 contract_string += indices[si]
                             else:
                                 contract_string += ","+indices[si]
-                        contract_string += ",pqsr->"
+                        contract_string += ",psqr->"
                         #print("contract_string",contract_string)
 
 
