@@ -15,7 +15,7 @@ np.set_printoptions(suppress=True, precision=3, linewidth=1500)
 ttt = time.time()
 
 n_orb = 8
-U = 1
+U    = 1
 beta = 1.
 n_a = n_orb//2
 n_b = n_orb//2
@@ -286,6 +286,7 @@ def braJ_b_ketI(n_orb,cj_vec, ci_vec, naj, nbj, nai, nbi):
     return des
 # }}}
 
+
 for a in range(n_blocks):
     des_a = {}
     cre_a = {}
@@ -388,10 +389,8 @@ if 1:
         for b in range(a+1,n_blocks):
             ##CASE 1: 
             print("CASE1: H_a x I")
-            curr = 0
             for nA in range(0,nel+1):
                 nB = nel - nA
-                dim = nCr(bn_orb,nA) * nCr(bn_orb,nB)
 
                 ha, ga = get_cluster_eri(blocks[a],h,g)  #Form integrals within a cluster
                 HA = run_fci(cluster[a].n_orb,nA,a,ha,ga)
@@ -402,20 +401,15 @@ if 1:
                 AHA = cluster[a].block_states[nA,0].T @ HA @ cluster[a].block_states[nA,0]
                 BHB = cluster[b].block_states[nB,0].T @ HB @ cluster[b].block_states[nB,0]
                 H0 = np.kron(AHA,BHB)
-                print(curr,dim+curr)
-                #print(H0.shape)
 
-                Hfci[curr:dim+curr,curr:dim+curr] += H0
-                curr += dim
-                print(Hfci)
+                Hfci[fbl[nA,nB].strt: fbl[nA,nB].stop,fbl[nA,nB].strt: fbl[nA,nB].stop] += H0
+                #print(Hfci)
                 
 
             ##CASE 2: 
             print("CASE2: I x H_b")
-            curr = 0
             for nA in range(0,nel+1):
                 nB = nel - nA
-                dim = nCr(bn_orb,nA) * nCr(bn_orb,nB)
 
                 hb, gb = get_cluster_eri(blocks[b],h,g)  #Form integrals within a cluster
                 HB = run_fci(cluster[b].n_orb,nB,a,hb,gb)
@@ -426,40 +420,22 @@ if 1:
                 AHA = cluster[a].block_states[nA,0].T @ HA @ cluster[a].block_states[nA,0]
                 BHB = cluster[b].block_states[nB,0].T @ HB @ cluster[b].block_states[nB,0]
                 H0 = np.kron(AHA,BHB)
-                print(curr,dim+curr)
-                #print(H0.shape)
 
-                Hfci[curr:dim+curr,curr:dim+curr] += H0
-                curr += dim
-
-                print(Hfci)
+                Hfci[fbl[nA,nB].strt: fbl[nA,nB].stop,fbl[nA,nB].strt: fbl[nA,nB].stop] += H0
+                #print(Hfci)
 
             print("CASE3: H_ab")
 
-            FTEMP = {}
-
-            Hfci2 = 1* Hfci
-            curr = 0
             for nA in range(0,nel+1):
                 nB = nel - nA
                 temp1 = 0
                 temp2 = 0
 
-                ket_dim = nCr(bn_orb,nA) * nCr(bn_orb,nB)
-                ket_start = curr
-                ket_stop = curr + ket_dim
 
-
-                #print("ks", ket_start,ket_stop)
-
-                #temp = np.kron(cluster[a].tdm_a["A",nA,0][1,0,:], cluster[b].tdm_a["a",nB,0][1,0,:])
-                #Sigma1 = (-1)**(nA+nB-1)
-                #Sigma2 = (-1)**(nA+nB+1)
-                #Sigma1 = 1
-                #Sigma2 = 1
+                # state antisymmetry
                 Sigma1 = (-1)**(nA)
                 Sigma2 = (-1)**(nA)
-                print(Sigma1,Sigma2)
+                #print(Sigma1,Sigma2)
                 for p in range(cluster[a].n_orb):
                     for q in range(cluster[b].n_orb):
                         if nA != nel:
@@ -478,10 +454,7 @@ if 1:
                     #print(tuple([nA+1,nB-1,nA,nB]))
                     Hfci[fbl[nA+1,nB-1].strt: fbl[nA+1,nB-1].stop,fbl[nA,nB].strt: fbl[nA,nB].stop] = temp1
 
-                curr += ket_dim
                 
-
-            print(Hfci)
 
             print(Hfci)
             print(Hfci - Hfci.T)
