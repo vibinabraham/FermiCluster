@@ -336,14 +336,14 @@ class ClusteredOperator:
 
                         vijkl = v[ci.orb_list,:,:,:][:,cj.orb_list,:,:][:,:,ck.orb_list,:][:,:,:,cl.orb_list]
                         vijkl = 1*np.transpose(vijkl,axes=sorted_idx)
-                        
+                       
                         contract_string = indices[0]
                         for si in range(1,4):
                             if sorted_clusters_idx[si] == sorted_clusters_idx[si-1]:
                                 contract_string += indices[si]
                             else:
                                 contract_string += ","+indices[si]
-                        contract_string += ",pqrs->"
+                        contract_string += ",pqsr->"
                         #print("contract_string",contract_string)
 
 

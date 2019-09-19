@@ -17,13 +17,13 @@ import pyscf
 ttt = time.time()
 
 n_orb = 4
-U = 1.0
+U = 0.0
 beta = 1.0
 
 h, g = get_hubbard_params(n_orb,beta,U,pbc=False)
 np.random.seed(2)
-tmp = np.random.rand(h.shape[0],h.shape[1])*0.01
-h += tmp + tmp.T
+#tmp = np.random.rand(h.shape[0],h.shape[1])*0.01
+#h += tmp + tmp.T
 #h += .11
 #h[3,4] = 0
 #h[4,3] = 0
@@ -240,14 +240,14 @@ ci_vector.print()
 #print(me)
 #
 #
-#fock_l = ((2,2),(2,2))
-#fock_r = ((2,2),(2,2))
-#conf_l = (0,0)
-#conf_r = (0,0)
-##me = term_Aa.matrix_element(fock_l, conf_l, fock_r, conf_r)
-#me = clustered_ham.terms[((0,0),(0,0))][0].matrix_element(fock_l, conf_l, fock_r, conf_r)
-#print(me)
-#exit()
+fock_l = ((1,1),(1,1))
+fock_r = ((1,1),(1,1))
+conf_l = (0,0)
+conf_r = (0,0)
+#me = term_Aa.matrix_element(fock_l, conf_l, fock_r, conf_r)
+me = clustered_ham.terms[((0,0),(0,0))][0].matrix_element(fock_l, conf_l, fock_r, conf_r)
+print(me)
+exit()
 
 
 
