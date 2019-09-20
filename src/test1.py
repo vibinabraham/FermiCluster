@@ -17,7 +17,7 @@ import pyscf
 ttt = time.time()
 
 n_orb = 4
-U = 1.0
+U = 0.0
 beta = 1.0
 
 h, g = get_hubbard_params(n_orb,beta,U,pbc=False)
