@@ -16,8 +16,8 @@ from ClusteredState import *
 import pyscf
 ttt = time.time()
 
-n_orb = 4
-U = 0.0
+n_orb = 6
+U = 1.0
 beta = 1.0
 
 h, g = get_hubbard_params(n_orb,beta,U,pbc=False)
@@ -51,10 +51,10 @@ if do_fci:
     e, ci = cisolver.kernel(h, g, h.shape[1], mol.nelectron, ecore=0)
     print(" FCI:        %12.8f"%e)
 
-blocks = [[0,1],[2,3]]
+#blocks = [[0,1],[2,3]]
 #blocks = [[0,1,2,3]]
 #blocks = [[0,1,2,3],[4,5,6,7]]
-#blocks = [[0,1,2],[3,4,5]]
+blocks = [[0,1,2, 3],[4,5]]
 #blocks = [[0,1],[2,3],[4,5]]
 #blocks = [[0,1,2,3],[4,5,6,7]]
 #blocks = [[0,1],[2,3,4,5],[6],[7]]
@@ -112,7 +112,8 @@ ci_vector = ClusteredState(clusters)
 #ci_vector.init(((2,2),(2,2)))
 #ci_vector.init(((2,2),))
 #ci_vector.init(((2,2),(0,0)))
-ci_vector.init(((1,1),(1,1)))
+#ci_vector.init(((1,1),(1,1)))
+ci_vector.init(((2,2),(1,1)))
 
 # add single particle transfers
 print(" Add fock-blocks for single particle transfers and spin-flips")
@@ -354,21 +355,21 @@ ci_vector.print()
 #print(me)
 #exit()
 
-fock_l = ((2,2),(0,0))
-fock_r = ((2,2),(0,0))
-conf_l = (0,0)
-conf_r = (0,0)
-me = 0
-for term_label,term in clustered_ham.terms.items():
-    print(term_label)
-    [print(t) for t in term]
-
-for t in clustered_ham.terms[((0,0),(0,0))]:
-    met = t.matrix_element(fock_l, conf_l, fock_r, conf_r)
-    print(t,met)
-    me += met
-print(me)
-#exit()
+#fock_l = ((2,2),(0,0))
+#fock_r = ((2,2),(0,0))
+#conf_l = (0,0)
+#conf_r = (0,0)
+#me = 0
+#for term_label,term in clustered_ham.terms.items():
+#    print(term_label)
+#    [print(t) for t in term]
+#
+#for t in clustered_ham.terms[((0,0),(0,0))]:
+#    met = t.matrix_element(fock_l, conf_l, fock_r, conf_r)
+#    print(t,met)
+#    me += met
+#print(me)
+##exit()
 
 
 
