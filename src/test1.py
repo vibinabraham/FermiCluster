@@ -17,7 +17,7 @@ import pyscf
 ttt = time.time()
 
 n_orb = 6
-U = 1.0
+U = 0.0
 beta = 1.0
 
 h, g = get_hubbard_params(n_orb,beta,U,pbc=False)
@@ -54,7 +54,7 @@ if do_fci:
 #blocks = [[0,1],[2,3]]
 #blocks = [[0,1,2,3]]
 #blocks = [[0,1,2,3],[4,5,6,7]]
-blocks = [[0,1,2, 3],[4,5]]
+blocks = [[0,1],[2,3],[4,5]]
 #blocks = [[0,1],[2,3],[4,5]]
 #blocks = [[0,1,2,3],[4,5,6,7]]
 #blocks = [[0,1],[2,3,4,5],[6],[7]]
@@ -113,219 +113,243 @@ ci_vector = ClusteredState(clusters)
 #ci_vector.init(((2,2),))
 #ci_vector.init(((2,2),(0,0)))
 #ci_vector.init(((1,1),(1,1)))
-ci_vector.init(((2,2),(1,1)))
+ci_vector.init(((1,1),(1,1),(1,1)))
 
-# add single particle transfers
-print(" Add fock-blocks for single particle transfers and spin-flips")
-fblocks = list(ci_vector.fblocks())
-
-for ref_fblock in fblocks: 
-    for ci in clusters:
-        for cj in clusters:
-            if ci.idx != cj.idx:
-                if 1:
-                    # alpha transfer
-                    new_fblock = [[b[0],b[1]] for b in ref_fblock]
-                    new_fblock[ci.idx][0] += 1
-                    new_fblock[cj.idx][0] -= 1
-                    
-                    new_fblock = tuple([(b[0],b[1]) for b in new_fblock])
-                    if min(min(new_fblock)) >= 0:
-                        ci_vector.add_fockblock(new_fblock)
-
-                    # beta transfer
-                    new_fblock = [[b[0],b[1]] for b in ref_fblock]
-                    new_fblock[ci.idx][1] += 1
-                    new_fblock[cj.idx][1] -= 1
-                    
-                    new_fblock = tuple([(b[0],b[1]) for b in new_fblock])
-                    if min(min(new_fblock)) >= 0:
-                        ci_vector.add_fockblock(new_fblock)
-        
-                if 1:
-                    # spin_flip 
-                    new_fblock = [[b[0],b[1]] for b in ref_fblock]
-                    new_fblock[ci.idx][0] -= 1
-                    new_fblock[ci.idx][1] += 1
-                    new_fblock[cj.idx][0] += 1
-                    new_fblock[cj.idx][1] -= 1
-                    
-                    new_fblock = tuple([(b[0],b[1]) for b in new_fblock])
-                    ok = True
-                    for ci in clusters:
-                        if max(new_fblock[ci.idx]) > ci.n_orb or min(new_fblock[ci.idx]) < 0:
-                            ok = False
-                    if ok:
-                        ci_vector.add_fockblock(new_fblock)
-
-                if 1:
-                    # alpha/beta transfer
-                    new_fblock = [[b[0],b[1]] for b in ref_fblock]
-                    new_fblock[ci.idx][0] += 1
-                    new_fblock[ci.idx][1] += 1
-                    new_fblock[cj.idx][0] -= 1
-                    new_fblock[cj.idx][1] -= 1
-                    
-                    new_fblock = tuple([(b[0],b[1]) for b in new_fblock])
-                    ok = True
-                    for ci in clusters:
-                        if max(new_fblock[ci.idx]) > ci.n_orb or min(new_fblock[ci.idx]) < 0:
-                            ok = False
-                    if ok:
-                        ci_vector.add_fockblock(new_fblock)
-
-                if 1:
-                    # aabb transfer
-                    new_fblock = [[b[0],b[1]] for b in ref_fblock]
-                    new_fblock[ci.idx][0] += 2
-                    new_fblock[ci.idx][1] += 2
-                    new_fblock[cj.idx][0] -= 2
-                    new_fblock[cj.idx][1] -= 2
-                    
-                    new_fblock = tuple([(b[0],b[1]) for b in new_fblock])
-                    ok = True
-                    for ci in clusters:
-                        if max(new_fblock[ci.idx]) > ci.n_orb or min(new_fblock[ci.idx]) < 0:
-                            ok = False
-                    if ok:
-                        ci_vector.add_fockblock(new_fblock)
-
-                if 1:
-                    # aa transfer
-                    new_fblock = [[b[0],b[1]] for b in ref_fblock]
-                    new_fblock[ci.idx][0] += 2
-                    new_fblock[ci.idx][1] += 0
-                    new_fblock[cj.idx][0] -= 2
-                    new_fblock[cj.idx][1] -= 0
-                    
-                    new_fblock = tuple([(b[0],b[1]) for b in new_fblock])
-                    ok = True
-                    for ci in clusters:
-                        if max(new_fblock[ci.idx]) > ci.n_orb or min(new_fblock[ci.idx]) < 0:
-                            ok = False
-                    if ok:
-                        ci_vector.add_fockblock(new_fblock)
-
-                    # bb transfer
-                    new_fblock = [[b[0],b[1]] for b in ref_fblock]
-                    new_fblock[ci.idx][0] += 0
-                    new_fblock[ci.idx][1] += 2
-                    new_fblock[cj.idx][0] -= 0
-                    new_fblock[cj.idx][1] -= 2
-                    
-                    new_fblock = tuple([(b[0],b[1]) for b in new_fblock])
-                    ok = True
-                    for ci in clusters:
-                        if max(new_fblock[ci.idx]) > ci.n_orb or min(new_fblock[ci.idx]) < 0:
-                            ok = False
-                    if ok:
-                        ci_vector.add_fockblock(new_fblock)
-
-                if 1:
-                    # aab transfer
-                    new_fblock = [[b[0],b[1]] for b in ref_fblock]
-                    new_fblock[ci.idx][0] += 2
-                    new_fblock[ci.idx][1] += 1
-                    new_fblock[cj.idx][0] -= 2
-                    new_fblock[cj.idx][1] -= 1
-                    
-                    new_fblock = tuple([(b[0],b[1]) for b in new_fblock])
-                    ok = True
-                    for ci in clusters:
-                        if max(new_fblock[ci.idx]) > ci.n_orb or min(new_fblock[ci.idx]) < 0:
-                            ok = False
-                    if ok:
-                        ci_vector.add_fockblock(new_fblock)
-
-                    # abb transfer
-                    new_fblock = [[b[0],b[1]] for b in ref_fblock]
-                    new_fblock[ci.idx][0] += 1
-                    new_fblock[ci.idx][1] += 2
-                    new_fblock[cj.idx][0] -= 1
-                    new_fblock[cj.idx][1] -= 2
-                    
-                    new_fblock = tuple([(b[0],b[1]) for b in new_fblock])
-                    ok = True
-                    for ci in clusters:
-                        if max(new_fblock[ci.idx]) > ci.n_orb or min(new_fblock[ci.idx]) < 0:
-                            ok = False
-                    if ok:
-                        ci_vector.add_fockblock(new_fblock)
-
-# 3body alpha-beta
-for ref_fblock in fblocks: 
-    for ci in clusters:
-        for cj in clusters:
-            if ci.idx != cj.idx:
-                for ck in clusters:
-                    if ck.idx != cj.idx:
-                        if 1:
-                            # alpha/beta transfer ci-(a)->cj-(b)->ck
-                            
-                            new_fblock = [[b[0],b[1]] for b in ref_fblock]
-                            new_fblock[ci.idx][0] -= 1
-                            new_fblock[cj.idx][0] += 1
-                            new_fblock[cj.idx][1] -= 1
-                            new_fblock[ck.idx][1] += 1
-                            new_fblock = tuple([(b[0],b[1]) for b in new_fblock])
-                            ok = True
-                            for ci in clusters:
-                                if max(new_fblock[ci.idx]) > ci.n_orb or min(new_fblock[ci.idx]) < 0:
-                                    ok = False
-                            if ok:
-                                ci_vector.add_fockblock(new_fblock)
-                            
-                            
-                            new_fblock = [[b[0],b[1]] for b in ref_fblock]
-                            new_fblock[ci.idx][0] -= 1
-                            new_fblock[cj.idx][0] += 1
-                            new_fblock[cj.idx][1] += 1
-                            new_fblock[ck.idx][1] -= 1
-                            new_fblock = tuple([(b[0],b[1]) for b in new_fblock])
-                            ok = True
-                            for ci in clusters:
-                                if max(new_fblock[ci.idx]) > ci.n_orb or min(new_fblock[ci.idx]) < 0:
-                                    ok = False
-                            if ok:
-                                ci_vector.add_fockblock(new_fblock)
-
-                            new_fblock = [[b[0],b[1]] for b in ref_fblock]
-                            new_fblock[ci.idx][0] -= 1
-                            new_fblock[ci.idx][1] += 1
-                            new_fblock[cj.idx][0] += 1
-                            new_fblock[ck.idx][1] -= 1
-                            new_fblock = tuple([(b[0],b[1]) for b in new_fblock])
-                            ok = True
-                            for ci in clusters:
-                                if max(new_fblock[ci.idx]) > ci.n_orb or min(new_fblock[ci.idx]) < 0:
-                                    ok = False
-                            if ok:
-                                ci_vector.add_fockblock(new_fblock)
-
-                            new_fblock = [[b[0],b[1]] for b in ref_fblock]
-                            new_fblock[ci.idx][0] -= 1
-                            new_fblock[ci.idx][1] -= 1
-                            new_fblock[cj.idx][0] += 1
-                            new_fblock[ck.idx][1] += 1
-                            new_fblock = tuple([(b[0],b[1]) for b in new_fblock])
-                            ok = True
-                            for ci in clusters:
-                                if max(new_fblock[ci.idx]) > ci.n_orb or min(new_fblock[ci.idx]) < 0:
-                                    ok = False
-                            if ok:
-                                ci_vector.add_fockblock(new_fblock)
+## add single particle transfers
+#print(" Add fock-blocks for single particle transfers and spin-flips")
+#fblocks = list(ci_vector.fblocks())
+#
+#for ref_fblock in fblocks: 
+#    for ci in clusters:
+#        for cj in clusters:
+#            if ci.idx != cj.idx:
+#                if 1:
+#                    # alpha transfer
+#                    new_fblock = [[b[0],b[1]] for b in ref_fblock]
+#                    new_fblock[ci.idx][0] += 1
+#                    new_fblock[cj.idx][0] -= 1
+#                    
+#                    new_fblock = tuple([(b[0],b[1]) for b in new_fblock])
+#                    if min(min(new_fblock)) >= 0:
+#                        ci_vector.add_fockblock(new_fblock)
+#
+#                    # beta transfer
+#                    new_fblock = [[b[0],b[1]] for b in ref_fblock]
+#                    new_fblock[ci.idx][1] += 1
+#                    new_fblock[cj.idx][1] -= 1
+#                    
+#                    new_fblock = tuple([(b[0],b[1]) for b in new_fblock])
+#                    if min(min(new_fblock)) >= 0:
+#                        ci_vector.add_fockblock(new_fblock)
+#        
+#                if 1:
+#                    # spin_flip 
+#                    new_fblock = [[b[0],b[1]] for b in ref_fblock]
+#                    new_fblock[ci.idx][0] -= 1
+#                    new_fblock[ci.idx][1] += 1
+#                    new_fblock[cj.idx][0] += 1
+#                    new_fblock[cj.idx][1] -= 1
+#                    
+#                    new_fblock = tuple([(b[0],b[1]) for b in new_fblock])
+#                    ok = True
+#                    for ci in clusters:
+#                        if max(new_fblock[ci.idx]) > ci.n_orb or min(new_fblock[ci.idx]) < 0:
+#                            ok = False
+#                    if ok:
+#                        ci_vector.add_fockblock(new_fblock)
+#
+#                if 1:
+#                    # alpha/beta transfer
+#                    new_fblock = [[b[0],b[1]] for b in ref_fblock]
+#                    new_fblock[ci.idx][0] += 1
+#                    new_fblock[ci.idx][1] += 1
+#                    new_fblock[cj.idx][0] -= 1
+#                    new_fblock[cj.idx][1] -= 1
+#                    
+#                    new_fblock = tuple([(b[0],b[1]) for b in new_fblock])
+#                    ok = True
+#                    for ci in clusters:
+#                        if max(new_fblock[ci.idx]) > ci.n_orb or min(new_fblock[ci.idx]) < 0:
+#                            ok = False
+#                    if ok:
+#                        ci_vector.add_fockblock(new_fblock)
+#
+#                if 1:
+#                    # aabb transfer
+#                    new_fblock = [[b[0],b[1]] for b in ref_fblock]
+#                    new_fblock[ci.idx][0] += 2
+#                    new_fblock[ci.idx][1] += 2
+#                    new_fblock[cj.idx][0] -= 2
+#                    new_fblock[cj.idx][1] -= 2
+#                    
+#                    new_fblock = tuple([(b[0],b[1]) for b in new_fblock])
+#                    ok = True
+#                    for ci in clusters:
+#                        if max(new_fblock[ci.idx]) > ci.n_orb or min(new_fblock[ci.idx]) < 0:
+#                            ok = False
+#                    if ok:
+#                        ci_vector.add_fockblock(new_fblock)
+#
+#                if 1:
+#                    # aa transfer
+#                    new_fblock = [[b[0],b[1]] for b in ref_fblock]
+#                    new_fblock[ci.idx][0] += 2
+#                    new_fblock[ci.idx][1] += 0
+#                    new_fblock[cj.idx][0] -= 2
+#                    new_fblock[cj.idx][1] -= 0
+#                    
+#                    new_fblock = tuple([(b[0],b[1]) for b in new_fblock])
+#                    ok = True
+#                    for ci in clusters:
+#                        if max(new_fblock[ci.idx]) > ci.n_orb or min(new_fblock[ci.idx]) < 0:
+#                            ok = False
+#                    if ok:
+#                        ci_vector.add_fockblock(new_fblock)
+#
+#                    # bb transfer
+#                    new_fblock = [[b[0],b[1]] for b in ref_fblock]
+#                    new_fblock[ci.idx][0] += 0
+#                    new_fblock[ci.idx][1] += 2
+#                    new_fblock[cj.idx][0] -= 0
+#                    new_fblock[cj.idx][1] -= 2
+#                    
+#                    new_fblock = tuple([(b[0],b[1]) for b in new_fblock])
+#                    ok = True
+#                    for ci in clusters:
+#                        if max(new_fblock[ci.idx]) > ci.n_orb or min(new_fblock[ci.idx]) < 0:
+#                            ok = False
+#                    if ok:
+#                        ci_vector.add_fockblock(new_fblock)
+#
+#                if 1:
+#                    # aab transfer
+#                    new_fblock = [[b[0],b[1]] for b in ref_fblock]
+#                    new_fblock[ci.idx][0] += 2
+#                    new_fblock[ci.idx][1] += 1
+#                    new_fblock[cj.idx][0] -= 2
+#                    new_fblock[cj.idx][1] -= 1
+#                    
+#                    new_fblock = tuple([(b[0],b[1]) for b in new_fblock])
+#                    ok = True
+#                    for ci in clusters:
+#                        if max(new_fblock[ci.idx]) > ci.n_orb or min(new_fblock[ci.idx]) < 0:
+#                            ok = False
+#                    if ok:
+#                        ci_vector.add_fockblock(new_fblock)
+#
+#                    # abb transfer
+#                    new_fblock = [[b[0],b[1]] for b in ref_fblock]
+#                    new_fblock[ci.idx][0] += 1
+#                    new_fblock[ci.idx][1] += 2
+#                    new_fblock[cj.idx][0] -= 1
+#                    new_fblock[cj.idx][1] -= 2
+#                    
+#                    new_fblock = tuple([(b[0],b[1]) for b in new_fblock])
+#                    ok = True
+#                    for ci in clusters:
+#                        if max(new_fblock[ci.idx]) > ci.n_orb or min(new_fblock[ci.idx]) < 0:
+#                            ok = False
+#                    if ok:
+#                        ci_vector.add_fockblock(new_fblock)
+#
+## 3body alpha-beta
+#for ref_fblock in fblocks: 
+#    for ci in clusters:
+#        for cj in clusters:
+#            if ci.idx != cj.idx:
+#                for ck in clusters:
+#                    if ck.idx != cj.idx:
+#                        if 1:
+#                            # alpha/beta transfer ci-(a)->cj-(b)->ck
+#                            
+#                            new_fblock = [[b[0],b[1]] for b in ref_fblock]
+#                            new_fblock[ci.idx][0] -= 1
+#                            new_fblock[cj.idx][0] += 1
+#                            new_fblock[cj.idx][1] -= 1
+#                            new_fblock[ck.idx][1] += 1
+#                            new_fblock = tuple([(b[0],b[1]) for b in new_fblock])
+#                            ok = True
+#                            for ci in clusters:
+#                                if max(new_fblock[ci.idx]) > ci.n_orb or min(new_fblock[ci.idx]) < 0:
+#                                    ok = False
+#                            if ok:
+#                                ci_vector.add_fockblock(new_fblock)
+#                            
+#                            
+#                            new_fblock = [[b[0],b[1]] for b in ref_fblock]
+#                            new_fblock[ci.idx][0] -= 1
+#                            new_fblock[cj.idx][0] += 1
+#                            new_fblock[cj.idx][1] += 1
+#                            new_fblock[ck.idx][1] -= 1
+#                            new_fblock = tuple([(b[0],b[1]) for b in new_fblock])
+#                            ok = True
+#                            for ci in clusters:
+#                                if max(new_fblock[ci.idx]) > ci.n_orb or min(new_fblock[ci.idx]) < 0:
+#                                    ok = False
+#                            if ok:
+#                                ci_vector.add_fockblock(new_fblock)
+#
+#                            new_fblock = [[b[0],b[1]] for b in ref_fblock]
+#                            new_fblock[ci.idx][0] -= 1
+#                            new_fblock[ci.idx][1] += 1
+#                            new_fblock[cj.idx][0] += 1
+#                            new_fblock[ck.idx][1] -= 1
+#                            new_fblock = tuple([(b[0],b[1]) for b in new_fblock])
+#                            ok = True
+#                            for ci in clusters:
+#                                if max(new_fblock[ci.idx]) > ci.n_orb or min(new_fblock[ci.idx]) < 0:
+#                                    ok = False
+#                            if ok:
+#                                ci_vector.add_fockblock(new_fblock)
+#
+#                            new_fblock = [[b[0],b[1]] for b in ref_fblock]
+#                            new_fblock[ci.idx][0] -= 1
+#                            new_fblock[ci.idx][1] -= 1
+#                            new_fblock[cj.idx][0] += 1
+#                            new_fblock[ck.idx][1] += 1
+#                            new_fblock = tuple([(b[0],b[1]) for b in new_fblock])
+#                            ok = True
+#                            for ci in clusters:
+#                                if max(new_fblock[ci.idx]) > ci.n_orb or min(new_fblock[ci.idx]) < 0:
+#                                    ok = False
+#                            if ok:
+#                                ci_vector.add_fockblock(new_fblock)
 
 
 
            
+print("\n Make each Fock-Block the full space")
+# create full space for each fock block defined
+if 1:
+    ns = []
+    na = 0
+    nb = 0
+    for fblock,configs in ci_vector.items():
+        for c in fblock:
+            na += c[0]
+            nb += c[1]
+        break
+
+    for c in ci_vector.clusters:
+        for na in range(c.n_orb):
+            for nb in range(c.n_orb):
+                ns.append((na,nb))
+    for newfock in itertools.product(*ns):
+        nacurr = 0
+        nbcurr = 0
+        print(newfock)
+        for c in newfock:
+            nacurr += c[0]
+            nbfock += c[1]
+        if nacurr == na and nbcurr == nb:
+            ci_vector.add_fockblock(newfock) 
+
+
 ci_vector.print()
 print("\n Make each Fock-Block the full space")
 # create full space for each fock block defined
 if 1:
-    for c in ci_vector.clusters:
-        print(c.basis.keys())
     for fblock,configs in ci_vector.items():
-        print(fblock)
         dims = []
         for c in ci_vector.clusters:
             # get number of vectors for current fock space
