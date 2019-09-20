@@ -904,7 +904,6 @@ def build_ccaa_ss(no,bra_space,ket_space,basis,spin_case):
         tdm = np.einsum('ijt,jpqrsiu->tupqrs',v1,tmp) 
 
  
-    print(tdm)
     v2.shape = (ket_a_max*ket_b_max,nv2)
     v1.shape = (bra_a_max*bra_b_max,nv1)
    

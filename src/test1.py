@@ -50,8 +50,8 @@ if do_fci:
     e, ci = cisolver.kernel(h, g, h.shape[1], mol.nelectron, ecore=0)
     print(" FCI:        %12.8f"%e)
 
-blocks = [[0,1],[2,3]]
-#blocks = [[0,1,2,3]]
+#blocks = [[0,1],[2,3]]
+blocks = [[0,1,2,3]]
 #blocks = [[0,1,2,3],[4,5,6,7]]
 #blocks = [[0,1,2],[3,4,5]]
 #blocks = [[0,1],[2,3],[4,5]]
@@ -109,7 +109,8 @@ ci_vector = ClusteredState(clusters)
 #ci_vector.init(((2,2),(2,2),(0,0),(0,0)))
 #ci_vector.init(((3,3),(0,0)))
 #ci_vector.init(((2,2),(2,2)))
-ci_vector.init(((2,2),(0,0)))
+#ci_vector.init(((2,2),(0,0)))
+ci_vector.init(((2,2)))
 #ci_vector.init(((1,1),(1,1)))
 
 # add single particle transfers

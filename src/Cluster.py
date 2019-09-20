@@ -141,7 +141,28 @@ class Cluster(object):
             for nb in range(0,self.n_orb+1):
                 self.ops['AAaa'][(na,nb),(na,nb)] = build_ccaa_ss(self.n_orb, (na,nb),(na,nb),self.basis,'a')
                 self.ops['BBbb'][(na,nb),(na,nb)] = build_ccaa_ss(self.n_orb, (na,nb),(na,nb),self.basis,'b')
-                print(self.ops['BBbb'][(na,nb),(na,nb)])
+                #print(self.ops['BBbb'][(na,nb),(na,nb)])
+        
+        #  ABba
+        for na in range(1,self.n_orb+1):
+            for nb in range(1,self.n_orb+1):
+                a = self.ops['a'][(na-1,nb),(na,nb)]
+                b = self.ops['b'][(na-1,nb-1),(na-1,nb)]
+                B = self.ops['B'][(na-1,nb),(na-1,nb-1)]
+                A = self.ops['A'][(na,nb),(na-1,nb)]
+               
+                # <IJ|p'q'rs|KL>
+                self.ops['ABba'][(na,nb),(na,nb)] = np.einsum('abp,bcq,cdr,des->aepqrs',A,B,b,a)
+        #  BAab
+        for na in range(1,self.n_orb+1):
+            for nb in range(1,self.n_orb+1):
+                b = self.ops['b'][(na,nb-1),(na,nb)]
+                a = self.ops['a'][(na-1,nb-1),(na,nb-1)]
+                A = self.ops['A'][(na,nb-1),(na-1,nb-1)]
+                B = self.ops['B'][(na,nb),(na,nb-1)]
+               
+                # <IJ|p'q'rs|KL>
+                self.ops['BAab'][(na,nb),(na,nb)] = np.einsum('abp,bcq,cdr,des->aepqrs',B,A,a,b)
                
 
         #Add remaining operators ....
