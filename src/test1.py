@@ -29,7 +29,7 @@ np.random.seed(2)
 #h[1,2] = 0
 #h[2,1] = 0
 
-if 1:
+if 0:
     Escf,orb,h,g,C = run_hubbard_scf(h,g,n_orb//2)
 
 
@@ -110,9 +110,9 @@ ci_vector = ClusteredState(clusters)
 #ci_vector.init(((2,2),(2,2),(0,0),(0,0)))
 #ci_vector.init(((3,3),(0,0)))
 #ci_vector.init(((2,2),(2,2)))
-ci_vector.init(((2,2),(0,0)))
 #ci_vector.init(((2,2),))
-#ci_vector.init(((1,1),(1,1)))
+#ci_vector.init(((2,2),(0,0)))
+ci_vector.init(((1,1),(1,1)))
 
 # add single particle transfers
 print(" Add fock-blocks for single particle transfers and spin-flips")
@@ -417,7 +417,7 @@ for fock_li, fock_l in enumerate(ci_vector.data):
     shift_l += len(configs_l)
    
 
-print_mat(H)
+#print_mat(H)
 #print()
 #print_mat(H-H.T)
 print(" Diagonalize Hamiltonian Matrix:")

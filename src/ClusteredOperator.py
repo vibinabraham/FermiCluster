@@ -292,10 +292,10 @@ class ClusteredOperator:
                         delta_aa = list(cp.deepcopy(delta_tmp)) 
                         delta_bb = list(cp.deepcopy(delta_tmp)) 
                         delta_ab = list(cp.deepcopy(delta_tmp)) 
-                        #delta_ba = list(cp.deepcopy(delta_tmp)) 
+                        delta_ba = list(cp.deepcopy(delta_tmp)) 
                         ops_aa = cp.deepcopy(ops_tmp) #alpha hopping
                         ops_ab = cp.deepcopy(ops_tmp) #beta hopping
-                        #ops_ba = cp.deepcopy(ops_tmp) #alpha hopping
+                        ops_ba = cp.deepcopy(ops_tmp) #alpha hopping
                         ops_bb = cp.deepcopy(ops_tmp) #beta hopping
                         
                         delta_aa[ci.idx][0] += 1  #not diagonal
@@ -308,10 +308,10 @@ class ClusteredOperator:
                         delta_ab[ck.idx][1] -= 1  #not diagonal
                         delta_ab[cl.idx][0] -= 1  #not diagonal
 
-                        #delta_ba[ci.idx][1] += 1  #not diagonal
-                        #delta_ba[cj.idx][0] += 1  #not diagonal
-                        #delta_ba[ck.idx][0] -= 1  #not diagonal
-                        #delta_ba[cl.idx][1] -= 1  #not diagonal
+                        delta_ba[ci.idx][1] += 1  #not diagonal
+                        delta_ba[cj.idx][0] += 1  #not diagonal
+                        delta_ba[ck.idx][0] -= 1  #not diagonal
+                        delta_ba[cl.idx][1] -= 1  #not diagonal
 
                         delta_bb[ci.idx][1] += 1  #not diagonal
                         delta_bb[cj.idx][1] += 1  #not diagonal
@@ -328,10 +328,10 @@ class ClusteredOperator:
                         ops_ab[ck.idx] += "b"
                         ops_ab[cl.idx] += "a"
                         
-                        #ops_ba[ci.idx] += "B"
-                        #ops_ba[cj.idx] += "A"
-                        #ops_ba[ck.idx] += "a"
-                        #ops_ba[cl.idx] += "b"
+                        ops_ba[ci.idx] += "B"
+                        ops_ba[cj.idx] += "A"
+                        ops_ba[ck.idx] += "a"
+                        ops_ba[cl.idx] += "b"
                         
                         ops_bb[ci.idx] += "B"
                         ops_bb[cj.idx] += "B"
@@ -364,25 +364,19 @@ class ClusteredOperator:
 
                         delta_aa = tuple([tuple(i) for i in delta_aa])
                         delta_ab = tuple([tuple(i) for i in delta_ab])
-                        #delta_ba = tuple([tuple(i) for i in delta_ba])
+                        delta_ba = tuple([tuple(i) for i in delta_ba])
                         delta_bb = tuple([tuple(i) for i in delta_bb])
                         
                         term_aa = ClusteredTerm(delta_aa, ops_aa, vijkl, self.clusters)
                         term_ab = ClusteredTerm(delta_ab, ops_ab, vijkl, self.clusters)
-                        #term_ba = ClusteredTerm(delta_ba, ops_ba, vijkl, self.clusters)
+                        term_ba = ClusteredTerm(delta_ba, ops_ba, vijkl, self.clusters)
                         term_bb = ClusteredTerm(delta_bb, ops_bb, vijkl, self.clusters)
                        
                         term_aa.active = list(set([ci.idx,cj.idx,ck.idx,cl.idx]))
                         term_ab.active = list(set([ci.idx,cj.idx,ck.idx,cl.idx]))
-                        #term_ba.active = list(set([ci.idx,cj.idx,ck.idx,cl.idx]))
+                        term_ba.active = list(set([ci.idx,cj.idx,ck.idx,cl.idx]))
                         term_bb.active = list(set([ci.idx,cj.idx,ck.idx,cl.idx]))
                         
-#                        if cj.idx < ci.idx:
-#                            term_a.sign = -1
-#                            term_b.sign = -1
-#                            term_a.ints = 1.0*np.transpose(term_a.ints, axes=(1,0))
-#                            term_b.ints = 1.0*np.transpose(term_b.ints, axes=(1,0))
-               
                         
                         nswaps = countswaps.countSwaps([ci.idx,cj.idx,ck.idx,cl.idx],4)
 
@@ -393,19 +387,16 @@ class ClusteredOperator:
                        
                         term_aa.sign = sign
                         term_ab.sign = sign
-                        #term_ba.sign = sign
+                        term_ba.sign = sign
                         term_bb.sign = sign
                         
                         term_aa.contract_string = contract_string
                         term_ab.contract_string = contract_string
-                        #term_ba.contract_string = contract_string
+                        term_ba.contract_string = contract_string
                         term_bb.contract_string = contract_string
                        
                         #print(term_bb, [ci.idx,cj.idx,ck.idx,cl.idx])
                        
-                        #todo:
-                        #   create einsum contraction strings here and store for each term
-
                         try:
                             self.terms[delta_aa].append(term_aa)
                         except:
@@ -416,10 +407,11 @@ class ClusteredOperator:
                         except:
                             self.terms[delta_ab] = [term_ab]
                         
-                        #try:
-                        #    self.terms[delta_ba].append(term_ba)
-                        #except:                
-                        #    self.terms[delta_ba] = [term_ba]
+                        if len(term_aa.active) > 1:
+                            try:
+                                self.terms[delta_ba].append(term_ba)
+                            except:                
+                                self.terms[delta_ba] = [term_ba]
                         
                         try:
                             self.terms[delta_bb].append(term_bb)
