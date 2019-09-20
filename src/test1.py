@@ -17,7 +17,7 @@ import pyscf
 ttt = time.time()
 
 n_orb = 6
-U = 0.0
+U = 1.0
 beta = 1.0
 
 h, g = get_hubbard_params(n_orb,beta,U,pbc=False)
@@ -331,21 +331,21 @@ if 1:
         break
 
     for c in ci_vector.clusters:
-        for na in range(c.n_orb):
-            for nb in range(c.n_orb):
-                ns.append((na,nb))
+        nsi = []
+        for nai in range(c.n_orb+1):
+            for nbi in range(c.n_orb+1):
+                nsi.append((nai,nbi))
+        ns.append(nsi)
     for newfock in itertools.product(*ns):
         nacurr = 0
         nbcurr = 0
-        print(newfock)
         for c in newfock:
             nacurr += c[0]
-            nbfock += c[1]
+            nbcurr += c[1]
         if nacurr == na and nbcurr == nb:
             ci_vector.add_fockblock(newfock) 
 
 
-ci_vector.print()
 print("\n Make each Fock-Block the full space")
 # create full space for each fock block defined
 if 1:
