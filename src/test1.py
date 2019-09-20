@@ -16,7 +16,7 @@ from ClusteredState import *
 import pyscf
 ttt = time.time()
 
-n_orb = 6
+n_orb = 8
 U = 1.0
 beta = 1.0
 
@@ -53,8 +53,8 @@ if do_fci:
 
 #blocks = [[0,1],[2,3]]
 #blocks = [[0,1,2,3]]
-#blocks = [[0,1,2,3],[4,5,6,7]]
-blocks = [[0,1],[2,3],[4,5]]
+blocks = [[0,1,2,3],[4,5,6,7]]
+#blocks = [[0,1],[2,3],[4,5]]
 #blocks = [[0,1],[2,3],[4,5]]
 #blocks = [[0,1,2,3],[4,5,6,7]]
 #blocks = [[0,1],[2,3,4,5],[6],[7]]
@@ -113,7 +113,9 @@ ci_vector = ClusteredState(clusters)
 #ci_vector.init(((2,2),))
 #ci_vector.init(((2,2),(0,0)))
 #ci_vector.init(((1,1),(1,1)))
-ci_vector.init(((1,1),(1,1),(1,1)))
+#ci_vector.init(((1,1),(1,1),(1,1)))
+#ci_vector.init(((1,1),(1,1),(1,1),(1,1)))
+ci_vector.init(((2,2),(2,2)))
 
 ## add single particle transfers
 #print(" Add fock-blocks for single particle transfers and spin-flips")
@@ -410,10 +412,10 @@ H = np.zeros((len(ci_vector),len(ci_vector)))
 shift_l = 0 
 for fock_li, fock_l in enumerate(ci_vector.data):
     configs_l = ci_vector[fock_l]
+    print(fock_l)
    
     for config_li, config_l in enumerate(configs_l):
         idx_l = shift_l + config_li 
-        
         
         shift_r = 0 
         for fock_ri, fock_r in enumerate(ci_vector.data):
