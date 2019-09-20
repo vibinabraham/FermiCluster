@@ -2,6 +2,8 @@ import numpy as np
 import scipy
 import itertools as it
 
+import opt_einsum as oe
+
 from ci_string import *
 from Hamiltonian import *
 from davidson import *
@@ -103,6 +105,18 @@ class Cluster(object):
         self.ops['Bb'] = {}
         self.ops['Ab'] = {}
         self.ops['Ba'] = {}
+        self.ops['AAaa'] = {}
+        self.ops['BBbb'] = {}
+        self.ops['ABba'] = {}
+        self.ops['BAab'] = {}
+        self.ops['AA'] = {}
+        self.ops['BB'] = {}
+        self.ops['AB'] = {}
+        self.ops['BA'] = {}
+        self.ops['aa'] = {}
+        self.ops['bb'] = {}
+        self.ops['ba'] = {}
+        self.ops['ab'] = {}
 
         #  a, A 
         for na in range(1,self.n_orb+1):
@@ -152,7 +166,7 @@ class Cluster(object):
                 A = self.ops['A'][(na,nb),(na-1,nb)]
                
                 # <IJ|p'q'rs|KL>
-                self.ops['ABba'][(na,nb),(na,nb)] = np.einsum('abp,bcq,cdr,des->aepqrs',A,B,b,a)
+                self.ops['ABba'][(na,nb),(na,nb)] = oe.contract('abp,bcq,cdr,des->aepqrs',A,B,b,a)
         #  BAab
         for na in range(1,self.n_orb+1):
             for nb in range(1,self.n_orb+1):
@@ -162,8 +176,43 @@ class Cluster(object):
                 B = self.ops['B'][(na,nb),(na,nb-1)]
                
                 # <IJ|p'q'rs|KL>
-                self.ops['BAab'][(na,nb),(na,nb)] = np.einsum('abp,bcq,cdr,des->aepqrs',B,A,a,b)
-               
+                self.ops['BAab'][(na,nb),(na,nb)] = oe.contract('abp,bcq,cdr,des->aepqrs',B,A,a,b)
+        
+        
+        #  AA
+        for na in range(2,self.n_orb+1):
+            for nb in range(0,self.n_orb+1):
+                try:
+                    A1 = self.ops['A'][(na-1,nb),(na-2,nb)]
+                    A2 = self.ops['A'][(na,nb),(na,nb-1)]
+                    
+                    self.ops['AA'][(na,nb),(na-2,nb)] = oe.contract('abp,bcq->acpq',A2,A1)
+                    self.ops['aa'][(na-2,nb),(na,nb)] = self.ops['AA'][(na,nb),(na-2,nb)].T
+                except:
+                    pass
+
+        #  BB
+        for na in range(0,self.n_orb+1):
+            for nb in range(2,self.n_orb+1):
+                try:
+                    B1 = self.ops['B'][(na,nb-1),(na,nb-2)]
+                    B2 = self.ops['B'][(na,nb),(na,nb-1)]
+                    
+                    self.ops['BB'][(na,nb),(na,nb-2)] = oe.contract('abp,bcq->acpq',B2,B1)
+                    self.ops['bb'][(na,nb-2),(na,nb)] = self.ops['BB'][(na,nb),(na,nb-2)].T
+                except:
+                    pass 
+        #  AB
+        for na in range(1,self.n_orb+1):
+            for nb in range(1,self.n_orb+1):
+                try:
+                    B = self.ops['B'][(na-1,nb),(na-1,nb-1)]
+                    A = self.ops['A'][(na,nb),(na-1,nb)]
+                    
+                    self.ops['AB'][(na,nb),(na-1,nb-1)] = oe.contract('abp,bcq->acpq',A,B)
+                    self.ops['ba'][(na-1,nb-1),(na,nb)] = self.ops['AB'][(na,nb),(na-1,nb-1)].T
+                except:
+                    pass 
 
         #Add remaining operators ....
 

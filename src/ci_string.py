@@ -5,6 +5,7 @@ import copy as cp
 from Hamiltonian import *
 from davidson import *
 
+import opt_einsum as oe
 
 class ci_string:
 # {{{
@@ -896,12 +897,10 @@ def build_ccaa_ss(no,bra_space,ket_space,basis,spin_case):
     
     if spin_case == "a":
         # v(IJt) <IJ|pqrs|KL> v(KLu)  = v(IJt) <I|pqrs|K> v(KJu) = A(tupqrs)
-        tmp = np.einsum('ikpqrs,kju->ipqrsju',tdm_1spin,v2)
-        tdm = np.einsum('ijt,ipqrsju->tupqrs',v1,tmp)
+        tdm = oe.contract('ijt,ikpqrs,kju->tupqrs',v1,tdm_1spin,v2)
     elif spin_case == "b":
         # v(IJt) <IJ|pqrs|KL> v(KLu)   = v(IJt) tdm(JLpqrs) v(ILu) = A(tupqrs)
-        tmp = np.einsum('jlpqrs,ilu->jpqrsiu',tdm_1spin,v2)
-        tdm = np.einsum('ijt,jpqrsiu->tupqrs',v1,tmp) 
+        tdm = oe.contract('ijt,jlpqrs,ilu->tupqrs',v1,tdm_1spin,v2)
 
  
     v2.shape = (ket_a_max*ket_b_max,nv2)
@@ -1018,9 +1017,7 @@ def build_ca_os(no,bra_space,ket_space,basis,spin_case):
     #                               = v(IJs) Da(IKp) Dbv(JKqt)
     #                               = vDa(JsKp) Dbv(JqKt)
     #                               = D(stpq)
-    tmp1 = np.einsum('jlq,klt->jqkt',Db,v2)
-    tmp2 = np.einsum('ijs,ikp->jskp',v1,Da)
-    tdm = (-1)**NAK * np.einsum('jskp,jqkt->stpq',tmp1,tmp2)
+    tdm = (-1)**NAK * oe.contract('ijs,ikp,jlq,klt->stpq',v1,Da,Db,v2)
 
     v2.shape = (ket_a_max*ket_b_max,nv2)
     v1.shape = (bra_a_max*bra_b_max,nv1)
