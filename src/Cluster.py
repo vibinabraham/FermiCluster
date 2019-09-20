@@ -127,14 +127,21 @@ class Cluster(object):
         #  Aa,Bb
         for na in range(0,self.n_orb+1):
             for nb in range(0,self.n_orb+1):
-                self.ops['Aa'][(na,nb),(na,nb)] = build_ss_ca(self.n_orb, (na,nb),(na,nb),self.basis,'alpha')
-                self.ops['Bb'][(na,nb),(na,nb)] = build_ss_ca(self.n_orb, (na,nb),(na,nb),self.basis,'beta')
+                self.ops['Aa'][(na,nb),(na,nb)] = build_ca_ss(self.n_orb, (na,nb),(na,nb),self.basis,'a')
+                self.ops['Bb'][(na,nb),(na,nb)] = build_ca_ss(self.n_orb, (na,nb),(na,nb),self.basis,'b')
                
         #  Ab,Ba
         for na in range(1,self.n_orb+1):
             for nb in range(1,self.n_orb+1):
-                self.ops['Ab'][(na,nb-1),(na-1,nb)] = build_os_ca(self.n_orb, (na,nb-1),(na-1,nb),self.basis,'ab')
-                self.ops['Ba'][(na-1,nb),(na,nb-1)] = build_os_ca(self.n_orb, (na-1,nb),(na,nb-1),self.basis,'ba')
+                self.ops['Ab'][(na,nb-1),(na-1,nb)] = build_ca_os(self.n_orb, (na,nb-1),(na-1,nb),self.basis,'ab')
+                self.ops['Ba'][(na-1,nb),(na,nb-1)] = build_ca_os(self.n_orb, (na-1,nb),(na,nb-1),self.basis,'ba')
+               
+        #  AAaa,BBbb
+        for na in range(0,self.n_orb+1):
+            for nb in range(0,self.n_orb+1):
+                self.ops['AAaa'][(na,nb),(na,nb)] = build_ccaa_ss(self.n_orb, (na,nb),(na,nb),self.basis,'a')
+                self.ops['BBbb'][(na,nb),(na,nb)] = build_ccaa_ss(self.n_orb, (na,nb),(na,nb),self.basis,'b')
+                print(self.ops['BBbb'][(na,nb),(na,nb)])
                
 
         #Add remaining operators ....

@@ -28,7 +28,7 @@ np.random.seed(2)
 #h[1,2] = 0
 #h[2,1] = 0
 
-if 0:
+if 1:
     Escf,orb,h,g,C = run_hubbard_scf(h,g,n_orb//2)
 
 
@@ -109,7 +109,8 @@ ci_vector = ClusteredState(clusters)
 #ci_vector.init(((2,2),(2,2),(0,0),(0,0)))
 #ci_vector.init(((3,3),(0,0)))
 #ci_vector.init(((2,2),(2,2)))
-ci_vector.init(((1,1),(1,1)))
+ci_vector.init(((2,2),(0,0)))
+#ci_vector.init(((1,1),(1,1)))
 
 # add single particle transfers
 print(" Add fock-blocks for single particle transfers and spin-flips")
@@ -125,6 +126,8 @@ for ref_fblock in fblocks:
                     new_fblock[cj.idx][0] -= 1
                     if new_fblock[ci.idx][0] < 0 or  new_fblock[cj.idx][0] < 0:
                         continue
+                    if new_fblock[ci.idx][0] >= ci.n_orb or  new_fblock[cj.idx][0] >= ci.n_orb:
+                        continue
                     new_fblock = tuple([(b[0],b[1]) for b in new_fblock])
                     ci_vector[new_fblock] = OrderedDict()
                     # beta transfer
@@ -132,6 +135,8 @@ for ref_fblock in fblocks:
                     new_fblock[ci.idx][1] += 1
                     new_fblock[cj.idx][1] -= 1
                     if new_fblock[ci.idx][1] < 0 or  new_fblock[cj.idx][1] < 0:
+                        continue
+                    if new_fblock[ci.idx][0] >= ci.n_orb or  new_fblock[cj.idx][0] >= ci.n_orb:
                         continue
                     new_fblock = tuple([(b[0],b[1]) for b in new_fblock])
                     ci_vector[new_fblock] = OrderedDict()
@@ -144,6 +149,8 @@ for ref_fblock in fblocks:
                     new_fblock[cj.idx][1] -= 1
                     if new_fblock[ci.idx][1] < 0 or  new_fblock[cj.idx][1] < 0:
                         continue
+                    if new_fblock[ci.idx][0] >= ci.n_orb or  new_fblock[cj.idx][0] >= ci.n_orb:
+                        continue
                     new_fblock = tuple([(b[0],b[1]) for b in new_fblock])
                     #ci_vector[new_fblock] = OrderedDict()
                     ci_vector.add_fockblock(new_fblock)
@@ -155,6 +162,8 @@ for ref_fblock in fblocks:
                     new_fblock[cj.idx][0] -= 1
                     new_fblock[cj.idx][1] -= 1
                     if new_fblock[ci.idx][0] < 0 or  new_fblock[cj.idx][0] < 0:
+                        continue
+                    if new_fblock[ci.idx][0] >= ci.n_orb or  new_fblock[cj.idx][0] >= ci.n_orb:
                         continue
                     new_fblock = tuple([(b[0],b[1]) for b in new_fblock])
                     ci_vector[new_fblock] = OrderedDict()
@@ -172,6 +181,8 @@ for ref_fblock in fblocks:
                             new_fblock[ck.idx][1] += 1
                             if new_fblock[ci.idx][0] < 0 or  new_fblock[cj.idx][0] < 0  or  new_fblock[ck.idx][0] < 0:
                                 continue
+                            if new_fblock[ci.idx][0] >= ci.n_orb or  new_fblock[cj.idx][0] >= ci.n_orb  or  new_fblock[ck.idx][0] >= ci.n_orb:
+                                continue
                             new_fblock = tuple([(b[0],b[1]) for b in new_fblock])
                             ci_vector[new_fblock] = OrderedDict()
                             
@@ -182,6 +193,8 @@ for ref_fblock in fblocks:
                             new_fblock[cj.idx][1] += 1
                             new_fblock[ck.idx][1] -= 1
                             if new_fblock[ci.idx][0] < 0 or  new_fblock[cj.idx][0] < 0  or  new_fblock[ck.idx][0] < 0:
+                                continue
+                            if new_fblock[ci.idx][0] >= ci.n_orb or  new_fblock[cj.idx][0] >= ci.n_orb  or  new_fblock[ck.idx][0] >= ci.n_orb:
                                 continue
                             new_fblock = tuple([(b[0],b[1]) for b in new_fblock])
                             ci_vector[new_fblock] = OrderedDict()
@@ -194,6 +207,8 @@ for ref_fblock in fblocks:
                             new_fblock[ck.idx][1] -= 1
                             if new_fblock[ci.idx][0] < 0 or  new_fblock[cj.idx][0] < 0  or  new_fblock[ck.idx][0] < 0:
                                 continue
+                            if new_fblock[ci.idx][0] >= ci.n_orb or  new_fblock[cj.idx][0] >= ci.n_orb  or  new_fblock[ck.idx][0] >= ci.n_orb:
+                                continue
                             new_fblock = tuple([(b[0],b[1]) for b in new_fblock])
                             ci_vector[new_fblock] = OrderedDict()
 
@@ -204,6 +219,8 @@ for ref_fblock in fblocks:
                             new_fblock[cj.idx][0] += 1
                             new_fblock[ck.idx][1] += 1
                             if new_fblock[ci.idx][0] < 0 or  new_fblock[cj.idx][0] < 0  or  new_fblock[ck.idx][0] < 0:
+                                continue
+                            if new_fblock[ci.idx][0] >= ci.n_orb or  new_fblock[cj.idx][0] >= ci.n_orb  or  new_fblock[ck.idx][0] >= ci.n_orb:
                                 continue
                             new_fblock = tuple([(b[0],b[1]) for b in new_fblock])
                             ci_vector[new_fblock] = OrderedDict()
@@ -245,10 +262,9 @@ fock_r = ((1,1),(1,1))
 conf_l = (0,0)
 conf_r = (0,0)
 #me = term_Aa.matrix_element(fock_l, conf_l, fock_r, conf_r)
-me = clustered_ham.terms[((0,0),(0,0))][0].matrix_element(fock_l, conf_l, fock_r, conf_r)
-me += clustered_ham.terms[((0,0),(0,0))][1].matrix_element(fock_l, conf_l, fock_r, conf_r)
-me += clustered_ham.terms[((0,0),(0,0))][2].matrix_element(fock_l, conf_l, fock_r, conf_r)
-me += clustered_ham.terms[((0,0),(0,0))][3].matrix_element(fock_l, conf_l, fock_r, conf_r)
+me = 0
+for t in clustered_ham.terms[((0,0),(0,0))]:
+    me += t.matrix_element(fock_l, conf_l, fock_r, conf_r)
 print(me)
 #exit()
 

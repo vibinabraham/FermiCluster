@@ -97,10 +97,12 @@ class ClusteredTerm:
             are the state indices for clusters 1, 2, and 3, respectively, in the 
             particle number blocks specified by fock_bra and fock_ket.
         """
+        
         for ci in range(self.n_clusters):
             if (bra[ci]!=ket[ci]) and (ci not in self.active):
                 return 0
-        
+       
+
         # <bra|term|ket>    = <IJK|o1o2o3|K'J'I'>
         #                   = <I|o1|I'><J|o2|J'><K|o3|K'> 
         #print(bra,ket,self)
@@ -124,6 +126,8 @@ class ClusteredTerm:
                 #exit()
             #print(o) 
             #print(self.clusters[oi].ops[o].keys())
+            print(oi,o)
+            d = self.clusters[oi].ops[o][(fock_bra[oi],fock_ket[oi])][bra[oi],ket[oi]] #D(I,J,:,:...)
             try:
                 d = self.clusters[oi].ops[o][(fock_bra[oi],fock_ket[oi])][bra[oi],ket[oi]] #D(I,J,:,:...)
             except:
@@ -134,14 +138,14 @@ class ClusteredTerm:
         #print("ints:")
         #print(self.ints)
         me = 0.0
-        mats_inds = ""
-        idx = 0
-        for mi,m in enumerate(mats):
-            for i in range(len(m.shape)):
-                mats_inds += self.ints_inds[idx]
-                idx += 1
-            mats_inds += ","
-        string = mats_inds + self.ints_inds + "->"
+#        mats_inds = ""
+#        idx = 0
+#        for mi,m in enumerate(mats):
+#            for i in range(len(m.shape)):
+#                mats_inds += self.ints_inds[idx]
+#                idx += 1
+#            mats_inds += ","
+#        string = mats_inds + self.ints_inds + "->"
         if len(mats) == 1:
             me = self.sign*np.einsum(self.contract_string,mats[0],self.ints) * state_sign
             if len(self.ints.shape)==4:
@@ -150,6 +154,7 @@ class ClusteredTerm:
             me = self.sign*np.einsum(self.contract_string,mats[0],mats[1],self.ints) * state_sign
             if len(self.ints.shape)==4:
                 print(me)
+                exit()
         elif len(mats) == 3:
             me = self.sign*np.einsum(self.contract_string,mats[0],mats[1],mats[2],self.ints) * state_sign
         elif len(mats) == 4:
@@ -340,11 +345,11 @@ class ClusteredOperator:
                         # i'j'kl<ij|lk> = i'j'kl(il|jk)
                         vijkl = v[ci.orb_list,:,:,:][:,cl.orb_list,:,:][:,:,cj.orb_list,:][:,:,:,ck.orb_list]
                         #vijkl = v[ci.orb_list,:,:,:][:,cj.orb_list,:,:][:,:,ck.orb_list,:][:,:,:,cl.orb_list]
+                        #print('nick:', clusters_idx, vijkl.shape)
                         if  not np.any(vijkl):
                             continue
                         #vijkl = 1.0*np.transpose(vijkl,axes=sorted_idx)
                      
-                        print(vijkl)
                         contract_string = indices[0]
                         for si in range(1,4):
                             if sorted_clusters_idx[si] == sorted_clusters_idx[si-1]:
