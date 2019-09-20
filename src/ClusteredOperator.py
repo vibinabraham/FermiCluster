@@ -153,6 +153,8 @@ class ClusteredTerm:
             #if len(self.ints.shape)==4:
                 #print(me)
         elif len(mats) == 2:
+            print(self, self.contract_string)
+            print(mats[0].shape, mats[1].shape, self.ints.shape)
             me = self.sign*np.einsum(self.contract_string,mats[0],mats[1],self.ints) * state_sign
             #if len(self.ints.shape)==4:
                 #print(me)
@@ -339,29 +341,61 @@ class ClusteredOperator:
                         ops_bb[cl.idx] += "b"
                         
                         clusters_idx = [ci.idx,cj.idx,ck.idx,cl.idx]
-                        indices = ['p','q','r','s']
-                        sorted_idx = np.argsort(clusters_idx)
-                        sorted_clusters_idx = [clusters_idx[s] for s in sorted_idx]
-                        #print(sorted_clusters_idx) 
-
+                        ops_aa_list = ['A','A','a','a']
+                        ops_ab_list = ['A','B','b','a']
+                        ops_ba_list = ['B','A','a','b']
+                        ops_bb_list = ['B','B','b','b']
+                        cont_indices1 = ['p','q','r','s'] #density indices
+                        cont_indices2 = ['p','s','q','r'] #integral indices in chemists notation
+                        sorted_idx = np.argsort(clusters_idx,kind='stable')
+                        
+                        
+                        ops_aa_list = [ops_aa_list[s] for s in sorted_idx]
+                        ops_ab_list = [ops_ab_list[s] for s in sorted_idx]
+                        ops_ba_list = [ops_ba_list[s] for s in sorted_idx]
+                        ops_bb_list = [ops_bb_list[s] for s in sorted_idx]
+                        cont_indices1 = [cont_indices1[s] for s in sorted_idx]
+                        #cont_indices2 = [cont_indices2[s] for s in sorted_idx]
+                        clusters_idx = [clusters_idx[s] for s in sorted_idx]
+                        
+                        
                         # i'j'kl<ij|lk> = i'j'kl(il|jk)
+                        
                         vijkl = v[ci.orb_list,:,:,:][:,cl.orb_list,:,:][:,:,cj.orb_list,:][:,:,:,ck.orb_list]
-                        #vijkl = v[ci.orb_list,:,:,:][:,cj.orb_list,:,:][:,:,ck.orb_list,:][:,:,:,cl.orb_list]
-                        #print('nick:', clusters_idx, vijkl.shape)
+                        
                         if  not np.any(vijkl):
                             continue
+                        
+                        #print(vijkl.shape)
                         #vijkl = 1.0*np.transpose(vijkl,axes=sorted_idx)
-                     
-                        contract_string = indices[0]
-                        for si in range(1,4):
-                            if sorted_clusters_idx[si] == sorted_clusters_idx[si-1]:
-                                contract_string += indices[si]
-                            else:
-                                contract_string += ","+indices[si]
-                        contract_string += ",psqr->"
-                        #print("contract_string",contract_string)
+                        print(vijkl.shape)
+                        str_dict = OrderedDict() 
+                        str_dict[ci.idx] = ""
+                        str_dict[cj.idx] = ""
+                        str_dict[ck.idx] = ""
+                        str_dict[cl.idx] = ""
+                        
+                        for idx in range(4): 
+                            str_dict[clusters_idx[idx]] += cont_indices1[idx] 
+                       
+                        print(str_dict)
+                        
+                        contract_string = ""
+                        for stringi,string in str_dict.items():
+                            contract_string += string + ","
 
-
+#                        contract_string = indices[0]
+#                        for si in range(1,4):
+#                            if sorted_clusters_idx[si] == sorted_clusters_idx[si-1]:
+#                                contract_string += indices[si]
+#                            else:
+#                                contract_string += ","+indices[si]
+                        
+                        contract_string += cont_indices2[0] +cont_indices2[3] +cont_indices2[2] +cont_indices2[1] + "->"
+                        #contract_string += "psqr->"
+                        print("contract_string",contract_string)
+                        print() 
+                        
                         delta_aa = tuple([tuple(i) for i in delta_aa])
                         delta_ab = tuple([tuple(i) for i in delta_ab])
                         delta_ba = tuple([tuple(i) for i in delta_ba])
@@ -407,7 +441,7 @@ class ClusteredOperator:
                         except:
                             self.terms[delta_ab] = [term_ab]
                         
-                        if len(term_aa.active) > 1:
+                        if len(term_ba.active) > 1:
                             try:
                                 self.terms[delta_ba].append(term_ba)
                             except:                
@@ -418,7 +452,6 @@ class ClusteredOperator:
                         except:                
                             self.terms[delta_bb] = [term_bb]
                         
-
 
         print(self.print_terms_header())
         for ti,t in self.terms.items():
