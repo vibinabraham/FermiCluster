@@ -59,8 +59,8 @@ if do_fci:
     print(" FCI:        %12.8f"%e)
 
 #blocks = [[0,2],[1,3]]
-blocks = [[0,1],[2,3]]
-#blocks = [[0,1,2,3]]
+#blocks = [[0,1],[2,3]]
+blocks = [[0,1,2,3]]
 #blocks = [[0,1,2,3],[4,5]]
 #blocks = [[0,1,2,3],[4,5,6,7]]
 #blocks = [[0,1],[2,3],[4,5]]
@@ -106,6 +106,13 @@ for c in clusters:
     print(" Build mats for cluster ",c.idx)
     c.build_op_matrices()
 
+
+for c in clusters:
+    print(c)
+    for k in c.ops.keys():
+        print(" ", k)
+        for f in c.ops[k].keys():
+            print("   ", f)
 #print("a")
 #print(clusters[0].ops['a'][((1,2),(2,2))][0,0,:] )
 #print("A")
@@ -119,10 +126,10 @@ ci_vector = ClusteredState(clusters)
 #ci_vector.init(((2,2),(2,2),(0,0),(0,0)))
 #ci_vector.init(((3,3),(0,0)))
 #ci_vector.init(((2,2),(2,2)))
-#ci_vector.init(((2,2),))
+ci_vector.init(((2,2),))
 #ci_vector.init(((2,2),(1,1)))
 #ci_vector.init(((2,2),(0,0)))
-ci_vector.init(((1,1),(1,1)))
+#ci_vector.init(((1,1),(1,1)))
 #ci_vector.init(((1,1),(1,1),(1,1)))
 #ci_vector.init(((1,1),(1,1),(1,1),(1,1)))
 #ci_vector.init(((2,2),(2,2)))
