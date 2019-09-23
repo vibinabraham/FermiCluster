@@ -5,6 +5,7 @@ import copy as cp
 from Hamiltonian import *
 from davidson import *
 
+import helpers
 import opt_einsum as oe
 
 class ci_string:
@@ -415,7 +416,8 @@ class ci_solver:
    
         #print(" Hamiltonian Matrix:")
         #tools.printm(Hci)
-        
+       
+        helpers.print_mat(Hci)
         print(" Diagonalize Matrix for %i roots" %self.n_roots)
         l,C = scipy.sparse.linalg.eigsh(Hci,self.n_roots,which='SA')
         sort_ind = np.argsort(l)

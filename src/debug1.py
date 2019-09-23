@@ -35,7 +35,7 @@ h += tmp + tmp.T
 #h[2,1] = 0
 #h[3,1] = 0
 
-if 0:
+if 1:
     Escf,orb,h,g,C = run_hubbard_scf(h,g,n_orb//2)
 
 
@@ -56,17 +56,21 @@ if do_fci:
     e, ci = cisolver.kernel(h, g, h.shape[1], mol.nelectron, ecore=0)
     print(" FCI:        %12.8f"%e)
 
-#blocks = [[0,2,1],[3]]
-#blocks = [[0,1],[2,3]]
+H = Hamiltonian()
+H.S = np.eye(h.shape[0])
+H.C = H.S
+H.t = h
+H.V = g
+ci = ci_solver()
+ci.algorithm = "direct"
+ci.init(H,2,1,100)
+print(ci)
+ci.run()
+#self.basis[(na,nb)] = np.eye(ci.results_v.shape[0])
+# = ci.results_v
+
+
 blocks = [[0],[1],[2]]
-#blocks = [[0],[1],[2],[3]]
-#blocks = [[0,1,2,3]]
-#blocks = [[0,1,2,3],[4,5]]
-#blocks = [[0,1,2,3],[4,5,6,7]]
-#blocks = [[0,1],[2,3],[4,5]]
-#blocks = [[0,1],[2,3],[4,5]]
-#blocks = [[0,1,2,3],[4,5,6,7]]
-#blocks = [[0,1],[2,3,4,5],[6],[7]]
 n_blocks = len(blocks)
 clusters = []
 
@@ -289,7 +293,7 @@ for fock_li, fock_l in enumerate(ci_vector.data):
     shift_l += len(configs_l)
    
 
-#print_mat(H)
+print_mat(H)
 #print()
 #print_mat(H-H.T)
 print(" Diagonalize Hamiltonian Matrix:")
