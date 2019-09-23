@@ -16,8 +16,8 @@ from ClusteredState import *
 import pyscf
 ttt = time.time()
 
-n_orb = 4
-U = 1.0
+n_orb = 3
+U = 4
 beta = 1.0
 
 h, g = get_hubbard_params(n_orb,beta,U,pbc=False)
@@ -35,10 +35,8 @@ h += tmp + tmp.T
 #h[2,1] = 0
 #h[3,1] = 0
 
-print(h)
 if 1:
     Escf,orb,h,g,C = run_hubbard_scf(h,g,n_orb//2)
-
 
 
 do_fci = 1
@@ -58,9 +56,11 @@ if do_fci:
     e, ci = cisolver.kernel(h, g, h.shape[1], mol.nelectron, ecore=0)
     print(" FCI:        %12.8f"%e)
 
-#blocks = [[0,2],[1,3]]
+#blocks = [[0,2,1],[3]]
 #blocks = [[0,1],[2,3]]
-blocks = [[0,1,2,3]]
+blocks = [[0],[1],[2]]
+#blocks = [[0],[1],[2],[3]]
+#blocks = [[0,1,2,3]]
 #blocks = [[0,1,2,3],[4,5]]
 #blocks = [[0,1,2,3],[4,5,6,7]]
 #blocks = [[0,1],[2,3],[4,5]]
@@ -81,6 +81,24 @@ for b in seen:
 for ci,c in enumerate(blocks):
     clusters.append(Cluster(ci,c))
 
+
+ci_vector = ClusteredState(clusters)
+#ci_vector.init(((2,2),(2,2),(0,0)))
+#ci_vector.init(((2,2),(2,2),(0,0),(0,0)))
+#ci_vector.init(((3,3),(0,0)))
+#ci_vector.init(((2,2),(2,2)))
+#ci_vector.init(((2,2),))
+#ci_vector.init(((2,2),(1,1)))
+ci_vector.init(((1,1),(1,0),(0,0)))
+#ci_vector.init(((1,1),(1,1),(0,0),(0,0)))
+#ci_vector.init(((3,3),(0,0)))
+#ci_vector.init(((1,1),(1,1)))
+#ci_vector.init(((1,1),(1,1),(1,1)))
+#ci_vector.init(((1,1),(1,1),(1,1),(1,1)))
+#ci_vector.init(((2,2),(2,2)))
+
+
+
 print(" Clusters:")
 [print(ci) for ci in clusters]
 
@@ -88,7 +106,6 @@ clustered_ham = ClusteredOperator(clusters)
 print(" Add 1-body terms")
 clustered_ham.add_1b_terms(h)
 clustered_ham.add_2b_terms(g)
-
 
 print(" Build cluster basis")
 for ci_idx, ci in enumerate(clusters):
@@ -100,39 +117,34 @@ for ci_idx, ci in enumerate(clusters):
     print(" Form basis by diagonalize local Hamiltonian for cluster: ",ci_idx)
     ci.form_eigbasis_from_local_operator(opi,max_roots=1000)
 
-clustered_ham.add_ops_to_clusters()
+#clustered_ham.add_ops_to_clusters()
 print(" Build these local operators")
 for c in clusters:
     print(" Build mats for cluster ",c.idx)
     c.build_op_matrices()
 
 
-for c in clusters:
-    print(c)
-    for k in c.ops.keys():
-        print(" ", k)
-        for f in c.ops[k].keys():
-            print("   ", f)
+#for c in clusters:
+#    print(c)
+#    for opkey,op in c.ops.items():
+#        if opkey == 'ABb':
+#            for fi,f in op.items():
+#                f *= 0.0
+
+#for c in clusters:
+#    print(c)
+#    for k in c.ops.keys():
+#        print(" ", k)
+#        for f in c.ops[k].keys():
+#            print("   ", f,c.ops[k][f].shape)
+
+
 #print("a")
 #print(clusters[0].ops['a'][((1,2),(2,2))][0,0,:] )
 #print("A")
 #print(clusters[0].ops['A'][((2,2),(1,2))][0,0,:] )
 #print(np.trace(clusters[0].ops['Aa'][((2,2),(2,2))][0,0,:] ))
 #exit()
-
-
-ci_vector = ClusteredState(clusters)
-#ci_vector.init(((2,2),(2,2),(0,0)))
-#ci_vector.init(((2,2),(2,2),(0,0),(0,0)))
-#ci_vector.init(((3,3),(0,0)))
-#ci_vector.init(((2,2),(2,2)))
-ci_vector.init(((2,2),))
-#ci_vector.init(((2,2),(1,1)))
-#ci_vector.init(((2,2),(0,0)))
-#ci_vector.init(((1,1),(1,1)))
-#ci_vector.init(((1,1),(1,1),(1,1)))
-#ci_vector.init(((1,1),(1,1),(1,1),(1,1)))
-#ci_vector.init(((2,2),(2,2)))
 
 
 
@@ -208,6 +220,22 @@ ci_vector.print()
 #    [print(t) for t in term]
 #
 #for t in clustered_ham.terms[((0,0),(0,0))]:
+#    met = t.matrix_element(fock_l, conf_l, fock_r, conf_r)
+#    print(t,met)
+#    me += met
+#print(me)
+#exit()
+
+#fock_l = ((2,3),(1,0))
+#fock_r = ((3,3),(0,0))
+#conf_l = (0,0)
+#conf_r = (0,0)
+#me = 0
+##for term_label,term in clustered_ham.terms.items():
+##    print(term_label)
+##    [print(t) for t in term]
+##
+#for t in clustered_ham.terms[((-1,0),(1,0))]:
 #    met = t.matrix_element(fock_l, conf_l, fock_r, conf_r)
 #    print(t,met)
 #    me += met

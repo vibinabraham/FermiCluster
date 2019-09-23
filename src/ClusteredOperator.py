@@ -361,7 +361,7 @@ class ClusteredOperator:
                         ops_ba_list = [ops_ba_list[s] for s in sorted_idx]
                         ops_bb_list = [ops_bb_list[s] for s in sorted_idx]
                         cont_indices1 = [cont_indices1[s] for s in sorted_idx]
-                        cont_indices2 = [cont_indices2[s] for s in sorted_idx]
+                        #cont_indices2 = [cont_indices2[s] for s in sorted_idx]
                         clusters_idx = [clusters_idx[s] for s in sorted_idx]
                         
                        
@@ -375,13 +375,13 @@ class ClusteredOperator:
                         
                         # i'j'kl<ij|lk> = i'j'kl(il|jk)
                         
-                        vijkl = v[ci.orb_list,:,:,:][:,cl.orb_list,:,:][:,:,cj.orb_list,:][:,:,:,ck.orb_list]
+                        vijkl = sign*.5*v[ci.orb_list,:,:,:][:,cl.orb_list,:,:][:,:,cj.orb_list,:][:,:,:,ck.orb_list]
                         
                         if  not np.any(vijkl):
                             continue
                         
-                        vijkl = 1.0*np.transpose(vijkl,axes=[0,2,3,1]) # align with 2rdm indices
-                        vijkl = sign * np.transpose(vijkl,axes=sorted_idx) # sort 
+                        #vijkl = np.transpose(vijkl,axes=[0,2,3,1]) # align with 2rdm indices
+                        #vijkl = sign * np.transpose(vijkl,axes=sorted_idx) # sort 
 
                         #print(vijkl.shape)
 
@@ -407,7 +407,7 @@ class ClusteredOperator:
 #                            else:
 #                                contract_string += ","+indices[si]
                         
-                        contract_string += cont_indices1[0] +cont_indices1[1] +cont_indices1[2] +cont_indices1[3] + "->"
+                        contract_string += cont_indices2[0] +cont_indices2[1] +cont_indices2[2] +cont_indices2[3] + "->"
                         #contract_string += "psqr->"
                         #print("contract_string",contract_string)
                         #print() 
@@ -455,26 +455,30 @@ class ClusteredOperator:
                         except:
                             self.terms[delta_ab] = [term_ab]
                         
-                        if len(term_ba.active) > 1:
-                            try:
-                                self.terms[delta_ba].append(term_ba)
-                            except:                
-                                self.terms[delta_ba] = [term_ba]
+#                        if len(term_ba.active) > 1:
+#                            try:
+#                                self.terms[delta_ba].append(term_ba)
+#                            except:                
+#                                self.terms[delta_ba] = [term_ba]
+                        try:
+                            self.terms[delta_ba].append(term_ba)
+                        except:                
+                            self.terms[delta_ba] = [term_ba]
                         
                         try:
                             self.terms[delta_bb].append(term_bb)
                         except:                
                             self.terms[delta_bb] = [term_bb]
 
-                        
+                                
 
-        #exit()
         print(self.print_terms_header())
         for ti,t in self.terms.items():
             print(ti)
             for tt in t:
                 print(tt,tt.contract_string)
-                #print_mat(tt.ints)
+                #print(tt.ints)
+        #exit()
 # }}}
 
     def add_2b_terms_old(self,v):
