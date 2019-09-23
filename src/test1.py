@@ -16,7 +16,7 @@ from ClusteredState import *
 import pyscf
 ttt = time.time()
 
-n_orb = 6
+n_orb = 4
 U = 1.0
 beta = 1.0
 
@@ -29,7 +29,7 @@ np.random.seed(2)
 #h[1,2] = 0
 #h[2,1] = 0
 
-if 1:
+if 0:
     Escf,orb,h,g,C = run_hubbard_scf(h,g,n_orb//2)
 
 
@@ -51,9 +51,9 @@ if do_fci:
     e, ci = cisolver.kernel(h, g, h.shape[1], mol.nelectron, ecore=0)
     print(" FCI:        %12.8f"%e)
 
-#blocks = [[0,1],[2,3]]
+blocks = [[0,1],[2,3]]
 #blocks = [[0,1,2,3]]
-blocks = [[0,1,2,3],[4,5]]
+#blocks = [[0,1,2,3],[4,5]]
 #blocks = [[0,1,2,3],[4,5,6,7]]
 #blocks = [[0,1],[2,3],[4,5]]
 #blocks = [[0,1],[2,3],[4,5]]
@@ -112,9 +112,9 @@ ci_vector = ClusteredState(clusters)
 #ci_vector.init(((3,3),(0,0)))
 #ci_vector.init(((2,2),(2,2)))
 #ci_vector.init(((2,2),))
-ci_vector.init(((2,2),(1,1)))
+#ci_vector.init(((2,2),(1,1)))
 #ci_vector.init(((2,2),(0,0)))
-#ci_vector.init(((1,1),(1,1)))
+ci_vector.init(((1,1),(1,1)))
 #ci_vector.init(((1,1),(1,1),(1,1)))
 #ci_vector.init(((1,1),(1,1),(1,1),(1,1)))
 #ci_vector.init(((2,2),(2,2)))
