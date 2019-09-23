@@ -124,8 +124,16 @@ class ClusteredTerm:
             #print(o) 
             #print(self.clusters[oi].ops[o].keys())
             try:
-                d = self.clusters[oi].ops[o][(fock_bra[oi],fock_ket[oi])][bra[oi],ket[oi]] #D(I,J,:,:...)
+                do = self.clusters[oi].ops[o]
+                #do = self.clusters[oi].ops[o][(fock_bra[oi],fock_ket[oi])][bra[oi],ket[oi]] #D(I,J,:,:...)
             except:
+                print(" Couldn't find:", self)
+                exit()
+                return 0
+            try:
+                d = do[(fock_bra[oi],fock_ket[oi])][bra[oi],ket[oi]] #D(I,J,:,:...)
+            except:
+                #print(" Couldn't find:", self)
                 return 0
             mats.append(d)
             #print(self.clusters[oi].ops[o][tuple([].extend(fock_bra[oi])).extend(fock_ket[oi]))].shape)
