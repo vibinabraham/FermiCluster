@@ -40,7 +40,7 @@ class ClusteredTerm:
         self.delta = delta
         self.ops = ops
         self.ints = ints
-        self.sign = 1
+        #self.sign = 1
         self.active = [] 
         assert(len(self.ints.shape) == 2 or len(self.ints.shape) == 4) 
         if len(self.ints.shape) == 2:
@@ -58,13 +58,6 @@ class ClusteredTerm:
             out += " %2i"%d[1]
             out += ":"
         out += "|"
-        if self.sign == 1:
-            out += "+"
-        elif self.sign == -1:
-            out += "-"
-        else:
-            print("wtf?")
-            exit()
         for o in self.ops:
             if o == "":
                 out += " ____,"
@@ -149,20 +142,20 @@ class ClusteredTerm:
 #            mats_inds += ","
 #        string = mats_inds + self.ints_inds + "->"
         if len(mats) == 1:
-            me = self.sign*np.einsum(self.contract_string,mats[0],self.ints) * state_sign
+            me = np.einsum(self.contract_string,mats[0],self.ints) * state_sign
             #if len(self.ints.shape)==4:
                 #print(me)
         elif len(mats) == 2:
             #print(self, self.contract_string)
             #print(mats[0].shape, mats[1].shape, self.ints.shape)
-            me = self.sign*np.einsum(self.contract_string,mats[0],mats[1],self.ints) * state_sign
+            me = np.einsum(self.contract_string,mats[0],mats[1],self.ints) * state_sign
             #if len(self.ints.shape)==4:
                 #print(me)
                 #exit()
         elif len(mats) == 3:
-            me = self.sign*np.einsum(self.contract_string,mats[0],mats[1],mats[2],self.ints) * state_sign
+            me = np.einsum(self.contract_string,mats[0],mats[1],mats[2],self.ints) * state_sign
         elif len(mats) == 4:
-            me = self.sign*np.einsum(self.contract_string,mats[0],mats[1],mats[2],mats[3],self.ints) * state_sign
+            me = np.einsum(self.contract_string,mats[0],mats[1],mats[2],mats[3],self.ints) * state_sign
         elif len(mats) == 0:
             return 0 
         else:
@@ -225,6 +218,9 @@ class ClusteredOperator:
                 ops_b[cj.idx] += "b"
                 hij = h[ci.orb_list,:][:,cj.orb_list]
 
+                if  not np.any(hij):
+                    continue
+                
                 delta_a = tuple([tuple(i) for i in delta_a])
                 delta_b = tuple([tuple(i) for i in delta_b])
                 term_a = ClusteredTerm(delta_a, ops_a, hij, self.clusters)
@@ -237,10 +233,8 @@ class ClusteredOperator:
                     term_a.active = [ci.idx,cj.idx]
                     term_b.active = [ci.idx,cj.idx]
                 if cj.idx < ci.idx:
-                    term_a.sign = -1
-                    term_b.sign = -1
-                    term_a.ints = 1.0*np.transpose(term_a.ints, axes=(1,0))
-                    term_b.ints = 1.0*np.transpose(term_b.ints, axes=(1,0))
+                    term_a.ints = -1.0*np.transpose(term_a.ints, axes=(1,0))
+                    term_b.ints = -1.0*np.transpose(term_b.ints, axes=(1,0))
                     #term_a.ints = np.transpose(term_a.ints, axes=(0,1))
                     #term_b.ints = np.transpose(term_b.ints, axes=(0,1))
 
@@ -295,8 +289,8 @@ class ClusteredOperator:
                         delta_bb = list(cp.deepcopy(delta_tmp)) 
                         delta_ab = list(cp.deepcopy(delta_tmp)) 
                         delta_ba = list(cp.deepcopy(delta_tmp)) 
-                        print("\n===========================================================")
-                        print("ci.idx, cj.idx, ck.idx, cl.idx",ci.idx, cj.idx, ck.idx, cl.idx)
+                        #print("\n===========================================================")
+                        #print("ci.idx, cj.idx, ck.idx, cl.idx",ci.idx, cj.idx, ck.idx, cl.idx)
                         ops_aa = cp.deepcopy(ops_tmp) #alpha hopping
                         ops_ab = cp.deepcopy(ops_tmp) #beta hopping
                         ops_ba = cp.deepcopy(ops_tmp) #alpha hopping
@@ -357,10 +351,17 @@ class ClusteredOperator:
                         ops_ba_list = [ops_ba_list[s] for s in sorted_idx]
                         ops_bb_list = [ops_bb_list[s] for s in sorted_idx]
                         cont_indices1 = [cont_indices1[s] for s in sorted_idx]
-                        #cont_indices2 = [cont_indices2[s] for s in sorted_idx]
+                        cont_indices2 = [cont_indices2[s] for s in sorted_idx]
                         clusters_idx = [clusters_idx[s] for s in sorted_idx]
                         
-                        print('indices:', cont_indices1)
+                       
+                        # get sign from reordering operators
+                        sign = 1
+                        nswaps = countswaps.countSwaps([ci.idx,cj.idx,ck.idx,cl.idx],4)
+                        if nswaps%2!=0:
+                            sign = -1
+                        
+                        #print('indices:', cont_indices1)
                         
                         # i'j'kl<ij|lk> = i'j'kl(il|jk)
                         
@@ -370,9 +371,9 @@ class ClusteredOperator:
                             continue
                         
                         vijkl = 1.0*np.transpose(vijkl,axes=[0,2,3,1]) # align with 2rdm indices
-                        vijkl = 1.0*np.transpose(vijkl,axes=sorted_idx) # sort 
+                        vijkl = sign * np.transpose(vijkl,axes=sorted_idx) # sort 
 
-                        print(vijkl.shape)
+                        #print(vijkl.shape)
 
 
                         #   Group the indices by cluster
@@ -383,7 +384,7 @@ class ClusteredOperator:
                         for idx in range(4): 
                             str_dict[clusters_idx[idx]] += cont_indices1[idx] 
                        
-                        print(str_dict)
+                        #print(str_dict)
                         
                         contract_string = ""
                         for stringi,string in str_dict.items():
@@ -398,8 +399,8 @@ class ClusteredOperator:
                         
                         contract_string += cont_indices1[0] +cont_indices1[1] +cont_indices1[2] +cont_indices1[3] + "->"
                         #contract_string += "psqr->"
-                        print("contract_string",contract_string)
-                        print() 
+                        #print("contract_string",contract_string)
+                        #print() 
                         
                         delta_aa = tuple([tuple(i) for i in delta_aa])
                         delta_ab = tuple([tuple(i) for i in delta_ab])
@@ -417,17 +418,15 @@ class ClusteredOperator:
                         term_bb.active = list(set([ci.idx,cj.idx,ck.idx,cl.idx]))
                         
                         
-                        nswaps = countswaps.countSwaps([ci.idx,cj.idx,ck.idx,cl.idx],4)
-
-                        if nswaps%2==0:
-                            sign = 1
-                        else: 
-                            sign = -1
                        
-                        term_aa.sign = sign
-                        term_ab.sign = sign
-                        term_ba.sign = sign
-                        term_bb.sign = sign
+                        #term_aa.sign = sign
+                        #term_ab.sign = sign
+                        #term_ba.sign = sign
+                        #term_bb.sign = sign
+                        #term_aa.ints *= sign
+                        #term_ab.ints *= sign
+                        #term_ba.ints *= sign
+                        #term_bb.ints *= sign
                         
                         term_aa.contract_string = contract_string
                         term_ab.contract_string = contract_string
@@ -456,6 +455,7 @@ class ClusteredOperator:
                             self.terms[delta_bb].append(term_bb)
                         except:                
                             self.terms[delta_bb] = [term_bb]
+
                         
 
         #exit()
@@ -463,7 +463,7 @@ class ClusteredOperator:
         for ti,t in self.terms.items():
             print(ti)
             for tt in t:
-                print(tt)
+                print(tt,tt.contract_string)
                 #print_mat(tt.ints)
 # }}}
 
@@ -676,7 +676,6 @@ class ClusteredOperator:
             out += " Δb"
             out += ":"
         out += "|"
-        out += " "
         for oi,o in enumerate(self.clusters):
             out += " %4i,"%oi
         return out

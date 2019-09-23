@@ -17,19 +17,26 @@ import pyscf
 ttt = time.time()
 
 n_orb = 4
-U = 1.0
+U = 0.1
 beta = 1.0
 
 h, g = get_hubbard_params(n_orb,beta,U,pbc=False)
 np.random.seed(2)
-#tmp = np.random.rand(h.shape)*0.01
-#h += tmp + tmp.T
+tmp = np.random.rand(h.shape[0])*0.01
+h += tmp + tmp.T
 #tmp = np.random.rand(v.shape)*0.01
 #h += .11
-#h[1,2] = 0
-#h[2,1] = 0
+h[0,2] = 0
+h[0,3] = 0
+h[1,2] = 0
+h[1,3] = 0
+h[2,0] = 0
+h[3,0] = 0
+h[2,1] = 0
+h[3,1] = 0
 
-if 0:
+print(h)
+if 1:
     Escf,orb,h,g,C = run_hubbard_scf(h,g,n_orb//2)
 
 
@@ -51,6 +58,7 @@ if do_fci:
     e, ci = cisolver.kernel(h, g, h.shape[1], mol.nelectron, ecore=0)
     print(" FCI:        %12.8f"%e)
 
+blocks = [[0,2],[1,3]]
 blocks = [[0,1],[2,3]]
 #blocks = [[0,1,2,3]]
 #blocks = [[0,1,2,3],[4,5]]
