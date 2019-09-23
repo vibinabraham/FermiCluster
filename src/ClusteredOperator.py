@@ -142,6 +142,8 @@ class ClusteredTerm:
 #            mats_inds += ","
 #        string = mats_inds + self.ints_inds + "->"
         if len(mats) == 1:
+            #print(self, self.contract_string)
+            #print(self.ints)
             me = np.einsum(self.contract_string,mats[0],self.ints) * state_sign
             #if len(self.ints.shape)==4:
                 #print(me)

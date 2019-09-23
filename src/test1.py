@@ -17,23 +17,23 @@ import pyscf
 ttt = time.time()
 
 n_orb = 4
-U = 0.1
+U = 1.0
 beta = 1.0
 
 h, g = get_hubbard_params(n_orb,beta,U,pbc=False)
 np.random.seed(2)
-tmp = np.random.rand(h.shape[0])*0.01
+tmp = np.random.rand(h.shape[0],h.shape[1])*0.01
 h += tmp + tmp.T
 #tmp = np.random.rand(v.shape)*0.01
 #h += .11
-h[0,2] = 0
-h[0,3] = 0
-h[1,2] = 0
-h[1,3] = 0
-h[2,0] = 0
-h[3,0] = 0
-h[2,1] = 0
-h[3,1] = 0
+#h[0,2] = 0
+#h[0,3] = 0
+#h[1,2] = 0
+#h[1,3] = 0
+#h[2,0] = 0
+#h[3,0] = 0
+#h[2,1] = 0
+#h[3,1] = 0
 
 print(h)
 if 1:
@@ -58,7 +58,7 @@ if do_fci:
     e, ci = cisolver.kernel(h, g, h.shape[1], mol.nelectron, ecore=0)
     print(" FCI:        %12.8f"%e)
 
-blocks = [[0,2],[1,3]]
+#blocks = [[0,2],[1,3]]
 blocks = [[0,1],[2,3]]
 #blocks = [[0,1,2,3]]
 #blocks = [[0,1,2,3],[4,5]]
@@ -183,7 +183,7 @@ ci_vector.print()
 #for term_label,term in clustered_ham.terms.items():
 #    print(term_label)
 #    [print(t) for t in term]
-#
+# 
 #for t in clustered_ham.terms[((0,0),)]:
 #    met = t.matrix_element(fock_l, conf_l, fock_r, conf_r)
 #    print(t,met)
@@ -205,7 +205,7 @@ ci_vector.print()
 #    print(t,met)
 #    me += met
 #print(me)
-##exit()
+#exit()
 
 
 
