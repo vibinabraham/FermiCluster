@@ -370,8 +370,9 @@ class ClusteredOperator:
                         nswaps = countswaps.countSwaps([ci.idx,cj.idx,ck.idx,cl.idx],4)
                         if nswaps%2!=0:
                             sign = -1
-                        
-                        #print('indices:', cont_indices1)
+                       
+                        sign = 1
+                        print('indices:', [ci.idx,cj.idx,ck.idx,cl.idx], cont_indices1, sign)
                         
                         # i'j'kl<ij|lk> = i'j'kl(il|jk)
                         

@@ -16,13 +16,13 @@ from ClusteredState import *
 import pyscf
 ttt = time.time()
 
-n_orb = 3
-U = 4
+n_orb = 2
+U = 100.
 beta = 1.0
 
 h, g = get_hubbard_params(n_orb,beta,U,pbc=False)
 np.random.seed(2)
-tmp = np.random.rand(h.shape[0],h.shape[1])*0.01
+tmp = np.random.rand(h.shape[0],h.shape[1])*0.1
 h += tmp + tmp.T
 #tmp = np.random.rand(v.shape)*0.01
 #h += .11
@@ -54,7 +54,7 @@ if do_fci:
     cisolver = fci.direct_spin1.FCI(mol)
     #e, ci = cisolver.kernel(h1, eri, h1.shape[1], 2, ecore=mol.energy_nuc())
     e, ci = cisolver.kernel(h, g, h.shape[1], mol.nelectron, ecore=0)
-    print(" FCI:        %12.8f"%e)
+    print(" FCI:        %16.12f"%e)
 
 H = Hamiltonian()
 H.S = np.eye(h.shape[0])
@@ -63,14 +63,15 @@ H.t = h
 H.V = g
 ci = ci_solver()
 ci.algorithm = "direct"
-ci.init(H,2,1,100)
+ci.init(H,1,1,100)
 print(ci)
 ci.run()
 #self.basis[(na,nb)] = np.eye(ci.results_v.shape[0])
 # = ci.results_v
 
 
-blocks = [[0],[1],[2]]
+blocks = [[0],[1]]
+#blocks = [[0],[1],[2]]
 n_blocks = len(blocks)
 clusters = []
 
@@ -93,7 +94,7 @@ ci_vector = ClusteredState(clusters)
 #ci_vector.init(((2,2),(2,2)))
 #ci_vector.init(((2,2),))
 #ci_vector.init(((2,2),(1,1)))
-ci_vector.init(((1,1),(1,0),(0,0)))
+ci_vector.init(((1,1),(0,0)))
 #ci_vector.init(((1,1),(1,1),(0,0),(0,0)))
 #ci_vector.init(((3,3),(0,0)))
 #ci_vector.init(((1,1),(1,1)))
@@ -302,6 +303,6 @@ idx = e.argsort()
 e = e[idx]
 v = v[:,idx]
 v0 = v[:,0]
-print(" Ground state of CI:                 %12.8f  CI Dim: %4i "%(e[0].real,len(ci_vector)))
+print(" Ground state of CI:                 %16.12f  CI Dim: %4i "%(e[0].real,len(ci_vector)))
 
 
