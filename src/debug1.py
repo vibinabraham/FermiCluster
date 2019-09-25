@@ -152,8 +152,13 @@ for c in clusters:
 #exit()
 
 
-
-
+print()
+print(" Two electron integrals:")
+for i in range(n_orb):
+    for j in range(n_orb):
+        for k in range(n_orb):
+            for l in range(n_orb):
+                print(" %4i %4i %4i %4i: %12.8f" %(i,j,k,l,g[i,j,k,l]))
            
 if 1:
     # create full space for each fock block defined
@@ -306,3 +311,15 @@ v0 = v[:,0]
 print(" Ground state of CI:                 %16.12f  CI Dim: %4i "%(e[0].real,len(ci_vector)))
 
 
+H = Hamiltonian()
+H.S = np.eye(h.shape[0])
+H.C = H.S
+H.t = h
+H.V = g
+ci = ci_solver()
+ci.algorithm = "direct"
+ci.init(H,1,1,100)
+print(ci)
+ci.run()
+#self.basis[(na,nb)] = np.eye(ci.results_v.shape[0])
+# = ci.results_v

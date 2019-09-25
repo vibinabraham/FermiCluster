@@ -150,17 +150,36 @@ class Cluster(object):
                 #   basis transformation costs, but simplifies later manipulations. Later I need to 
                 #   remove the redundant storage by manually handling the transpositions from a to A
 
-        #  Aa,Bb
-        for na in range(0,self.n_orb+1):
+        #  Aa
+        for na in range(1,self.n_orb+1):
             for nb in range(0,self.n_orb+1):
                 self.ops['Aa'][(na,nb),(na,nb)] = build_ca_ss(self.n_orb, (na,nb),(na,nb),self.basis,'a')
+        #  Bb
+        for na in range(0,self.n_orb+1):
+            for nb in range(1,self.n_orb+1):
                 self.ops['Bb'][(na,nb),(na,nb)] = build_ca_ss(self.n_orb, (na,nb),(na,nb),self.basis,'b')
                
-        #  Ab,Ba
+#        #  Ab,Ba
+#        for na in range(1,self.n_orb+1):
+#            for nb in range(1,self.n_orb+1):
+#                self.ops['Ab'][(na,nb-1),(na-1,nb)] = build_ca_os(self.n_orb, (na,nb-1),(na-1,nb),self.basis,'ab')
+#                self.ops['Ba'][(na-1,nb),(na,nb-1)] = build_ca_os(self.n_orb, (na-1,nb),(na,nb-1),self.basis,'ba')
+        
+        #  Ab
         for na in range(1,self.n_orb+1):
             for nb in range(1,self.n_orb+1):
-                self.ops['Ab'][(na,nb-1),(na-1,nb)] = build_ca_os(self.n_orb, (na,nb-1),(na-1,nb),self.basis,'ab')
-                self.ops['Ba'][(na-1,nb),(na,nb-1)] = build_ca_os(self.n_orb, (na-1,nb),(na,nb-1),self.basis,'ba')
+                b = self.ops['b'][(na-1,nb-1),(na-1,nb)]
+                A = self.ops['A'][(na,nb-1),(na-1,nb-1)]
+                self.ops['Ab'][(na,nb-1),(na-1,nb)] = oe.contract('abp,bcq->acpq',A,b)
+        
+        #  Ba
+        for na in range(1,self.n_orb+1):
+            for nb in range(1,self.n_orb+1):
+                a = self.ops['a'][(na-1,nb-1),(na,nb-1)]
+                B = self.ops['B'][(na-1,nb),(na-1,nb-1)]
+                self.ops['Ba'][(na-1,nb),(na,nb-1)] = oe.contract('abp,bcq->acpq',B,a)
+        
+               
                
 #        #  AAaa,BBbb
 #        for na in range(0,self.n_orb+1):

@@ -158,6 +158,9 @@ class ClusteredTerm:
         elif len(mats) == 2:
             #print(self, self.contract_string)
             #print(mats[0].shape, mats[1].shape, self.ints.shape)
+            print()
+            print(fock_bra, "|", fock_ket)
+            print(self, "D1", mats[0], "D2", mats[1], "Ints", self.ints, 'State sign: ', state_sign)
             me = np.einsum(self.contract_string,mats[0],mats[1],self.ints) * state_sign
             #if len(self.ints.shape)==4:
                 #print(me)
@@ -371,7 +374,6 @@ class ClusteredOperator:
                         if nswaps%2!=0:
                             sign = -1
                        
-                        sign = 1
                         print('indices:', [ci.idx,cj.idx,ck.idx,cl.idx], cont_indices1, sign)
                         
                         # i'j'kl<ij|lk> = i'j'kl(il|jk)
@@ -477,7 +479,7 @@ class ClusteredOperator:
         for ti,t in self.terms.items():
             print(ti)
             for tt in t:
-                print(tt,tt.contract_string)
+                print(tt,tt.contract_string,tt.ints)
                 #print(tt.ints)
         #exit()
 # }}}
