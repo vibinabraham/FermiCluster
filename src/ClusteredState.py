@@ -52,6 +52,7 @@ class ClusteredState(OrderedDict):
         for b,c in self.data.items():
             l += len(c)
         return l 
+
     def fblock(self,b):
         return self.data[b]
     def fblocks(self):

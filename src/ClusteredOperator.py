@@ -6,6 +6,7 @@ from collections import OrderedDict
 from helpers import *
 
 import countswaps
+from ClusteredState import *
 
 class LocalOperator:
     def __init__(self, cluster):
@@ -15,6 +16,8 @@ class LocalOperator:
         self.terms.append(term)
     def build_matrix_dumb1(self):
         np.zeros([self.cluster.dim_tot, self.cluster.dim_tot])
+
+
 
 class ClusteredTerm:
     def __init__(self, delta, ops, ints, clusters):
@@ -265,7 +268,7 @@ class ClusteredOperator:
                 #print_mat(tt.ints)
 # }}}
 
-    def add_2b_terms(self,v):
+    def add_2b_terms(self,v,iprint=0):
         """
         Add terms of the form v_{pqrs}\hat{a}^\dagger_p\hat{a}^\dagger_q\hat{a}_s\hat{a}_r
 
@@ -365,18 +368,21 @@ class ClusteredOperator:
                         if nswaps%2!=0:
                             sign = -1
                        
-                        print('indices:', [ci.idx,cj.idx,ck.idx,cl.idx], cont_indices1, sign)
+                        #print('indices:', [ci.idx,cj.idx,ck.idx,cl.idx], cont_indices1, sign)
                         
                         # i'j'kl<ij|lk> = i'j'kl(il|jk)
                         
+                        #vijkl = sign*v[ci.orb_list,:,:,:][:,cl.orb_list,:,:][:,:,cj.orb_list,:][:,:,:,ck.orb_list]
                         vijkl = sign*.5*v[ci.orb_list,:,:,:][:,cl.orb_list,:,:][:,:,cj.orb_list,:][:,:,:,ck.orb_list]
                         
                         if  not np.any(vijkl):
                             continue
                         
-                        #vijkl = np.transpose(vijkl,axes=[0,2,3,1]) # align with 2rdm indices
-                        #vijkl = sign * np.transpose(vijkl,axes=sorted_idx) # sort 
-
+                        #vijkl = np.transpose(vijkl,axes=sorted_idx) # sort 
+                    
+                        sorted_idx_ints = np.argsort([ci.idx,cl.idx,cj.idx,ck.idx],kind='stable')
+                        cont_indices2 = [cont_indices2[s] for s in sorted_idx_ints]
+                        vijkl = np.transpose(vijkl,axes=sorted_idx_ints) # sort 
                         #print(vijkl.shape)
 
 
@@ -394,17 +400,8 @@ class ClusteredOperator:
                         for stringi,string in str_dict.items():
                             contract_string += string + ","
 
-#                        contract_string = indices[0]
-#                        for si in range(1,4):
-#                            if sorted_clusters_idx[si] == sorted_clusters_idx[si-1]:
-#                                contract_string += indices[si]
-#                            else:
-#                                contract_string += ","+indices[si]
                         
                         contract_string += cont_indices2[0] +cont_indices2[1] +cont_indices2[2] +cont_indices2[3] + "->"
-                        #contract_string += "psqr->"
-                        #print("contract_string",contract_string)
-                        #print() 
                         
                         delta_aa = tuple([tuple(i) for i in delta_aa])
                         delta_ab = tuple([tuple(i) for i in delta_ab])
@@ -464,211 +461,29 @@ class ClusteredOperator:
                         except:                
                             self.terms[delta_bb] = [term_bb]
 
-                                
 
-        print(self.print_terms_header())
-        for ti,t in self.terms.items():
-            print(ti)
-            for tt in t:
-                print(tt,tt.contract_string,tt.ints)
-                #print(tt.ints)
-        #exit()
+
+        if iprint > 2:
+            print(self.print_terms_header())
+            for ti,t in self.terms.items():
+                print(ti)
+                for tt in t:
+                    print(tt)
 # }}}
 
-    def add_2b_terms_old(self,v):
+    def combine_common_terms(self,iprint=0):
         """
-        Add terms of the form v_{pqrs}\hat{a}^\dagger_p\hat{a}^\dagger_q\hat{a}_s\hat{a}_r
-
-        input:
-        v is a square matrix NxNxNxN, where N is the number of spatial orbitals
+        
         """
 # {{{
-        assert(len(v.shape)==4)
-        assert(v.shape[0]==self.n_orb)
-        assert(v.shape[1]==self.n_orb)
-        assert(v.shape[2]==self.n_orb)
-        assert(v.shape[3]==self.n_orb)
-
-        delta_tmp = []
-        ops_tmp = []
-        for ci in self.clusters:
-            delta_tmp.append([0,0])
-            ops_tmp.append("")
-
-        for ci in self.clusters:
-            for cj in self.clusters:
-                for ck in self.clusters:
-                    for cl in self.clusters:
-                        delta_aa = list(cp.deepcopy(delta_tmp)) 
-                        delta_bb = list(cp.deepcopy(delta_tmp)) 
-                        delta_ab = list(cp.deepcopy(delta_tmp)) 
-                        delta_ba = list(cp.deepcopy(delta_tmp)) 
-                        ops_aa = cp.deepcopy(ops_tmp) #alpha hopping
-                        ops_ab = cp.deepcopy(ops_tmp) #beta hopping
-                        ops_ba = cp.deepcopy(ops_tmp) #alpha hopping
-                        ops_bb = cp.deepcopy(ops_tmp) #beta hopping
-                        
-                        delta_aa[ci.idx][0] += 1  #not diagonal
-                        delta_aa[cj.idx][0] += 1  #not diagonal
-                        delta_aa[ck.idx][0] -= 1  #not diagonal
-                        delta_aa[cl.idx][0] -= 1  #not diagonal
-
-                        delta_ab[ci.idx][0] += 1  #not diagonal
-                        delta_ab[cj.idx][1] += 1  #not diagonal
-                        delta_ab[ck.idx][1] -= 1  #not diagonal
-                        delta_ab[cl.idx][0] -= 1  #not diagonal
-
-                        delta_ba[ci.idx][1] += 1  #not diagonal
-                        delta_ba[cj.idx][0] += 1  #not diagonal
-                        delta_ba[ck.idx][0] -= 1  #not diagonal
-                        delta_ba[cl.idx][1] -= 1  #not diagonal
-
-                        delta_bb[ci.idx][1] += 1  #not diagonal
-                        delta_bb[cj.idx][1] += 1  #not diagonal
-                        delta_bb[ck.idx][1] -= 1  #not diagonal
-                        delta_bb[cl.idx][1] -= 1  #not diagonal
-
-                        ops_aa[ci.idx] += "A"
-                        ops_aa[cj.idx] += "A"
-                        ops_aa[ck.idx] += "a"
-                        ops_aa[cl.idx] += "a"
-                        
-                        ops_ab[ci.idx] += "A"
-                        ops_ab[cj.idx] += "B"
-                        ops_ab[ck.idx] += "b"
-                        ops_ab[cl.idx] += "a"
-                        
-                        ops_ba[ci.idx] += "B"
-                        ops_ba[cj.idx] += "A"
-                        ops_ba[ck.idx] += "a"
-                        ops_ba[cl.idx] += "b"
-                        
-                        ops_bb[ci.idx] += "B"
-                        ops_bb[cj.idx] += "B"
-                        ops_bb[ck.idx] += "b"
-                        ops_bb[cl.idx] += "b"
-                        
-                        clusters_idx = [ci.idx,cj.idx,ck.idx,cl.idx]
-                        ops_aa_list = ['A','A','a','a']
-                        ops_ab_list = ['A','B','b','a']
-                        ops_ba_list = ['B','A','a','b']
-                        ops_bb_list = ['B','B','b','b']
-                        cont_indices1 = ['i','j','k','l'] #density indices
-                        cont_indices2 = ['i','l','j','k'] #integral indices in chemists notation
-                        sorted_idx = np.argsort(clusters_idx,kind='stable')
-                        
-                        
-                        ops_aa_list = [ops_aa_list[s] for s in sorted_idx]
-                        ops_ab_list = [ops_ab_list[s] for s in sorted_idx]
-                        ops_ba_list = [ops_ba_list[s] for s in sorted_idx]
-                        ops_bb_list = [ops_bb_list[s] for s in sorted_idx]
-                        cont_indices1 = [cont_indices1[s] for s in sorted_idx]
-                        cont_indices2 = [cont_indices2[s] for s in sorted_idx]
-                        #clusters_idx = [clusters_idx[s] for s in sorted_idx]
-                        
-                        
-                        # i'j'kl<ij|lk> = i'j'kl(il|jk)
-                        
-                        vijkl = v[ci.orb_list,:,:,:][:,cl.orb_list,:,:][:,:,cj.orb_list,:][:,:,:,ck.orb_list]
-                        
-                        if  not np.any(vijkl):
-                            continue
-                        
-                        #print(vijkl.shape)
-                        #vijkl = 1.0*np.transpose(vijkl,axes=sorted_idx)
-
-                        print(vijkl.shape)
-                        str_dict = OrderedDict() 
-                        
-                        for idx in range(4):
-                            str_dict[clusters_idx[idx]] = ""
-
-                        for idx in range(4): 
-                            str_dict[clusters_idx[idx]] += cont_indices1[idx] 
-                       
-                        print(str_dict)
-                        
-                        contract_string = ""
-                        for stringi,string in str_dict.items():
-                            contract_string += string + ","
-
-#                        contract_string = indices[0]
-#                        for si in range(1,4):
-#                            if sorted_clusters_idx[si] == sorted_clusters_idx[si-1]:
-#                                contract_string += indices[si]
-#                            else:
-#                                contract_string += ","+indices[si]
-                        
-                        contract_string += cont_indices2[0] +cont_indices2[1] +cont_indices2[2] +cont_indices2[3] + "->"
-                        #contract_string += "psqr->"
-                        print("clusters:",[ci.idx, cj.idx, ck.idx, cl.idx])
-                        print("contract_string",contract_string)
-                        print() 
-                        
-                        delta_aa = tuple([tuple(i) for i in delta_aa])
-                        delta_ab = tuple([tuple(i) for i in delta_ab])
-                        delta_ba = tuple([tuple(i) for i in delta_ba])
-                        delta_bb = tuple([tuple(i) for i in delta_bb])
-                        
-                        term_aa = ClusteredTerm(delta_aa, ops_aa, vijkl, self.clusters)
-                        term_ab = ClusteredTerm(delta_ab, ops_ab, vijkl, self.clusters)
-                        term_ba = ClusteredTerm(delta_ba, ops_ba, vijkl, self.clusters)
-                        term_bb = ClusteredTerm(delta_bb, ops_bb, vijkl, self.clusters)
-                       
-                        term_aa.active = list(set([ci.idx,cj.idx,ck.idx,cl.idx]))
-                        term_ab.active = list(set([ci.idx,cj.idx,ck.idx,cl.idx]))
-                        term_ba.active = list(set([ci.idx,cj.idx,ck.idx,cl.idx]))
-                        term_bb.active = list(set([ci.idx,cj.idx,ck.idx,cl.idx]))
-                        
-                        
-                        nswaps = countswaps.countSwaps([ci.idx,cj.idx,ck.idx,cl.idx],4)
-
-                        if nswaps%2==0:
-                            sign = 1
-                        else: 
-                            sign = -1
-                       
-                        term_aa.sign = sign
-                        term_ab.sign = sign
-                        term_ba.sign = sign
-                        term_bb.sign = sign
-                        
-                        term_aa.contract_string = contract_string
-                        term_ab.contract_string = contract_string
-                        term_ba.contract_string = contract_string
-                        term_bb.contract_string = contract_string
-                       
-                        #print(term_bb, [ci.idx,cj.idx,ck.idx,cl.idx])
-                       
-                        try:
-                            self.terms[delta_aa].append(term_aa)
-                        except:
-                            self.terms[delta_aa] = [term_aa]
-                        
-                        try:
-                            self.terms[delta_ab].append(term_ab)
-                        except:
-                            self.terms[delta_ab] = [term_ab]
-                        
-                        if len(term_ba.active) > 1:
-                            try:
-                                self.terms[delta_ba].append(term_ba)
-                            except:                
-                                self.terms[delta_ba] = [term_ba]
-                        
-                        try:
-                            self.terms[delta_bb].append(term_bb)
-                        except:                
-                            self.terms[delta_bb] = [term_bb]
-                        
-
+        if iprint > 0:
+            print(self.print_terms_header())
+            for ti,t in self.terms.items():
+                print(ti)
+                for tt in t:
+                    print(tt,tt.contract_string)
+        print("NYI")
         exit()
-        print(self.print_terms_header())
-        for ti,t in self.terms.items():
-            print(ti)
-            for tt in t:
-                print(tt)
-                #print_mat(tt.ints)
 # }}}
 
     def print_terms_header(self):
