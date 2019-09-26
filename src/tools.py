@@ -37,6 +37,7 @@ def matvec1(h,v):
                     nnz = 0
                     opii = -1
                     mats = []
+                    good = True
                     for opi,op in enumerate(term.ops):
                         if op == "":
                             continue
@@ -47,23 +48,41 @@ def matvec1(h,v):
                             oi = ci.ops[op][(fock_l[ci.idx],fock_r[ci.idx])][:,conf_r[ci.idx],:]
                             mats.append(oi)
                         except KeyError:
-                            continue 
-                    
-                    print('mats:')
-                    [print(m.shape) for m in mats]
-                    print(term.ints.shape)
+                            good = False
+                            break
+                    if good == False:
+                        continue                        
+                        #break
+                   
+                    if len(mats) == 0:
+                        continue
+                    print('mats:', end='')
+                    [print(m.shape,end='') for m in mats]
+                    print()
+                    print('ints:', term.ints.shape)
+                    print("contract_string       :", term.contract_string)
+                    print("contract_string_matvec:", term.contract_string_matvec)
+                    tmp = 0
                     if len(mats) == 1:
-                        print(" Do TDM(:,pqrs)J Ints(pqrs) v(...J...,t)")
-                        mi = 1
-                        #old_shape = cp.deepcopy(m[0].shape)
-                        for i in range(1,len(mats[0].shape)):
-                            mi *= mats[0].shape[i]
-                        mats[0].shape = (mats[0].shape[0],mi)
+                        tmp = np.einsum(term.contract_string_matvec, mats[0], term.ints)
+                    elif len(mats) == 2:
+                        tmp = np.einsum(term.contract_string_matvec, mats[0], mats[1], term.ints)
+                    elif len(mats) == 3:
+                        tmp = np.einsum(term.contract_string_matvec, mats[0], mats[1], mats[2], term.ints)
+                    elif len(mats) == 4:
+                        tmp = np.einsum(term.contract_string_matvec, mats[0], mats[1], mats[2], mats[2], term.ints)
                     elif len(mats) == 0:
                         print(mats)
                         print('wtf?')
                         exit()
-                    
+                    print("output:", tmp.shape)
+                    print()
+                   
+                    new_configs = [[i] for i in conf_r] 
+                    for cacti,cact in enumerate(term.active):
+                        new_configs[cact] = range(mats[cacti].shape[0])
+                    for sp_idx, spi in enumerate(it.product(*new_configs)):
+                        print(" New config: ", spi)
 #                            nonzeros_curr = []
 #                            for i,ii in enumerate(oi[:,ket[ci_idx]]):
 #                                if ii*ii > thresh_transition:

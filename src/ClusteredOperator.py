@@ -52,6 +52,7 @@ class ClusteredTerm:
             self.ints_inds = 'abcd'
 
         self.contract_string = ""
+        self.contract_string_matvec = ""
         
     def __str__(self):
         #assert(len(self.delta)==2)
@@ -93,7 +94,7 @@ class ClusteredTerm:
             are the state indices for clusters 1, 2, and 3, respectively, in the 
             particle number blocks specified by fock_bra and fock_ket.
         """
-        
+        # {{{
         for ci in range(self.n_clusters):
             if (bra[ci]!=ket[ci]) and (ci not in self.active):
                 return 0
@@ -169,6 +170,10 @@ class ClusteredTerm:
             print("NYI")
             exit()
         return me
+# }}}
+
+
+
 
 class ClusteredOperator:
     """
@@ -248,9 +253,13 @@ class ClusteredOperator:
                 if cj.idx == ci.idx:
                     term_a.contract_string = "pq,pq->"
                     term_b.contract_string = "pq,pq->"
+                    term_a.contract_string_matvec = "xpq,pq->x"
+                    term_b.contract_string_matvec = "xpq,pq->x"
                 else:
                     term_a.contract_string = "p,q,pq->"
                     term_b.contract_string = "p,q,pq->"
+                    term_a.contract_string_matvec = "xp,yq,pq->xy"
+                    term_b.contract_string_matvec = "xp,yq,pq->xy"
 
                 try:
                     self.terms[delta_a].append(term_a)
@@ -391,17 +400,26 @@ class ClusteredOperator:
                         for idx in range(4):
                             str_dict[clusters_idx[idx]] = ""
 
+                        state_indices = ['w','x','y','z']
                         for idx in range(4): 
                             str_dict[clusters_idx[idx]] += cont_indices1[idx] 
                        
                         #print(str_dict)
                         
                         contract_string = ""
+                        contract_string_matvec = ""
                         for stringi,string in str_dict.items():
                             contract_string += string + ","
+                            contract_string_matvec += state_indices[stringi] + string + ","
+                        
 
                         
                         contract_string += cont_indices2[0] +cont_indices2[1] +cont_indices2[2] +cont_indices2[3] + "->"
+                        contract_string_matvec += cont_indices2[0] +cont_indices2[1] +cont_indices2[2] +cont_indices2[3] + "->"
+                       
+                         
+                        for stringi,string in str_dict.items():
+                            contract_string_matvec += state_indices[stringi] 
                         
                         delta_aa = tuple([tuple(i) for i in delta_aa])
                         delta_ab = tuple([tuple(i) for i in delta_ab])
@@ -433,6 +451,11 @@ class ClusteredOperator:
                         term_ab.contract_string = contract_string
                         term_ba.contract_string = contract_string
                         term_bb.contract_string = contract_string
+                        
+                        term_aa.contract_string_matvec = contract_string_matvec
+                        term_ab.contract_string_matvec = contract_string_matvec
+                        term_ba.contract_string_matvec = contract_string_matvec
+                        term_bb.contract_string_matvec = contract_string_matvec
                        
                         #print(term_bb, [ci.idx,cj.idx,ck.idx,cl.idx])
                        
@@ -490,6 +513,7 @@ class ClusteredOperator:
         """
         print header with labels for printing term
         """
+        # {{{
         out = ""
         for di,d in enumerate(self.clusters):
             out += "%2i_____"%di
@@ -502,6 +526,7 @@ class ClusteredOperator:
         for oi,o in enumerate(self.clusters):
             out += " %4i,"%oi
         return out
+# }}}
 
 
     def add_ops_to_clusters(self):
