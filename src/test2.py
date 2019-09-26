@@ -29,6 +29,7 @@ h += tmp + tmp.T
 if 1:
     Escf,orb,h,g,C = run_hubbard_scf(h,g,n_orb//2)
 
+cipsi_thresh = 1e-4
 
 do_fci = 1
 if do_fci:
@@ -88,7 +89,6 @@ for c in clusters:
 pt_vector = ci_vector.copy()
 for it in range(4):
     print(" Build full Hamiltonian")
-    ci_vector.add_basis(pt_vector)
     H = build_full_hamiltonian(clustered_ham, ci_vector)
 
     print(" Diagonalize Hamiltonian Matrix:")
@@ -131,8 +131,23 @@ for it in range(4):
     denom = 1/(e0 - build_hamiltonian_diagonal(clustered_ham, pt_vector))
     pt_vector_v = pt_vector.get_vector()
     pt_vector_v.shape = (pt_vector_v.shape[0])
-    print(denom.shape, pt_vector_v.shape)
+    
     e2 = np.multiply(denom,pt_vector_v)
+    pt_vector.set_vector(e2)
     e2 = np.dot(pt_vector_v,e2)
+    
     print(" PT2 Energy Correction = %12.8f" %e2)
     print(" PT2 Energy Total      = %12.8f" %(e0+e2))
+
+    print(" Choose which states to add to CI space")
+
+    for fockspace,configs in pt_vector.items():
+        for config,coeff in configs.items():
+            if coeff*coeff > cipsi_thresh:
+                if fockspace in ci_vector:
+                    ci_vector[fockspace][config] = 0
+                else:
+                    ci_vector.add_fockblock(fockspace)
+                    ci_vector[fockspace][config] = 0
+    print(" Next iteration CI space dimension", len(ci_vector))
+
