@@ -408,9 +408,11 @@ class ClusteredOperator:
                         
                         contract_string = ""
                         contract_string_matvec = ""
+                        tmp = 0
                         for stringi,string in str_dict.items():
                             contract_string += string + ","
-                            contract_string_matvec += state_indices[stringi] + string + ","
+                            contract_string_matvec += state_indices[tmp] + string + ","
+                            tmp+=1
                         
 
                         
@@ -418,7 +420,7 @@ class ClusteredOperator:
                         contract_string_matvec += cont_indices2[0] +cont_indices2[1] +cont_indices2[2] +cont_indices2[3] + "->"
                        
                          
-                        for stringi,string in str_dict.items():
+                        for stringi,string in enumerate(str_dict.items()):
                             contract_string_matvec += state_indices[stringi] 
                         
                         delta_aa = tuple([tuple(i) for i in delta_aa])

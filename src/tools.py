@@ -94,7 +94,7 @@ def matvec1(h,v,term_thresh=1e-12):
                     elif len(mats) == 3:
                         tmp = np.einsum(term.contract_string_matvec, mats[0], mats[1], mats[2], term.ints)
                     elif len(mats) == 4:
-                        tmp = np.einsum(term.contract_string_matvec, mats[0], mats[1], mats[2], mats[2], term.ints)
+                        tmp = np.einsum(term.contract_string_matvec, mats[0], mats[1], mats[2], mats[3], term.ints)
                     elif len(mats) == 0:
                         #print(mats)
                         #print('wtf?')

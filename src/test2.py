@@ -17,7 +17,7 @@ from tools import *
 import pyscf
 ttt = time.time()
 
-n_orb = 6
+n_orb = 8
 U = 1
 beta = 1.0
 
@@ -49,7 +49,9 @@ if do_fci:
     print(" FCI:        %12.8f"%e)
 
 blocks = [[0,1],[2,3]]
-blocks = [[0,1],[2,3],[4,5]]
+blocks = [[0],[1],[2],[3],[4],[5],[6],[7]]
+blocks = [[0,1,2,3,4],[5,6,7]]
+#blocks = [[0],[1],[2,3,4,5],[6,7]]
 n_blocks = len(blocks)
 clusters = []
 
@@ -58,7 +60,11 @@ for ci,c in enumerate(blocks):
 
 ci_vector = ClusteredState(clusters)
 #ci_vector.init(((2,2),(0,0)))
-ci_vector.init(((2,2),(1,1),(0,0)))
+#ci_vector.init(((2,2),(2,2),(0,0)))
+#ci_vector.init(((1,1),(1,1),(1,1),(1,1),(0,0),(0,0),(0,0),(0,0)))
+#ci_vector.init(((2,2),(2,2),(0,0),(0,0)))
+#ci_vector.init(((2,2),(2,2),(0,0)))
+ci_vector.init(((4,4),(0,0)))
 
 print(" Clusters:")
 [print(ci) for ci in clusters]
