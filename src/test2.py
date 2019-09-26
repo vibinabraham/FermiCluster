@@ -17,8 +17,8 @@ from tools import *
 import pyscf
 ttt = time.time()
 
-n_orb = 8
-U = 1
+n_orb = 8 
+U = 4
 beta = 1.0
 
 h, g = get_hubbard_params(n_orb,beta,U,pbc=False)
@@ -26,10 +26,11 @@ np.random.seed(2)
 tmp = np.random.rand(h.shape[0],h.shape[1])*0.01
 h += tmp + tmp.T
 
-if 1:
+if 0:
     Escf,orb,h,g,C = run_hubbard_scf(h,g,n_orb//2)
 
-cipsi_thresh = 1e-4
+cipsi_thresh     = 1e-7
+filter_ci_thresh = 1e-4
 
 do_fci = 1
 if do_fci:
@@ -48,10 +49,10 @@ if do_fci:
     e, ci = cisolver.kernel(h, g, h.shape[1], mol.nelectron, ecore=0)
     print(" FCI:        %12.8f"%e)
 
-blocks = [[0,1],[2,3]]
 blocks = [[0],[1],[2],[3],[4],[5],[6],[7]]
-blocks = [[0,1,2,3,4],[5,6,7]]
-#blocks = [[0],[1],[2,3,4,5],[6,7]]
+blocks = [[0,1,2,3,4,5],[6,7,8,9,10,11]]
+blocks = [[0,1],[2,3,4,5],[6,7]]
+blocks = [[0,1,2,3],[4,5,6,7]]
 n_blocks = len(blocks)
 clusters = []
 
@@ -64,7 +65,8 @@ ci_vector = ClusteredState(clusters)
 #ci_vector.init(((1,1),(1,1),(1,1),(1,1),(0,0),(0,0),(0,0),(0,0)))
 #ci_vector.init(((2,2),(2,2),(0,0),(0,0)))
 #ci_vector.init(((2,2),(2,2),(0,0)))
-ci_vector.init(((4,4),(0,0)))
+ci_vector.init(((2,2),(2,2)))
+#ci_vector.init(((4,4),(0,0)))
 
 print(" Clusters:")
 [print(ci) for ci in clusters]
@@ -110,7 +112,14 @@ for it in range(4):
     ci_vector.set_vector(v0)
     pt_vector = matvec1(clustered_ham, ci_vector)
     pt_vector.print()
-  
+ 
+
+    if filter_ci_thresh > 0:
+        print(" Clip CI Vector: thresh = ", filter_ci_thresh)
+        print(" Old CI Dim: ", len(ci_vector))
+        ci_vector.clip(filter_ci_thresh)
+        print(" New CI Dim: ", len(ci_vector))
+
     var = pt_vector.norm() - e0*e0
     print(" Variance: %12.8f" % var)
     

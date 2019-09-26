@@ -3,6 +3,7 @@ import scipy
 import itertools
 import copy as cp
 from helpers import *
+import opt_einsum as oe
 
 from ClusteredOperator import *
 from ClusteredState import *
@@ -48,7 +49,9 @@ def matvec1(h,v,term_thresh=1e-12):
                 #print(" term: ", term)
                 for conf_ri, conf_r in enumerate(v[fock_r]):
                     #print("  ", conf_r)
-                
+                    
+                    #if abs(v[fock_r][conf_r]) < 5e-2:
+                    #    continue
                     # get state sign 
                     state_sign = 1
                     for oi,o in enumerate(term.ops):
@@ -86,21 +89,10 @@ def matvec1(h,v,term_thresh=1e-12):
                     #print('ints:', term.ints.shape)
                     #print("contract_string       :", term.contract_string)
                     #print("contract_string_matvec:", term.contract_string_matvec)
-                    tmp = 0
-                    if len(mats) == 1:
-                        tmp = np.einsum(term.contract_string_matvec, mats[0], term.ints)
-                    elif len(mats) == 2:
-                        tmp = np.einsum(term.contract_string_matvec, mats[0], mats[1], term.ints)
-                    elif len(mats) == 3:
-                        tmp = np.einsum(term.contract_string_matvec, mats[0], mats[1], mats[2], term.ints)
-                    elif len(mats) == 4:
-                        tmp = np.einsum(term.contract_string_matvec, mats[0], mats[1], mats[2], mats[3], term.ints)
-                    elif len(mats) == 0:
-                        #print(mats)
-                        #print('wtf?')
-                        exit()
-                    #print("output:", tmp.shape)
-                    #print()
+                    
+                    #tmp = oe.contract(term.contract_string_matvec, *mats, term.ints)
+                    
+                    tmp = np.einsum(term.contract_string_matvec, *mats, term.ints)
                     
 
                     v_coeff = v[fock_r][conf_r]

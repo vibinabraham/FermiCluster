@@ -81,6 +81,19 @@ class ClusteredState(OrderedDict):
                 self.data[fock][config] = v[idx]
                 idx += 1
         return 
+    def clip(self,thresh):
+        """
+        delete values smaller than thresh
+        """
+        for fockspace,configs in self.items():
+            for config,coeff in list(configs.items()):
+                if abs(coeff) < thresh:
+                    del self.data[fockspace][config]
+
+        # clean out empty fockspaces
+        for fockspace,configs in list(self.items()):
+            if len(configs) == 0:
+                del self.data[fockspace]
 
     def zero(self):
         for fock,configs in self.data.items():
