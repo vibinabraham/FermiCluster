@@ -18,7 +18,7 @@ import pyscf
 ttt = time.time()
 
 n_orb = 6
-U = 4
+U = 1
 beta = 1.0
 
 h, g = get_hubbard_params(n_orb,beta,U,pbc=False)
@@ -48,7 +48,7 @@ if do_fci:
     print(" FCI:        %12.8f"%e)
 
 blocks = [[0,1],[2,3]]
-blocks = [[0,1,2],[3],[4,5]]
+blocks = [[0,1],[2,3],[4,5]]
 n_blocks = len(blocks)
 clusters = []
 
@@ -57,7 +57,7 @@ for ci,c in enumerate(blocks):
 
 ci_vector = ClusteredState(clusters)
 #ci_vector.init(((2,2),(0,0)))
-ci_vector.init(((3,3),(0,0),(0,0)))
+ci_vector.init(((2,2),(1,1),(0,0)))
 
 print(" Clusters:")
 [print(ci) for ci in clusters]
@@ -85,69 +85,54 @@ for c in clusters:
     print(" Build mats for cluster ",c.idx)
     c.build_op_matrices()
 
+pt_vector = ci_vector.copy()
+for it in range(4):
+    print(" Build full Hamiltonian")
+    ci_vector.add_basis(pt_vector)
+    H = build_full_hamiltonian(clustered_ham, ci_vector)
 
-sigma = matvec1(clustered_ham, ci_vector)
-sigma.print_configs()
-sigma_v = sigma.vector()
-
-ci_vector.expand_to_full_space()
-ci_vector.print()
-
-
-
-
-
-print(" Build full Hamiltonian")
-print(" Total dimension of CI space", len(ci_vector))
-sys.stdout.flush()
-
-H = np.zeros((len(ci_vector),len(ci_vector)))
-
-shift_l = 0 
-for fock_li, fock_l in enumerate(ci_vector.data):
-    configs_l = ci_vector[fock_l]
-    print(fock_l)
+    print(" Diagonalize Hamiltonian Matrix:")
+    e,v = np.linalg.eigh(H)
+    idx = e.argsort()   
+    e = e[idx]
+    v = v[:,idx]
+    v0 = v[:,0]
+    e0 = e[0]
+    print(" Ground state of CI:                 %12.8f  CI Dim: %4i "%(e[0].real,len(ci_vector)))
    
-    for config_li, config_l in enumerate(configs_l):
-        idx_l = shift_l + config_li 
-        
-        shift_r = 0 
-        for fock_ri, fock_r in enumerate(ci_vector.data):
-            configs_r = ci_vector[fock_r]
-            delta_fock= tuple([(fock_l[ci][0]-fock_r[ci][0], fock_l[ci][1]-fock_r[ci][1]) for ci in range(len(clusters))])
-            if fock_ri<fock_li:
-                shift_r += len(configs_r) 
-                continue
-            try:
-                terms = clustered_ham.terms[delta_fock]
-            except KeyError:
-                shift_r += len(configs_r) 
-                continue 
-            
-            for config_ri, config_r in enumerate(configs_r):        
-                idx_r = shift_r + config_ri
-                if idx_r<idx_l:
-                    continue
-                
-                for term in terms:
-                    me = term.matrix_element(fock_l,config_l,fock_r,config_r)
-                    H[idx_l,idx_r] += me
-                    if idx_r>idx_l:
-                        H[idx_r,idx_l] += me
-                    #print(" %4i %4i = %12.8f"%(idx_l,idx_r,me),"  :  ",config_l,config_r, " :: ", term)
-            shift_r += len(configs_r) 
-    shift_l += len(configs_l)
-   
+    ci_vector.zero()
+    ci_vector.set_vector(v0)
+    pt_vector = matvec1(clustered_ham, ci_vector)
+    pt_vector.print()
+  
+    var = pt_vector.norm() - e0*e0
+    print(" Variance: %12.8f" % var)
+    
+    
+    print(" Remove CI space from pt_vector vector")
+    for fockspace,configs in pt_vector.items():
+        if fockspace in ci_vector.fblocks():
+            for config,coeff in list(configs.items()):
+                if config in ci_vector[fockspace]:
+                    del pt_vector[fockspace][config]
 
-for hi in range(H.shape[0]):
-    print(" %12.8f" %(H[hi,0]-sigma_v[hi]))
+    
+    for fockspace,configs in ci_vector.items():
+        if fockspace in pt_vector:
+            for config,coeff in configs.items():
+                assert(config not in pt_vector[fockspace])
 
-print(" Diagonalize Hamiltonian Matrix:")
-e,v = np.linalg.eigh(H)
-idx = e.argsort()   
-e = e[idx]
-v = v[:,idx]
-v0 = v[:,0]
-print(" Ground state of CI:                 %12.8f  CI Dim: %4i "%(e[0].real,len(ci_vector)))
-
-
+    print(" Norm of CI vector = %12.8f" %ci_vector.norm())
+    print(" Dimension of CI space: ", len(ci_vector)) 
+    print(" Dimension of PT space: ", len(pt_vector)) 
+    print(" Compute Denominator")
+    #next_ci_vector = cp.deepcopy(ci_vector) 
+    # compute diagonal for PT2
+    denom = 1/(e0 - build_hamiltonian_diagonal(clustered_ham, pt_vector))
+    pt_vector_v = pt_vector.get_vector()
+    pt_vector_v.shape = (pt_vector_v.shape[0])
+    print(denom.shape, pt_vector_v.shape)
+    e2 = np.multiply(denom,pt_vector_v)
+    e2 = np.dot(pt_vector_v,e2)
+    print(" PT2 Energy Correction = %12.8f" %e2)
+    print(" PT2 Energy Total      = %12.8f" %(e0+e2))

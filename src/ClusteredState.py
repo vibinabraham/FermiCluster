@@ -60,23 +60,32 @@ class ClusteredState(OrderedDict):
         new = ClusteredState(self.clusters)
         new.data = cp.deepcopy(self.data)
         return new
-    def vector(self):
+    def get_vector(self):
         """
         return a ndarray vector for the state
         """
         v = np.zeros((len(self),1))
         idx = 0
         for fockspace,configs in self.items():
-            for config,coeffs in configs.items():
-                print(coeffs)
-                v[idx] = coeffs
+            for config,coeff in configs.items():
+                v[idx] = coeff
                 idx += 1
         return v
+    def set_vector(self,v):
+        """
+        input a ndarray vector for the state and update coeffs
+        """
+        idx = 0
+        for fock,configs in self.data.items():
+            for config,coeffs in configs.items():
+                self.data[fock][config] = v[idx]
+                idx += 1
+        return 
 
     def zero(self):
         for fock,configs in self.data.items():
             for config,coeffs in configs.items():
-                coeffs *= 0
+                self.data[fock][config] = 0
     def fblock(self,b):
         return self.data[b]
     def fblocks(self):
@@ -85,7 +94,6 @@ class ClusteredState(OrderedDict):
         """
         Add a fock space to the current state basis
         """
-
         if block not in self.data:
             self.data[block] = OrderedDict()
 
@@ -134,7 +142,41 @@ class ClusteredState(OrderedDict):
         return
 # }}}
 
+    def add(self,other):
+        """
+        add clusteredstate vector coefficients to self
+        """
+        for fockspace,configs in other.items():
+            if fockspace not in self.fblocks():
+                self.add_fockblock(fockspace)
+            for config,coeff in configs.items():
+                if config in self.data[fockspace]:
+                    self.data[fockspace][config] += coeff
+                else:
+                    self.data[fockspace][config] = coeff
+        return 
+    
+    def add_basis(self,other):
+        """
+        add the configuration space to the self
+        """
+        for fockspace,configs in other.items():
+            if fockspace not in self.fblocks():
+                self.add_fockblock(fockspace)
+            for config,coeff in configs.items():
+                if config not in self.data[fockspace]:
+                    self.data[fockspace][config] = 0
+        return 
 
+    def norm(self):
+        """
+        Compute norm of state
+        """
+        norm = 0
+        for fockspace,configs in self.items():
+            for config,coeff in configs.items():
+                norm += coeff*coeff
+        return norm
 
     def print(self):
         """ Pretty print """

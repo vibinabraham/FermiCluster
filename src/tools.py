@@ -13,14 +13,14 @@ def matvec1(h,v,term_thresh=1e-12):
     returns a ClusteredState object. 
 
     """
+# {{{
     print(" Compute matrix vector product:")
     clusters = h.clusters
     sigma = ClusteredState(clusters)
     sigma = v.copy() 
     sigma.zero()
    
-    sigma.print_configs()
-    if 1:
+    if 0:
         # use this to debug
         sigma.expand_to_full_space()
 
@@ -37,7 +37,7 @@ def matvec1(h,v,term_thresh=1e-12):
             if good == False:
                 continue
             
-            print(fock_l, "<--", fock_r)
+            #print(fock_l, "<--", fock_r)
             
             if fock_l not in sigma.data:
                 sigma.add_fockblock(fock_l)
@@ -45,9 +45,9 @@ def matvec1(h,v,term_thresh=1e-12):
             configs_l = sigma[fock_l] 
             
             for term in h.terms[terms]:
-                print(" term: ", term)
+                #print(" term: ", term)
                 for conf_ri, conf_r in enumerate(v[fock_r]):
-                    print("  ", conf_r)
+                    #print("  ", conf_r)
                 
                     # get state sign 
                     state_sign = 1
@@ -58,7 +58,7 @@ def matvec1(h,v,term_thresh=1e-12):
                             for cj in range(oi):
                                 state_sign *= (-1)**(fock_r[cj][0]+fock_r[cj][1])
                     
-                    print('state_sign ', state_sign)
+                    #print('state_sign ', state_sign)
                     opii = -1
                     mats = []
                     good = True
@@ -80,12 +80,12 @@ def matvec1(h,v,term_thresh=1e-12):
                    
                     if len(mats) == 0:
                         continue
-                    print('mats:', end='')
-                    [print(m.shape,end='') for m in mats]
-                    print()
-                    print('ints:', term.ints.shape)
-                    print("contract_string       :", term.contract_string)
-                    print("contract_string_matvec:", term.contract_string_matvec)
+                    #print('mats:', end='')
+                    #[print(m.shape,end='') for m in mats]
+                    #print()
+                    #print('ints:', term.ints.shape)
+                    #print("contract_string       :", term.contract_string)
+                    #print("contract_string_matvec:", term.contract_string_matvec)
                     tmp = 0
                     if len(mats) == 1:
                         tmp = np.einsum(term.contract_string_matvec, mats[0], term.ints)
@@ -96,11 +96,11 @@ def matvec1(h,v,term_thresh=1e-12):
                     elif len(mats) == 4:
                         tmp = np.einsum(term.contract_string_matvec, mats[0], mats[1], mats[2], mats[2], term.ints)
                     elif len(mats) == 0:
-                        print(mats)
-                        print('wtf?')
+                        #print(mats)
+                        #print('wtf?')
                         exit()
-                    print("output:", tmp.shape)
-                    print()
+                    #print("output:", tmp.shape)
+                    #print()
                     
 
                     v_coeff = v[fock_r][conf_r]
@@ -117,3 +117,79 @@ def matvec1(h,v,term_thresh=1e-12):
                             else:
                                 configs_l[spi] += tmp[sp_idx] 
     return sigma 
+# }}}
+
+
+def build_full_hamiltonian(clustered_ham,ci_vector,iprint=0):
+    """
+    Build hamiltonian in basis in ci_vector
+    """
+# {{{
+    clusters = ci_vector.clusters
+    H = np.zeros((len(ci_vector),len(ci_vector)))
+    
+    shift_l = 0 
+    for fock_li, fock_l in enumerate(ci_vector.data):
+        configs_l = ci_vector[fock_l]
+        if iprint > 0:
+            print(fock_l)
+       
+        for config_li, config_l in enumerate(configs_l):
+            idx_l = shift_l + config_li 
+            
+            shift_r = 0 
+            for fock_ri, fock_r in enumerate(ci_vector.data):
+                configs_r = ci_vector[fock_r]
+                delta_fock= tuple([(fock_l[ci][0]-fock_r[ci][0], fock_l[ci][1]-fock_r[ci][1]) for ci in range(len(clusters))])
+                if fock_ri<fock_li:
+                    shift_r += len(configs_r) 
+                    continue
+                try:
+                    terms = clustered_ham.terms[delta_fock]
+                except KeyError:
+                    shift_r += len(configs_r) 
+                    continue 
+                
+                for config_ri, config_r in enumerate(configs_r):        
+                    idx_r = shift_r + config_ri
+                    if idx_r<idx_l:
+                        continue
+                    
+                    for term in terms:
+                        me = term.matrix_element(fock_l,config_l,fock_r,config_r)
+                        H[idx_l,idx_r] += me
+                        if idx_r>idx_l:
+                            H[idx_r,idx_l] += me
+                        #print(" %4i %4i = %12.8f"%(idx_l,idx_r,me),"  :  ",config_l,config_r, " :: ", term)
+                shift_r += len(configs_r) 
+        shift_l += len(configs_l)
+    return H
+# }}}
+
+
+
+def build_hamiltonian_diagonal(clustered_ham,ci_vector):
+    """
+    Build hamiltonian diagonal in basis in ci_vector
+    """
+# {{{
+    clusters = ci_vector.clusters
+    Hd = np.zeros((len(ci_vector)))
+    
+    shift = 0 
+   
+    idx = 0
+    for fockspace, configs in ci_vector.items():
+        for config, coeff in configs.items():
+            delta_fock= tuple([(0,0) for ci in range(len(clusters))])
+            terms = clustered_ham.terms[delta_fock]
+            for term in terms:
+                Hd[idx] += term.matrix_element(fockspace,config,fockspace,config)
+            idx += 1
+
+    return Hd
+
+# }}}
+
+
+
