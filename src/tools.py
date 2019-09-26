@@ -7,7 +7,7 @@ from helpers import *
 from ClusteredOperator import *
 from ClusteredState import *
 
-def matvec1(h,v):
+def matvec1(h,v,term_thresh=1e-12):
     print(" Compute matrix vector product:")
     clusters = h.clusters
     sigma = ClusteredState(clusters) 
@@ -24,9 +24,12 @@ def matvec1(h,v):
                 continue
             
             print(fock_l, "<--", fock_r)
+            
+            if fock_l not in sigma.data:
+                sigma.add_fockblock(fock_l)
 
-            configs_l = OrderedDict()
-
+            configs_l = sigma[fock_l] 
+            
             for term in h.terms[terms]:
                 print(" term: ", term)
                 for conf_ri, conf_r in enumerate(v[fock_r]):
@@ -77,20 +80,18 @@ def matvec1(h,v):
                         exit()
                     print("output:", tmp.shape)
                     print()
-                   
+                    
+                    v_coeff = v[fock_r][conf_r][0]
+                    tmp = tmp.ravel()*v_coeff
+
                     new_configs = [[i] for i in conf_r] 
                     for cacti,cact in enumerate(term.active):
                         new_configs[cact] = range(mats[cacti].shape[0])
                     for sp_idx, spi in enumerate(it.product(*new_configs)):
-                        print(" New config: ", spi)
-#                            nonzeros_curr = []
-#                            for i,ii in enumerate(oi[:,ket[ci_idx]]):
-#                                if ii*ii > thresh_transition:
-#                                    nonzeros_curr.append(i)
-#                                    nnz += 1
-#                            nonzeros.append(nonzeros_curr)
-#                            if len(nonzeros_curr) > 0:
-#                                sig = np.kron(sig,oi[nonzeros_curr,ket[ci_idx]])
-#                            else:
-#                                continue
-
+                        #print(" New config: %12.8f" %tmp[sp_idx], spi)
+                        if abs(tmp[sp_idx]) > term_thresh:
+                            if spi not in configs_l:
+                                configs_l[spi] = tmp[sp_idx] 
+                            else:
+                                configs_l[spi] += tmp[sp_idx] 
+    return sigma 

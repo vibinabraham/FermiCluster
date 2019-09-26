@@ -86,7 +86,8 @@ for c in clusters:
     c.build_op_matrices()
 
 
-matvec1(clustered_ham, ci_vector)
+sigma = matvec1(clustered_ham, ci_vector)
+sigma.print_configs()
 exit()
 
            

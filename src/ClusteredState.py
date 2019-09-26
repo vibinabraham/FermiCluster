@@ -85,8 +85,10 @@ class ClusteredState(OrderedDict):
     def print_configs(self):
         """ Pretty print """
         for f in self.data:
+            if len(self.data[f]) == 0:
+                continue
             print(" Dim %4i fock_space: "%len(self.data[f]), f)
             for config, value in self.data[f].items():
                 print("%20s"%str(config),end="")
                 #print_row(value)
-                print(" ",value)
+                print(" %12.8f"%value)
