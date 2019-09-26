@@ -13,6 +13,7 @@ class Cluster(object):
         self.dim_tot = 2**(2*self.n_orb)
         self.block_states = {}
         self.tdm_a = {}
+        self.ops = {}
 
         
     def init(self,n_range):
@@ -25,3 +26,8 @@ class Cluster(object):
     def read_tdms(self,mat,string,n_a,n_b):
         self.tdm_a[string,n_a,n_b] = mat
 
+    def read_ops(self,tens,string, naj, nbj, nai, nbi):
+        """
+        tensor has dimension: p,J,I for <J|p|I>
+        """
+        self.ops[string,naj,nbj,nai,nbi] = tens
