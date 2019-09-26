@@ -88,46 +88,9 @@ for c in clusters:
 
 sigma = matvec1(clustered_ham, ci_vector)
 sigma.print_configs()
-exit()
+sigma_v = sigma.vector()
 
-           
-if 1:
-    # create full space for each fock block defined
-    print("\n Create FCI space")
-    ns = []
-    na = 0
-    nb = 0
-    for fblock,configs in ci_vector.items():
-        for c in fblock:
-            na += c[0]
-            nb += c[1]
-        break
-
-    for c in ci_vector.clusters:
-        nsi = []
-        for nai in range(c.n_orb+1):
-            for nbi in range(c.n_orb+1):
-                nsi.append((nai,nbi))
-        ns.append(nsi)
-    for newfock in itertools.product(*ns):
-        nacurr = 0
-        nbcurr = 0
-        for c in newfock:
-            nacurr += c[0]
-            nbcurr += c[1]
-        if nacurr == na and nbcurr == nb:
-            ci_vector.add_fockblock(newfock) 
-
-
-    print("\n Make each Fock-Block the full space")
-    # create full space for each fock block defined
-    for fblock,configs in ci_vector.items():
-        dims = []
-        for c in ci_vector.clusters:
-            # get number of vectors for current fock space
-            dims.append(range(c.basis[fblock[c.idx]].shape[1]))
-        for newconfig_idx, newconfig in enumerate(itertools.product(*dims)):
-            ci_vector[fblock][newconfig] = 0 
+ci_vector.expand_to_full_space()
 ci_vector.print()
 
 
@@ -175,6 +138,9 @@ for fock_li, fock_l in enumerate(ci_vector.data):
             shift_r += len(configs_r) 
     shift_l += len(configs_l)
    
+
+for hi in range(H.shape[0]):
+    print(" %12.8f" %(H[hi,0]-sigma_v[hi]))
 
 print(" Diagonalize Hamiltonian Matrix:")
 e,v = np.linalg.eigh(H)

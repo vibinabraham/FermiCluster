@@ -1,6 +1,6 @@
 import numpy as np
 import scipy
-import itertools as it
+import itertools
 import copy as cp
 from collections import OrderedDict
 from helpers import *
@@ -34,8 +34,9 @@ class ClusteredState(OrderedDict):
         """
         assert(len(fock_config)==self.n_clusters)
         self[fock_config] = OrderedDict()
-        
-        self[fock_config][tuple([0]*self.n_clusters)] = np.ones((1,))
+       
+        self[fock_config][tuple([0]*self.n_clusters)] = 1 
+        #self[fock_config][tuple([0]*self.n_clusters)] = [0] 
         #self.data[fock_config][tuple([0]*self.n_clusters)] = np.ndarray([1.],dtype='float')
    
     def items(self):
@@ -51,13 +52,40 @@ class ClusteredState(OrderedDict):
         l = 0
         for b,c in self.data.items():
             l += len(c)
-        return l 
+        return l
+    def copy(self):
+        """
+        Create a copy of this state
+        """
+        new = ClusteredState(self.clusters)
+        new.data = cp.deepcopy(self.data)
+        return new
+    def vector(self):
+        """
+        return a ndarray vector for the state
+        """
+        v = np.zeros((len(self),1))
+        idx = 0
+        for fockspace,configs in self.items():
+            for config,coeffs in configs.items():
+                print(coeffs)
+                v[idx] = coeffs
+                idx += 1
+        return v
 
+    def zero(self):
+        for fock,configs in self.data.items():
+            for config,coeffs in configs.items():
+                coeffs *= 0
     def fblock(self,b):
         return self.data[b]
     def fblocks(self):
         return self.data.keys()
     def add_fockblock(self,block):
+        """
+        Add a fock space to the current state basis
+        """
+
         if block not in self.data:
             self.data[block] = OrderedDict()
 
@@ -65,11 +93,47 @@ class ClusteredState(OrderedDict):
         """
         expand basis to full space
         """
-        
-        na = 0
-        nb = 0
+        # {{{
         # do something here
         #for c in self.clusters:
+        print("\n Expand to full space")
+        ns = []
+        na = 0
+        nb = 0
+        for fblock,configs in self.items():
+            for c in fblock:
+                na += c[0]
+                nb += c[1]
+            break
+    
+        for c in self.clusters:
+            nsi = []
+            for nai in range(c.n_orb+1):
+                for nbi in range(c.n_orb+1):
+                    nsi.append((nai,nbi))
+            ns.append(nsi)
+        for newfock in itertools.product(*ns):
+            nacurr = 0
+            nbcurr = 0
+            for c in newfock:
+                nacurr += c[0]
+                nbcurr += c[1]
+            if nacurr == na and nbcurr == nb:
+                self.add_fockblock(newfock) 
+    
+    
+        print("\n Make each Fock-Block the full space")
+        # create full space for each fock block defined
+        for fblock,configs in self.items():
+            dims = []
+            for c in self.clusters:
+                # get number of vectors for current fock space
+                dims.append(range(c.basis[fblock[c.idx]].shape[1]))
+            for newconfig_idx, newconfig in enumerate(itertools.product(*dims)):
+                self[fblock][newconfig] = 0 
+        return
+# }}}
+
 
 
     def print(self):
@@ -92,3 +156,4 @@ class ClusteredState(OrderedDict):
                 print("%20s"%str(config),end="")
                 #print_row(value)
                 print(" %12.8f"%value)
+                #[print(" %12.8f"%value) for value in values]

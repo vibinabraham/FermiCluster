@@ -1,6 +1,6 @@
 import numpy as np
 import scipy
-import itertools as it
+import itertools
 import copy as cp
 from helpers import *
 
@@ -8,9 +8,23 @@ from ClusteredOperator import *
 from ClusteredState import *
 
 def matvec1(h,v,term_thresh=1e-12):
+    """
+    Compute the action of H onto a sparse trial vector v
+    returns a ClusteredState object. 
+
+    """
     print(" Compute matrix vector product:")
     clusters = h.clusters
-    sigma = ClusteredState(clusters) 
+    sigma = ClusteredState(clusters)
+    sigma = v.copy() 
+    sigma.zero()
+   
+    sigma.print_configs()
+    if 1:
+        # use this to debug
+        sigma.expand_to_full_space()
+
+
     for fock_ri, fock_r in enumerate(v.fblocks()):
 
         for terms in h.terms:
@@ -34,10 +48,17 @@ def matvec1(h,v,term_thresh=1e-12):
                 print(" term: ", term)
                 for conf_ri, conf_r in enumerate(v[fock_r]):
                     print("  ", conf_r)
+                
+                    # get state sign 
+                    state_sign = 1
+                    for oi,o in enumerate(term.ops):
+                        if o == '':
+                            continue
+                        if len(o) == 1 or len(o) == 3:
+                            for cj in range(oi):
+                                state_sign *= (-1)**(fock_r[cj][0]+fock_r[cj][1])
                     
-                    nonzeros = []
-                    sig = np.array([1])
-                    nnz = 0
+                    print('state_sign ', state_sign)
                     opii = -1
                     mats = []
                     good = True
@@ -81,13 +102,14 @@ def matvec1(h,v,term_thresh=1e-12):
                     print("output:", tmp.shape)
                     print()
                     
-                    v_coeff = v[fock_r][conf_r][0]
-                    tmp = tmp.ravel()*v_coeff
+
+                    v_coeff = v[fock_r][conf_r]
+                    tmp = state_sign * tmp.ravel() * v_coeff
 
                     new_configs = [[i] for i in conf_r] 
                     for cacti,cact in enumerate(term.active):
                         new_configs[cact] = range(mats[cacti].shape[0])
-                    for sp_idx, spi in enumerate(it.product(*new_configs)):
+                    for sp_idx, spi in enumerate(itertools.product(*new_configs)):
                         #print(" New config: %12.8f" %tmp[sp_idx], spi)
                         if abs(tmp[sp_idx]) > term_thresh:
                             if spi not in configs_l:
