@@ -542,6 +542,9 @@ class ClusteredOperator:
                         self.clusters[opi].add_operator(op)
 
     def extract_local_operator(self,cluster_idx):
+        """
+        Extract Local operator, considering only terms which are completely contained inside cluster
+        """
         op = LocalOperator(self.clusters[cluster_idx])
         for t in self.terms:
             for tt in self.terms[t]:
@@ -553,11 +556,16 @@ class ClusteredOperator:
                     term.delta = [term.delta[cluster_idx]]
                     op.add_term(term)
     
-    def extract_local_embedded_operator(self,cluster_idx):
+    def extract_local_embedded_operator(self,cluster_idx,fock_state,config):
         """
         Extract a local operator embedded in a direct product state
 
             e.g. p'q<r's>(pr|qs)
+
+        input:
+            cluster_idx: index of cluster 
+            fock_state:  fockstate configuration of the clusters
+            config    :  state configuration within that fockstate
         """
         op = LocalOperator(self.clusters[cluster_idx])
         for t in self.terms:
@@ -569,6 +577,10 @@ class ClusteredOperator:
                     term.ops = [term.ops[cluster_idx]]
                     term.delta = [term.delta[cluster_idx]]
                     op.add_term(term)
+                
+                elif len(active) == 2 and active[0] == cluster_idx:
+                    if tt.ops[0] == 'Aa' or tt.ops[0] == 'Bb' :
+                        print(tt,tt.contract_string)
         return op
 
 
