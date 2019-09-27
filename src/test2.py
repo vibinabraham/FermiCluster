@@ -83,20 +83,26 @@ for ci_idx, ci in enumerate(clusters):
     assert(ci_idx == ci.idx)
     print(" Extract local operator for cluster",ci.idx)
     opi = clustered_ham.extract_local_operator(ci_idx)
-    ref_fblock = list(ci_vector.fblocks())[0]
-    ref_config = list(ci_vector.fblock(ref_fblock).items())[0][0]
-    opi_tmp = clustered_ham.extract_local_embedded_operator(ci_idx, ref_fblock, ref_config )
     print()
     print()
     print(" Form basis by diagonalize local Hamiltonian for cluster: ",ci_idx)
     ci.form_eigbasis_from_local_operator(opi,max_roots=1000)
 
-exit()
+
 #clustered_ham.add_ops_to_clusters()
 print(" Build these local operators")
 for c in clusters:
     print(" Build mats for cluster ",c.idx)
     c.build_op_matrices()
+
+print(" Do CMF:")
+for ci_idx, ci in enumerate(clusters):
+    assert(ci_idx == ci.idx)
+    print(" Extract local operator for cluster",ci.idx)
+    ref_fblock = list(ci_vector.fblocks())[0]
+    ref_config = list(ci_vector.fblock(ref_fblock).items())[0][0]
+    opi_tmp = clustered_ham.extract_local_embedded_operator(ci_idx, ref_fblock, ref_config )
+    exit()
 
 pt_vector = ci_vector.copy()
 for it in range(4):

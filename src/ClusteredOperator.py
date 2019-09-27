@@ -555,6 +555,7 @@ class ClusteredOperator:
                     term.ops = [term.ops[cluster_idx]]
                     term.delta = [term.delta[cluster_idx]]
                     op.add_term(term)
+        return op
     
     def extract_local_embedded_operator(self,cluster_idx,fock_state,config):
         """
@@ -580,7 +581,17 @@ class ClusteredOperator:
                 
                 elif len(active) == 2 and active[0] == cluster_idx:
                     if tt.ops[0] == 'Aa' or tt.ops[0] == 'Bb' :
-                        print(tt,tt.contract_string)
+                        new_str = tt.contract_string[3:12] +  tt.contract_string[0:2]
+                        fock_j = fock_state[active[1]]
+                        cj = self.clusters[active[1]]
+                        try:
+                            dens_j = cj.ops[tt.ops[1]]
+                        except KeyError:
+                            print("Error: ", tt.ops[1], " apparently not in cluster:",active[1]," have you built the basis yet?")
+                            exit()
+                            
+                        print(tt,new_str)
+        exit()
         return op
 
 
