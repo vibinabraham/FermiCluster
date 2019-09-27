@@ -552,6 +552,23 @@ class ClusteredOperator:
                     term.ops = [term.ops[cluster_idx]]
                     term.delta = [term.delta[cluster_idx]]
                     op.add_term(term)
+    
+    def extract_local_embedded_operator(self,cluster_idx):
+        """
+        Extract a local operator embedded in a direct product state
+
+            e.g. p'q<r's>(pr|qs)
+        """
+        op = LocalOperator(self.clusters[cluster_idx])
+        for t in self.terms:
+            for tt in self.terms[t]:
+                active = tt.get_active_clusters()
+                if len(active) == 1 and active[0] == cluster_idx:
+
+                    term = cp.deepcopy(tt)
+                    term.ops = [term.ops[cluster_idx]]
+                    term.delta = [term.delta[cluster_idx]]
+                    op.add_term(term)
         return op
 
 
