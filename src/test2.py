@@ -102,7 +102,7 @@ for ci_idx, ci in enumerate(clusters):
     ref_fblock = list(ci_vector.fblocks())[0]
     ref_config = list(ci_vector.fblock(ref_fblock).items())[0][0]
     opi_tmp = clustered_ham.extract_local_embedded_operator(ci_idx, ref_fblock, ref_config )
-    exit()
+exit()
 
 pt_vector = ci_vector.copy()
 for it in range(4):

@@ -578,20 +578,58 @@ class ClusteredOperator:
                     term.ops = [term.ops[cluster_idx]]
                     term.delta = [term.delta[cluster_idx]]
                     op.add_term(term)
-                
-                elif len(active) == 2 and active[0] == cluster_idx:
-                    if tt.ops[0] == 'Aa' or tt.ops[0] == 'Bb' :
+
+                doterm = False
+
+                new_str = ""
+                if len(active) == 2 and active[0] == cluster_idx:
+                    if tt.ops[0] == 'Aa' or tt.ops[0] == 'Bb':
+                        i,j = 0,1
+                        doterm = True
                         new_str = tt.contract_string[3:12] +  tt.contract_string[0:2]
-                        fock_j = fock_state[active[1]]
-                        cj = self.clusters[active[1]]
-                        try:
-                            dens_j = cj.ops[tt.ops[1]]
-                        except KeyError:
-                            print("Error: ", tt.ops[1], " apparently not in cluster:",active[1]," have you built the basis yet?")
+                elif len(active) == 2 and active[1] == cluster_idx:
+                    if tt.ops[1] == 'Aa' or tt.ops[1] == 'Bb':
+                        i,j = 1,0
+                        doterm = True
+                        new_str = tt.contract_string[3:12] +  tt.contract_string[0:2]
+                else:
+                    continue
+               
+                #print(tt,new_str)
+                if doterm:
+                    fock_j = fock_state[active[j]]
+                    cj = self.clusters[active[j]]
+                    conf_j = config[active[j]]
+                    try:
+                        dens_j = cj.ops[tt.ops[j]]
+                    except KeyError:
+                        print("Error: ", tt.ops[j], " apparently not in cluster:",active[j]," have you built the basis yet?")
+                        exit()
+                    
+                    try:
+                        dens_j = dens_j[(fock_j, fock_j)][conf_j, conf_j]
+                        #print(tt,new_str, dens_j.shape)
+                        new_v = np.einsum(new_str, dens_j, tt.ints)
+                        #new_str2 = new_str[9:11] + "," + new_str[3:5] + "->"
+                        
+                        term = cp.deepcopy(tt)
+                        term.ops = [term.ops[cluster_idx]]
+                        term.delta = [(0,0)]
+                        term.contract_string = "ab,ab->"    
+                        if new_str[9] == new_str[3]:
+                            term.ints = new_v
+                        elif new_str[9] == new_str[4]:
+                            term.ints = new_v.T
+                        else:
+                            print(" Error:")
                             exit()
-                            
-                        print(tt,new_str)
-        exit()
+                        #print(term, term.contract_string)
+                        op.add_term(term)
+                    except KeyError:
+                        #must not exist for state
+                        pass
+
+        print(op)
         return op
 
 
