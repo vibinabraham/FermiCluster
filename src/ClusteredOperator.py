@@ -623,6 +623,7 @@ class ClusteredOperator:
                     fock_j = fock_state[active[j]]
                     cj = self.clusters[active[j]]
                     conf_j = config[active[j]]
+                    print(tt)
                     try:
                         dens_j = cj.ops[tt.ops[j]]
                     except KeyError:

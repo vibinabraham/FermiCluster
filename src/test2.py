@@ -17,7 +17,7 @@ from tools import *
 import pyscf
 ttt = time.time()
 
-n_orb = 6 
+n_orb = 8 
 U = 4
 beta = 1.0
 
@@ -51,9 +51,9 @@ if do_fci:
 
 blocks = [[0],[1],[2],[3],[4],[5],[6],[7]]
 blocks = [[0,1,2,3,4,5],[6,7,8,9,10,11]]
-blocks = [[0,1],[2,3,4,5],[6,7]]
 blocks = [[0,1,2,3],[4,5,6,7]]
 blocks = [[0,1,2],[3,4,5]]
+blocks = [[0,1],[2,3,4,5],[6,7]]
 n_blocks = len(blocks)
 clusters = []
 
@@ -65,9 +65,9 @@ ci_vector = ClusteredState(clusters)
 #ci_vector.init(((2,2),(2,2),(0,0)))
 #ci_vector.init(((1,1),(1,1),(1,1),(1,1),(0,0),(0,0),(0,0),(0,0)))
 #ci_vector.init(((2,2),(2,2),(0,0),(0,0)))
-#ci_vector.init(((2,2),(2,2),(0,0)))
 #ci_vector.init(((2,2),(2,2)))
-ci_vector.init(((3,3),(0,0)))
+#ci_vector.init(((3,3),(0,0)))
+ci_vector.init(((2,2),(2,2),(0,0)))
 
 print(" Clusters:")
 [print(ci) for ci in clusters]
@@ -107,8 +107,7 @@ for ci_idx, ci in enumerate(clusters):
     print()
     print()
     print(" Form basis by diagonalize local Hamiltonian for cluster: ",ci_idx)
-    ci.form_eigbasis_from_local_operator(opi,max_roots=1000)
-exit()
+    #ci.form_eigbasis_from_local_operator(opi,max_roots=1000)
 
 pt_vector = ci_vector.copy()
 for it in range(4):
