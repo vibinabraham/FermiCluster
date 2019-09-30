@@ -71,9 +71,9 @@ class Cluster(object):
         v = np.zeros([self.n_orb]*4)
         for t in local_op.terms:
             if t.ops[0] == "Aa":
-                h = t.ints 
+                h += t.ints 
             if t.ops[0] == "AAaa":
-                v = t.ints 
+                v = 2*t.ints 
         
         H = Hamiltonian()
         H.S = np.eye(h.shape[0])

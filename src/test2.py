@@ -17,20 +17,20 @@ from tools import *
 import pyscf
 ttt = time.time()
 
-n_orb = 8 
+n_orb = 6 
 U = 4
 beta = 1.0
 
 h, g = get_hubbard_params(n_orb,beta,U,pbc=False)
 np.random.seed(2)
-tmp = np.random.rand(h.shape[0],h.shape[1])*0.01
-h += tmp + tmp.T
+#tmp = np.random.rand(h.shape[0],h.shape[1])*0.01
+#h += tmp + tmp.T
 
 if 1:
     Escf,orb,h,g,C = run_hubbard_scf(h,g,n_orb//2)
 
-cipsi_thresh     = 1e-7
-filter_ci_thresh = 1e-4
+cipsi_thresh     = 1e-5
+filter_ci_thresh = 1e-5
 
 do_fci = 1
 if do_fci:
@@ -51,8 +51,10 @@ if do_fci:
 
 blocks = [[0],[1],[2],[3],[4],[5],[6],[7]]
 blocks = [[0,1,2,3,4,5],[6,7,8,9,10,11]]
-blocks = [[0,1],[2,3,4,5],[6,7]]
 blocks = [[0,1,2,3],[4,5,6,7]]
+blocks = [[0,1],[2,3],[4,5]]
+blocks = [[0,5],[1,4],[2,3]]
+blocks = [[0,1,2],[3,4,5]]
 n_blocks = len(blocks)
 clusters = []
 
@@ -66,7 +68,8 @@ ci_vector = ClusteredState(clusters)
 #ci_vector.init(((2,2),(2,2),(0,0),(0,0)))
 #ci_vector.init(((2,2),(2,2),(0,0)))
 #ci_vector.init(((2,2),(2,2)))
-ci_vector.init(((4,4),(0,0)))
+#ci_vector.init(((1,1),(1,1),(1,1)))
+ci_vector.init(((3,3),(0,0)))
 
 print(" Clusters:")
 [print(ci) for ci in clusters]
@@ -95,18 +98,26 @@ for c in clusters:
     print(" Build mats for cluster ",c.idx)
     c.build_op_matrices()
 
-print(" Do CMF:")
-for ci_idx, ci in enumerate(clusters):
-    assert(ci_idx == ci.idx)
-    print(" Extract local operator for cluster",ci.idx)
-    ref_fblock = list(ci_vector.fblocks())[0]
-    ref_config = list(ci_vector.fblock(ref_fblock).items())[0][0]
-    opi_tmp = clustered_ham.extract_local_embedded_operator(ci_idx, ref_fblock, ref_config )
-exit()
+#print(" Do CMF:")
+#for ci_idx, ci in enumerate(clusters):
+#    assert(ci_idx == ci.idx)
+#    print(" Extract local operator for cluster",ci.idx)
+#    ref_fblock = list(ci_vector.fblocks())[0]
+#    ref_config = list(ci_vector.fblock(ref_fblock).items())[0][0]
+#    opi = clustered_ham.extract_local_embedded_operator(ci_idx, ref_fblock, ref_config )
+#    print(" Form basis by diagonalize local Hamiltonian for cluster: ",ci_idx)
+#    ci.form_eigbasis_from_local_operator(opi,max_roots=1000)
+##exit()
+ci_vector.expand_each_fock_space()
 
 pt_vector = ci_vector.copy()
 for it in range(4):
+    print()
+    print(" ===================================================================")
+    print("     Selected CI Iteration: %4i epsilon: %12.8f" %(it,cipsi_thresh))
+    print(" ===================================================================")
     print(" Build full Hamiltonian")
+    #ci_vector.expand_to_full_space()
     H = build_full_hamiltonian(clustered_ham, ci_vector)
 
     print(" Diagonalize Hamiltonian Matrix:")
@@ -121,7 +132,7 @@ for it in range(4):
     ci_vector.zero()
     ci_vector.set_vector(v0)
     pt_vector = matvec1(clustered_ham, ci_vector)
-    pt_vector.print()
+    #pt_vector.print()
  
 
     if filter_ci_thresh > 0:

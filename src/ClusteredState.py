@@ -110,6 +110,23 @@ class ClusteredState(OrderedDict):
         if block not in self.data:
             self.data[block] = OrderedDict()
 
+    def expand_each_fock_space(self):
+        """
+        expand basis to full space
+        """
+        # {{{
+        print("\n Make each Fock-Block the full space")
+        # create full space for each fock block defined
+        for fblock,configs in self.items():
+            dims = []
+            for c in self.clusters:
+                # get number of vectors for current fock space
+                dims.append(range(c.basis[fblock[c.idx]].shape[1]))
+            for newconfig_idx, newconfig in enumerate(itertools.product(*dims)):
+                self[fblock][newconfig] = 0 
+        return
+# }}}
+
     def expand_to_full_space(self):
         """
         expand basis to full space
