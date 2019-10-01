@@ -17,8 +17,8 @@ from tools import *
 import pyscf
 ttt = time.time()
 
-n_orb = 6
-U = 4
+n_orb = 24 
+U = 1. 
 beta = 1.0
 
 h, g = get_hubbard_params(n_orb,beta,U,pbc=False)
@@ -29,10 +29,10 @@ np.random.seed(2)
 if 1:
     Escf,orb,h,g,C = run_hubbard_scf(h,g,n_orb//2)
 
-cipsi_thresh     = 1e-5
-filter_ci_thresh = 1e-5
+cipsi_thresh     = 1e-3
+filter_ci_thresh = 1e-3
 
-do_fci = 1
+do_fci = 0
 if do_fci:
     # FCI
     from pyscf import gto, scf, ao2mo, fci, cc
@@ -49,12 +49,14 @@ if do_fci:
     e, ci = cisolver.kernel(h, g, h.shape[1], mol.nelectron, ecore=0)
     print(" FCI:        %12.8f"%e)
 
-blocks = [[0],[1],[2],[3],[4],[5],[6],[7]]
 blocks = [[0,1,2,3,4,5],[6,7,8,9,10,11]]
 blocks = [[0,1,2,3],[4,5,6,7]]
 blocks = [[0,1],[2,3],[4,5]]
 blocks = [[0,5],[1,4],[2,3]]
-blocks = [[0,1,2],[3,4,5]]
+blocks = [[0],[1],[2],[3],[4],[5]]
+blocks = [[0],[1],[2],[3],[4],[5],[6],[7]]
+blocks = [[0,1,2,3],[4,5,6,7]]
+blocks = [range(0,4),range(4,8),range(8,12),range(12,16),range(16,20),range(20,24)]
 n_blocks = len(blocks)
 clusters = []
 
@@ -64,11 +66,14 @@ for ci,c in enumerate(blocks):
 ci_vector = ClusteredState(clusters)
 #ci_vector.init(((2,2),(0,0)))
 #ci_vector.init(((2,2),(2,2),(0,0)))
-#ci_vector.init(((1,1),(1,1),(1,1),(1,1),(0,0),(0,0),(0,0),(0,0)))
 #ci_vector.init(((2,2),(2,2),(0,0),(0,0)))
 #ci_vector.init(((2,2),(2,2)))
 #ci_vector.init(((1,1),(1,1),(1,1)))
-ci_vector.init(((3,3),(0,0)))
+#ci_vector.init(((2,1),(1,2)))
+#ci_vector.init(((1,1),(1,1),(1,1),(0,0),(0,0),(0,0)))
+#ci_vector.init(((4,4),(0,0)))
+ci_vector.init(((4,4),(4,4),(4,4),(0,0),(0,0),(0,0)))
+#ci_vector.init(((1,1),(1,1),(1,1),(1,1),(0,0),(0,0),(0,0),(0,0)))
 
 print(" Clusters:")
 [print(ci) for ci in clusters]
@@ -97,17 +102,17 @@ for c in clusters:
     print(" Build mats for cluster ",c.idx)
     c.build_op_matrices()
 
-#print(" Do CMF:")
-#for ci_idx, ci in enumerate(clusters):
-#    assert(ci_idx == ci.idx)
-#    print(" Extract local operator for cluster",ci.idx)
-#    ref_fblock = list(ci_vector.fblocks())[0]
-#    ref_config = list(ci_vector.fblock(ref_fblock).items())[0][0]
-#    opi = clustered_ham.extract_local_embedded_operator(ci_idx, ref_fblock, ref_config )
-#    print(" Form basis by diagonalize local Hamiltonian for cluster: ",ci_idx)
-#    ci.form_eigbasis_from_local_operator(opi,max_roots=1000)
+print(" Do CMF:")
+for ci_idx, ci in enumerate(clusters):
+    assert(ci_idx == ci.idx)
+    print(" Extract local operator for cluster",ci.idx)
+    ref_fblock = list(ci_vector.fblocks())[0]
+    ref_config = list(ci_vector.fblock(ref_fblock).items())[0][0]
+    opi = clustered_ham.extract_local_embedded_operator(ci_idx, ref_fblock, ref_config )
+    print(" Form basis by diagonalize local Hamiltonian for cluster: ",ci_idx)
+    ci.form_eigbasis_from_local_operator(opi,max_roots=1000)
 ##exit()
-ci_vector.expand_each_fock_space()
+#ci_vector.expand_each_fock_space()
 
 pt_vector = ci_vector.copy()
 for it in range(4):
