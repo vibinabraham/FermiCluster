@@ -17,6 +17,29 @@ class LocalOperator:
     def build_matrix_dumb1(self):
         np.zeros([self.cluster.dim_tot, self.cluster.dim_tot])
 
+    def combine_common_terms(self,iprint=0):
+        """
+        combine common terms        
+        """
+# {{{
+        if iprint > 0:
+            print(self.print_terms_header())
+            for ti,t in self.terms.items():
+                print(ti)
+                for tt in t:
+                    print(tt,tt.contract_string)
+        unique = []
+        for opi_idx, opi in enumerate(self.terms):
+            found = False
+            for opj_idx,opj in enumerate(unique):
+                if opj.ops == opi.ops and opi.contract_string ==  opi.contract_string:
+                    opj.ints += opi.ints
+                    found = True
+            if found == False:
+                unique.append(opi)
+        self.terms = unique
+# }}}
+
 
 
 class ClusteredTerm:
@@ -600,6 +623,7 @@ class ClusteredOperator:
                     fock_j = fock_state[active[j]]
                     cj = self.clusters[active[j]]
                     conf_j = config[active[j]]
+                    print(tt)
                     try:
                         dens_j = cj.ops[tt.ops[j]]
                     except KeyError:
@@ -629,7 +653,6 @@ class ClusteredOperator:
                         #must not exist for state
                         pass
 
-        print(op)
         return op
 
 

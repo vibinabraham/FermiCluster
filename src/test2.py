@@ -17,7 +17,7 @@ from tools import *
 import pyscf
 ttt = time.time()
 
-n_orb = 6 
+n_orb = 6
 U = 4
 beta = 1.0
 
@@ -38,7 +38,7 @@ if do_fci:
     from pyscf import gto, scf, ao2mo, fci, cc
     pyscf.lib.num_threads(1)
     mol = gto.M(verbose=3)
-    mol.nelectron = n_orb 
+    mol.nelectron = n_orb
     # Setting incore_anyway=True to ensure the customized Hamiltonian (the _eri
     # attribute) to be used in the post-HF calculations.  Without this parameter,
     # some post-HF method (particularly in the MO integral transformation) may
@@ -66,7 +66,6 @@ ci_vector = ClusteredState(clusters)
 #ci_vector.init(((2,2),(2,2),(0,0)))
 #ci_vector.init(((1,1),(1,1),(1,1),(1,1),(0,0),(0,0),(0,0),(0,0)))
 #ci_vector.init(((2,2),(2,2),(0,0),(0,0)))
-#ci_vector.init(((2,2),(2,2),(0,0)))
 #ci_vector.init(((2,2),(2,2)))
 #ci_vector.init(((1,1),(1,1),(1,1)))
 ci_vector.init(((3,3),(0,0)))
@@ -122,18 +121,18 @@ for it in range(4):
 
     print(" Diagonalize Hamiltonian Matrix:")
     e,v = np.linalg.eigh(H)
-    idx = e.argsort()   
+    idx = e.argsort()
     e = e[idx]
     v = v[:,idx]
     v0 = v[:,0]
     e0 = e[0]
     print(" Ground state of CI:                 %12.8f  CI Dim: %4i "%(e[0].real,len(ci_vector)))
-   
+
     ci_vector.zero()
     ci_vector.set_vector(v0)
     pt_vector = matvec1(clustered_ham, ci_vector)
     #pt_vector.print()
- 
+
 
     if filter_ci_thresh > 0:
         print(" Clip CI Vector: thresh = ", filter_ci_thresh)
@@ -143,8 +142,8 @@ for it in range(4):
 
     var = pt_vector.norm() - e0*e0
     print(" Variance: %12.8f" % var)
-    
-    
+
+
     print(" Remove CI space from pt_vector vector")
     for fockspace,configs in pt_vector.items():
         if fockspace in ci_vector.fblocks():
@@ -152,26 +151,26 @@ for it in range(4):
                 if config in ci_vector[fockspace]:
                     del pt_vector[fockspace][config]
 
-    
+
     for fockspace,configs in ci_vector.items():
         if fockspace in pt_vector:
             for config,coeff in configs.items():
                 assert(config not in pt_vector[fockspace])
 
     print(" Norm of CI vector = %12.8f" %ci_vector.norm())
-    print(" Dimension of CI space: ", len(ci_vector)) 
-    print(" Dimension of PT space: ", len(pt_vector)) 
+    print(" Dimension of CI space: ", len(ci_vector))
+    print(" Dimension of PT space: ", len(pt_vector))
     print(" Compute Denominator")
-    #next_ci_vector = cp.deepcopy(ci_vector) 
+    #next_ci_vector = cp.deepcopy(ci_vector)
     # compute diagonal for PT2
     denom = 1/(e0 - build_hamiltonian_diagonal(clustered_ham, pt_vector))
     pt_vector_v = pt_vector.get_vector()
     pt_vector_v.shape = (pt_vector_v.shape[0])
-    
+
     e2 = np.multiply(denom,pt_vector_v)
     pt_vector.set_vector(e2)
     e2 = np.dot(pt_vector_v,e2)
-    
+
     print(" PT2 Energy Correction = %12.8f" %e2)
     print(" PT2 Energy Total      = %12.8f" %(e0+e2))
 
@@ -186,4 +185,3 @@ for it in range(4):
                     ci_vector.add_fockblock(fockspace)
                     ci_vector[fockspace][config] = 0
     print(" Next iteration CI space dimension", len(ci_vector))
-
