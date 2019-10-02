@@ -188,4 +188,4 @@ for it in range(4):
         opi = build_effective_operator(ci_idx, clustered_ham, ci_vector)
         print(" Form basis by diagonalize local Hamiltonian for cluster: ",ci_idx)
         ci.form_eigbasis_from_local_operator(opi,max_roots=1000)
-        exit()
+    exit()
