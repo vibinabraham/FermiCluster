@@ -159,6 +159,52 @@ def build_full_hamiltonian(clustered_ham,ci_vector,iprint=0):
 # }}}
 
 
+def build_effective_operator(cluster_idx, clustered_ham, ci_vector,iprint=0):
+    """
+    Build effective operator, doing a partial trace over all clusters except cluster_idx
+    
+        H = sum_i o_i h_i
+    """
+# {{{
+    clusters = ci_vector.clusters
+    H = np.zeros((len(ci_vector),len(ci_vector)))
+   
+    new_op = ClusteredOperator(clustered_ham.clusters)
+    shift_l = 0 
+    for fock_li, fock_l in enumerate(ci_vector.data):
+        configs_l = ci_vector[fock_l]
+        if iprint > 0:
+            print(fock_l)
+       
+        for config_li, config_l in enumerate(configs_l):
+            idx_l = shift_l + config_li 
+            
+            shift_r = 0 
+            for fock_ri, fock_r in enumerate(ci_vector.data):
+                configs_r = ci_vector[fock_r]
+                delta_fock= tuple([(fock_l[ci][0]-fock_r[ci][0], fock_l[ci][1]-fock_r[ci][1]) for ci in range(len(clusters))])
+                if fock_ri<fock_li:
+                    shift_r += len(configs_r) 
+                    continue
+                try:
+                    terms = clustered_ham.terms[delta_fock]
+                except KeyError:
+                    shift_r += len(configs_r) 
+                    continue 
+                
+                for config_ri, config_r in enumerate(configs_r):        
+                    idx_r = shift_r + config_ri
+                    if idx_r<idx_l:
+                        continue
+                    
+                    for term in terms:
+                        new_term = term.effective_cluster_operator(cluster_idx, fock_l, config_l, fock_r, config_r)
+                shift_r += len(configs_r) 
+        shift_l += len(configs_l)
+    return new_op 
+# }}}
+
+
 
 def build_hamiltonian_diagonal(clustered_ham,ci_vector):
     """
@@ -184,4 +230,47 @@ def build_hamiltonian_diagonal(clustered_ham,ci_vector):
 # }}}
 
 
+def build_1rdm(ci_vector):
+    """
+    Build 1rdm C_{I,J,K}<IJK|p'q|LMN> C_{L,M,N}
+    """
+    dm_aa = np.zeros((ci_vector.n_orb,ci_vector.n_orb))
+    dm_bb = np.zeros((ci_vector.n_orb,ci_vector.n_orb))
 
+
+    shift_l = 0 
+    for fock_li, fock_l in enumerate(ci_vector.data):
+        configs_l = ci_vector[fock_l]
+        if iprint > 0:
+            print(fock_l)
+       
+        for config_li, config_l in enumerate(configs_l):
+            idx_l = shift_l + config_li 
+            
+            shift_r = 0 
+            for fock_ri, fock_r in enumerate(ci_vector.data):
+                configs_r = ci_vector[fock_r]
+                delta_fock= tuple([(fock_l[ci][0]-fock_r[ci][0], fock_l[ci][1]-fock_r[ci][1]) for ci in range(len(clusters))])
+                if fock_ri<fock_li:
+                    shift_r += len(configs_r) 
+                    continue
+                try:
+                    terms = clustered_ham.terms[delta_fock]
+                except KeyError:
+                    shift_r += len(configs_r) 
+                    continue 
+                
+                for config_ri, config_r in enumerate(configs_r):        
+                    idx_r = shift_r + config_ri
+                    if idx_r<idx_l:
+                        continue
+                    
+                    for term in terms:
+                        me = term.matrix_element(fock_l,config_l,fock_r,config_r)
+                        H[idx_l,idx_r] += me
+                        if idx_r>idx_l:
+                            H[idx_r,idx_l] += me
+                        #print(" %4i %4i = %12.8f"%(idx_l,idx_r,me),"  :  ",config_l,config_r, " :: ", term)
+                shift_r += len(configs_r) 
+        shift_l += len(configs_l)
+    return H

@@ -196,6 +196,76 @@ class ClusteredTerm:
 # }}}
 
 
+    def effective_cluster_operator(self, cluster_idx, fock_bra, bra, fock_ket, ket):
+        """
+        Compute the cluster density matrix between <fock1,config1|H|fock2,config2>
+        where fock is the 'fock-block' of bra. This is just a specification
+        of the particle number space of each cluster. Eg., 
+        ((2,3),(4,3),(2,2)) would have 3 clusters with 2(3), 4(3), 2(2) 
+        alpha(beta) electrons, respectively. 
+
+        Args:
+            cluster_idx: index of cluster to extract effective operator for
+            fock_bra (tuple(tuple)): fock-block for bra
+            bra (tuple): cluster state configuration within specified fock block
+            fock_ket (tuple(tuple)): fock-block for ket 
+            ket (tuple): cluster state configuration within specified fock block
+        Returns:
+            matrix element. <IJK...|Hterm|LMN...>, where IJK, and LMN
+            are the state indices for clusters 1, 2, and 3, respectively, in the 
+            particle number blocks specified by fock_bra and fock_ket.
+        """
+        # {{{
+        for ci in range(self.n_clusters):
+            if (bra[ci]!=ket[ci]) and (ci not in self.active):
+                return 0
+     
+        assert(len(fock_bra) == len(fock_ket))
+        assert(len(fock_ket) == len(bra))
+        assert(len(bra) == len(ket))
+        assert(len(ket) == self.n_clusters)
+
+        # <bra|term|ket>    = <IJK|o1o2o3|K'J'I'>
+        #                   = <I|o1|I'><J|o2|J'><K|o3|K'> 
+        #print(bra,ket,self)
+        #print(self.ints.shape)
+    
+        mats = []
+        state_sign = 1
+        if self.ops[cluster_idx] == '':
+            print("skip:", self, cluster_idx)
+            return
+
+        for oi,o in enumerate(self.ops):
+            if o == '':
+                continue
+            if len(o) == 1 or len(o) == 3:
+                for cj in range(oi):
+                    state_sign *= (-1)**(fock_ket[cj][0]+fock_ket[cj][1])
+            try:
+                do = self.clusters[oi].ops[o]
+            except:
+                print(" Couldn't find:", self)
+                exit()
+                return 0
+            try:
+                d = do[(fock_bra[oi],fock_ket[oi])][bra[oi],ket[oi]] #D(I,J,:,:...)
+            except:
+                return 0
+            mats.append(d)
+
+        if len(mats) > 0:
+            print(self.contract_string)
+            me = np.einsum(self.contract_string,*mats,self.ints) * state_sign
+        elif len(mats) == 0:
+            return 0 
+        else:
+            print("Error")
+            exit()
+        return me
+# }}}
+
+
 
 
 class ClusteredOperator:
@@ -579,8 +649,44 @@ class ClusteredOperator:
                     term.delta = [term.delta[cluster_idx]]
                     op.add_term(term)
         return op
+    def extract_local_embedded_operator(self,cluster_idx,rdm):
+        """
+        Extract Local operator, considering only terms which are completely contained inside cluster,
+        integrating over the rest of the system.
+
+        H^A = \sum_{pq \in A}}\left(h_{pq} + \sum_B\sum_{rs\in B}\mel{pr\vert qs}P_{rs}\right) \hat{p}^\dagger\hat{q}
+                + \sum_{pqrs \in A} \mel{pr\vert qs}\hat{p}^\dagger\hat{r}^\dagger\hat{s}\hat{r}
+        
+        input:
+            1rdm: <p'q> matrix
+        
+        """
+        op = LocalOperator(self.clusters[cluster_idx])
+        for t in self.terms:
+            for tt in self.terms[t]:
+                active = tt.get_active_clusters()
+                if len(active) == 1 and active[0] == cluster_idx:
+
+                    term = cp.deepcopy(tt)
+                    term.ops = [term.ops[cluster_idx]]
+                    term.delta = [term.delta[cluster_idx]]
+                    op.add_term(term)
+                elif len(active) == 2:
+                    if active[0] == cluster_idx:
+                        if tt.ops[0] == 'Aa' or tt.ops[0] == 'Bb':
+                            tti = tt.ops[0]
+                            ttj = tt.ops[1]
+                            
+                            term = cp.deepcopy(tt)
+                            term.ops = [tti]
+                            term.delta = [(0,0)]
+                            term.ints = np.einsum('pqrs,rs->pq',term.ints,densites[ttj])
+                            print(term)
+                            op.add_term(term)
+
+        return op
     
-    def extract_local_embedded_operator(self,cluster_idx,fock_state,config):
+    def extract_local_embedded_operator2(self,cluster_idx,fock_state,config):
         """
         Extract a local operator embedded in a direct product state
 
