@@ -7,6 +7,7 @@ import opt_einsum as oe
 from ci_string import *
 from Hamiltonian import *
 from davidson import *
+from helpers import *
 
 class Cluster(object):
 
@@ -92,7 +93,26 @@ class Cluster(object):
                 #self.basis[(na,nb)] = np.eye(ci.results_v.shape[0])
                 self.basis[(na,nb)] = ci.results_v
             
-                
+    def rotate_basis(self,U):
+        """
+        Rotate cluster's basis using U, which is an dictionary mapping fock spaces to unitary rotation matrices.
+        rotate basis, and all associated operators
+        """
+        for fspace,mat in U.items():
+            self.basis[fspace] = self.basis[fspace] @ mat
+        #print(" Build all operators:")
+        #self.build_op_matrices()
+        for op,fspace_deltas in self.ops.items():
+            for fspace_delta,tdm in fspace_deltas.items():
+                fspace_l = fspace_delta[0]
+                fspace_r = fspace_delta[1]
+                if fspace_l in U:
+                    Ul = U[fspace_l]
+                    self.ops[op][fspace_delta] = np.einsum('pq,pr...->qr...',Ul,self.ops[op][fspace_delta])
+                if fspace_r in U:
+                    Ur = U[fspace_r]
+                    self.ops[op][fspace_delta] = np.einsum('rs,pr...->ps...',Ur,self.ops[op][fspace_delta])
+    
     def build_op_matrices(self):
         """
         build all operators needed

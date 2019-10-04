@@ -29,9 +29,6 @@ tmp = np.random.rand(h.shape[0],h.shape[1])*0.01
 if 0:
     Escf,orb,h,g,C = run_hubbard_scf(h,g,n_orb//2)
 
-cipsi_thresh     = 1e-5
-filter_ci_thresh = 1e-6
-
 do_fci = 1
 if do_fci:
     # FCI
@@ -114,20 +111,27 @@ for c in clusters:
 #ci_vector.expand_to_full_space()
 #ci_vector.expand_each_fock_space()
 
-ci_vector, e0, e2 = bc_cipsi(ci_vector, clustered_ham, thresh_cipsi=1e-4, thresh_ci_clip=1e-5)
 
-for ci in clusters:
-    print()
-    rdms = build_brdm(ci_vector, ci.idx)
-    norm = 0
-    for fspace,rdm in rdms.items():
-        print(" Diagonalize RDM for Cluster %2i in Fock space:"%ci.idx, fspace,flush=True)
-        n,U = np.linalg.eigh(rdm)
-        idx = n.argsort()[::-1]
-        n = n[idx]
-        U = U[:,idx]
-        norm += sum(n)
-        for ni_idx,ni in enumerate(n):
-            if abs(ni) > 1e-12:
-                print("   Rotated State %4i: %12.8f"%(ni_idx,ni))
-    print(" Final norm: %12.8f"%norm)
+for brdm_iter in range(20):
+    ci_vector, e0, e2 = bc_cipsi(ci_vector, clustered_ham, thresh_cipsi=1e-4, thresh_ci_clip=1e-5)
+    print(" CIPSI: E0 = %12.8f E2 = %12.8f CI_DIM: %i" %(e0, e2, len(ci_vector)))
+    
+    for ci in clusters:
+        print()
+        rdms = build_brdm(ci_vector, ci.idx)
+        norm = 0
+        rotations = {}
+        for fspace,rdm in rdms.items():
+            print(" Diagonalize RDM for Cluster %2i in Fock space:"%ci.idx, fspace,flush=True)
+            n,U = np.linalg.eigh(rdm)
+            idx = n.argsort()[::-1]
+            n = n[idx]
+            U = U[:,idx]
+            norm += sum(n)
+            for ni_idx,ni in enumerate(n):
+                if abs(ni) > 1e-12:
+                    print("   Rotated State %4i: %12.8f"%(ni_idx,ni))
+            rotations[fspace] = U
+        print(" Final norm: %12.8f"%norm)
+    
+        ci.rotate_basis(rotations)
