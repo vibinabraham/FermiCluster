@@ -344,9 +344,13 @@ class ClusteredOperator:
                 if ci.idx==cj.idx:
                     term_a.active = [ci.idx]
                     term_b.active = [ci.idx]
-                else:
+                elif ci.idx < cj.idx:
                     term_a.active = [ci.idx,cj.idx]
                     term_b.active = [ci.idx,cj.idx]
+                elif ci.idx > cj.idx:
+                    term_a.active = [cj.idx,ci.idx]
+                    term_b.active = [cj.idx,ci.idx]
+                
                 if cj.idx < ci.idx:
                     term_a.ints = -1.0*np.transpose(term_a.ints, axes=(1,0))
                     term_b.ints = -1.0*np.transpose(term_b.ints, axes=(1,0))
