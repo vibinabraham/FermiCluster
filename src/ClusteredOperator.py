@@ -233,11 +233,16 @@ class ClusteredTerm:
         mats = []
         state_sign = 1
         if self.ops[cluster_idx] == '':
-            print("skip:", self, cluster_idx)
             return
-
+        
+        new_opstr = ""
+        str_to_delete = -1 
         for oi,o in enumerate(self.ops):
             if o == '':
+                continue
+            if oi == cluster_idx:
+                new_opstr = o
+                str_to_delete = oi
                 continue
             if len(o) == 1 or len(o) == 3:
                 for cj in range(oi):
@@ -254,9 +259,14 @@ class ClusteredTerm:
                 return 0
             mats.append(d)
 
+        tmp = [x.strip() for x in self.contract_string.split(',')]
+        output_str = tmp[str_to_delete]
+        tmp.remove(tmp[str_to_delete])
+        new_contract_string = ",".join(tmp) + output_str
+        
+        print(self, self.contract_string, new_contract_string)
         if len(mats) > 0:
-            print(self.contract_string)
-            me = np.einsum(self.contract_string,*mats,self.ints) * state_sign
+            me = np.einsum(new_contract_string,*mats,self.ints) * state_sign
         elif len(mats) == 0:
             return 0 
         else:

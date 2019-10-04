@@ -17,8 +17,8 @@ from tools import *
 import pyscf
 ttt = time.time()
 
-n_orb = 4 
-U = 0. 
+n_orb = 4
+U = 0.
 beta = 1.0
 
 h, g = get_hubbard_params(n_orb,beta,U,pbc=False)
@@ -189,7 +189,7 @@ for it in range(10):
                 else:
                     ci_vector.add_fockblock(fockspace)
                     ci_vector[fockspace][config] = 0
-    if len(ci_vector) == old_dim:
+    if len(ci_vector) <= old_dim:
         print(" Converged")
         exit()
     print(" Next iteration CI space dimension", len(ci_vector))
