@@ -55,10 +55,11 @@ blocks = [[0,1],[2,3],[4,5],[6,7]]
 blocks = [[0,1],[2,3]]
 blocks = [[0,1],[2,3,4,5],[6,7]]
 blocks = [[0,1,6,7],[2,3,4,5]]
-blocks = [[0,1,2,3],[4,5,6,7]]
 blocks = [[0,1,2,3],[4,5],[6,7]]
 blocks = [[0,1,2,3],[4,5],[6,7]]
 blocks = [[0,1,2,3,4,5],[6,7,8,9,10,11]]
+blocks = [[0,1,2,3],[4,5,6,7]]
+blocks = [[0,1,2],[3,4,5]]
 blocks = [[0,1,2,3],[4,5,6,7],[8,9,10,11]]
 n_blocks = len(blocks)
 clusters = []
@@ -78,11 +79,13 @@ ci_vector = ClusteredState(clusters)
 #ci_vector.init(((2,2),(2,2),(0,0),(0,0)))
 #ci_vector.init(((1,1),(1,1)))
 #ci_vector.init(((2,2),(2,2),(0,0)))
+#ci_vector.init(((3,3),(0,0)))
 #ci_vector.init(((4,4),(0,0)))
 #ci_vector.init(((2,2),(2,2)))
 #ci_vector.init(((1,1),(1,1),(1,1),(1,1)))
 #ci_vector.init(((2,2),(1,1),(1,1)))
 #ci_vector.init(((3,3),(3,3)))
+#ci_vector.init(((4,4),(2,2),(0,0)))
 ci_vector.init(((2,2),(2,2),(2,2)))
 #ci_vector.init(((4,4),(4,4),(4,4),(0,0),(0,0),(0,0)))
 #ci_vector.init(((1,1),(1,1),(1,1),(1,1),(0,0),(0,0),(0,0),(0,0)))
@@ -118,7 +121,7 @@ for c in clusters:
 #ci_vector.expand_each_fock_space()
 
 ci_vector_ref = ci_vector.copy()
-for brdm_iter in range(20):
+for brdm_iter in range(40):
     ci_vector, e0, e2 = bc_cipsi(ci_vector, clustered_ham, thresh_cipsi=1e-4, thresh_ci_clip=1e-4)
     #ci_vector, e0, e2 = bc_cipsi(ci_vector_ref.copy(), clustered_ham, thresh_cipsi=1e-4, thresh_ci_clip=1e-4)
     print(" CIPSI: E0 = %12.8f E2 = %12.8f CI_DIM: %i" %(e0, e2, len(ci_vector)))
@@ -143,4 +146,26 @@ for brdm_iter in range(20):
     
         ci.rotate_basis(rotations)
 
-ci_vector, e0, e2 = bc_cipsi(ci_vector, clustered_ham, thresh_cipsi=1e-5, thresh_ci_clip=1e-5)
+for brdm_iter in range(40):
+    ci_vector, e0, e2 = bc_cipsi(ci_vector, clustered_ham, thresh_cipsi=1e-5, thresh_ci_clip=1e-5)
+    print(" CIPSI: E0 = %12.8f E2 = %12.8f CI_DIM: %i" %(e0, e2, len(ci_vector)))
+    for ci in clusters:
+        print()
+        rdms = build_brdm(ci_vector, ci.idx)
+        norm = 0
+        rotations = {}
+        for fspace,rdm in rdms.items():
+            print(" Diagonalize RDM for Cluster %2i in Fock space:"%ci.idx, fspace,flush=True)
+            n,U = np.linalg.eigh(rdm)
+            idx = n.argsort()[::-1]
+            n = n[idx]
+            U = U[:,idx]
+            norm += sum(n)
+            for ni_idx,ni in enumerate(n):
+                if abs(ni) > 1e-12:
+                    print("   Rotated State %4i: %12.8f"%(ni_idx,ni))
+            rotations[fspace] = U
+        print(" Final norm: %12.8f"%norm)
+    
+        ci.rotate_basis(rotations)
+

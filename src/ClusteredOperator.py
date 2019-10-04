@@ -4,6 +4,7 @@ import itertools as it
 import copy as cp
 from collections import OrderedDict
 from helpers import *
+import opt_einsum as oe
 
 import countswaps
 from ClusteredState import *
@@ -165,33 +166,12 @@ class ClusteredTerm:
             mats.append(d)
             #print(self.clusters[oi].ops[o][tuple([].extend(fock_bra[oi])).extend(fock_ket[oi]))].shape)
 
-        #print("ints:")
-        #print(self.ints)
         me = 0.0
-#        mats_inds = ""
-#        idx = 0
-#        for mi,m in enumerate(mats):
-#            for i in range(len(m.shape)):
-#                mats_inds += self.ints_inds[idx]
-#                idx += 1
-#            mats_inds += ","
-#        string = mats_inds + self.ints_inds + "->"
-        if len(mats) == 1:
-            me = np.einsum(self.contract_string,mats[0],self.ints) * state_sign
-        elif len(mats) == 2:
-            #print()
-            #print(fock_bra, "|", fock_ket)
-            #print(self, "D1", mats[0], "D2", mats[1], "Ints", self.ints, 'State sign: ', state_sign)
-            me = np.einsum(self.contract_string,mats[0],mats[1],self.ints) * state_sign
-        elif len(mats) == 3:
-            me = np.einsum(self.contract_string,mats[0],mats[1],mats[2],self.ints) * state_sign
-        elif len(mats) == 4:
-            me = np.einsum(self.contract_string,mats[0],mats[1],mats[2],mats[3],self.ints) * state_sign
-        elif len(mats) == 0:
+        if len(mats) == 0:
             return 0 
-        else:
-            print("NYI")
-            exit()
+        me = np.einsum(self.contract_string,*mats,self.ints) * state_sign
+        #me = oe.contract(self.contract_string,*mats,self.ints) * state_sign
+        
         return me
 # }}}
 

@@ -89,8 +89,8 @@ def matvec1(h,v,term_thresh=1e-12):
                     #print("contract_string       :", term.contract_string)
                     #print("contract_string_matvec:", term.contract_string_matvec)
                     
-                    #tmp = oe.contract(term.contract_string_matvec, *mats, term.ints)
                     
+                    #tmp = oe.contract(term.contract_string_matvec, *mats, term.ints)
                     tmp = np.einsum(term.contract_string_matvec, *mats, term.ints)
                     
 

@@ -970,7 +970,7 @@ def build_ca_os(no,bra_space,ket_space,basis,spin_case):
     nv1 = v1.shape[1]
     nv2 = v2.shape[1]
 
-    NAK = ket_space[1]
+    NAK = ket_space[0]
     Da = np.zeros((bra_a.max(),ket_a.max(),no))
     Db = np.zeros((bra_b.max(),ket_b.max(),no))
     
