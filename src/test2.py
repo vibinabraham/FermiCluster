@@ -17,8 +17,8 @@ from tools import *
 import pyscf
 ttt = time.time()
 
-n_orb = 8 
-U = 1. 
+n_orb = 4 
+U = 0. 
 beta = 1.0
 
 h, g = get_hubbard_params(n_orb,beta,U,pbc=False)
@@ -26,13 +26,13 @@ np.random.seed(2)
 #tmp = np.random.rand(h.shape[0],h.shape[1])*0.01
 #h += tmp + tmp.T
 
-if 1:
+if 0:
     Escf,orb,h,g,C = run_hubbard_scf(h,g,n_orb//2)
 
-cipsi_thresh     = 1e-3
-filter_ci_thresh = 1e-3
+cipsi_thresh     = 1e-5
+filter_ci_thresh = 1e-8
 
-do_fci = 0
+do_fci = 1
 if do_fci:
     # FCI
     from pyscf import gto, scf, ao2mo, fci, cc
@@ -56,8 +56,9 @@ blocks = [[0,5],[1,4],[2,3]]
 blocks = [[0],[1],[2],[3],[4],[5]]
 blocks = [[0],[1],[2],[3],[4],[5],[6],[7]]
 blocks = [range(0,4),range(4,8),range(8,12),range(12,16),range(16,20),range(20,24)]
-blocks = [[0,1,2,3],[4,5,6,7]]
 blocks = [[0,1],[2,3],[4,5],[6,7]]
+blocks = [[0,1,2,3],[4,5,6,7]]
+blocks = [[0,1],[2,3]]
 n_blocks = len(blocks)
 clusters = []
 
@@ -72,8 +73,11 @@ ci_vector = ClusteredState(clusters)
 #ci_vector.init(((1,1),(1,1),(1,1)))
 #ci_vector.init(((2,1),(1,2)))
 #ci_vector.init(((1,1),(1,1),(1,1),(0,0),(0,0),(0,0)))
-ci_vector.init(((2,2),(2,2),(0,0),(0,0)))
+#ci_vector.init(((1,1),(1,1),(1,1),(1,1)))
+#ci_vector.init(((2,2),(2,2),(0,0),(0,0)))
 #ci_vector.init(((4,4),(0,0)))
+ci_vector.init(((1,1),(1,1)))
+#ci_vector.init(((2,2),(2,2)))
 #ci_vector.init(((4,4),(4,4),(4,4),(0,0),(0,0),(0,0)))
 #ci_vector.init(((1,1),(1,1),(1,1),(1,1),(0,0),(0,0),(0,0),(0,0)))
 
@@ -83,6 +87,9 @@ print(" Clusters:")
 clustered_ham = ClusteredOperator(clusters)
 print(" Add 1-body terms")
 clustered_ham.add_1b_terms(h)
+print()
+[[print(hh,hh.contract_string,"\n",hh.ints) for hh in h] for delta, h in clustered_ham.terms.items()]
+#exit()
 print(" Add 2-body terms")
 clustered_ham.add_2b_terms(g)
 #clustered_ham.combine_common_terms(iprint=1)
@@ -104,15 +111,16 @@ for c in clusters:
     print(" Build mats for cluster ",c.idx)
     c.build_op_matrices()
 
+ci_vector.expand_to_full_space()
+#ci_vector.expand_each_fock_space()
 
 pt_vector = ci_vector.copy()
-for it in range(4):
+for it in range(10):
     print()
     print(" ===================================================================")
     print("     Selected CI Iteration: %4i epsilon: %12.8f" %(it,cipsi_thresh))
     print(" ===================================================================")
     print(" Build full Hamiltonian")
-    #ci_vector.expand_to_full_space()
     H = build_full_hamiltonian(clustered_ham, ci_vector)
 
     print(" Diagonalize Hamiltonian Matrix:")
@@ -172,6 +180,7 @@ for it in range(4):
 
     print(" Choose which states to add to CI space")
 
+    old_dim = len(ci_vector)
     for fockspace,configs in pt_vector.items():
         for config,coeff in configs.items():
             if coeff*coeff > cipsi_thresh:
@@ -180,12 +189,15 @@ for it in range(4):
                 else:
                     ci_vector.add_fockblock(fockspace)
                     ci_vector[fockspace][config] = 0
-    print(" Next iteration CI space dimension", len(ci_vector))
-    print(" Do CMF:")
-    for ci_idx, ci in enumerate(clusters):
-        assert(ci_idx == ci.idx)
-        print(" Extract local operator for cluster",ci.idx)
-        opi = build_effective_operator(ci_idx, clustered_ham, ci_vector)
-        print(" Form basis by diagonalize local Hamiltonian for cluster: ",ci_idx)
-        ci.form_eigbasis_from_local_operator(opi,max_roots=1000)
+    if len(ci_vector) == old_dim:
+        print(" Converged")
         exit()
+    print(" Next iteration CI space dimension", len(ci_vector))
+#    print(" Do CMF:")
+#    for ci_idx, ci in enumerate(clusters):
+#        assert(ci_idx == ci.idx)
+#        print(" Extract local operator for cluster",ci.idx)
+#        opi = build_effective_operator(ci_idx, clustered_ham, ci_vector)
+#        print(" Form basis by diagonalize local Hamiltonian for cluster: ",ci_idx)
+#        ci.form_eigbasis_from_local_operator(opi,max_roots=1000)
+#        exit()

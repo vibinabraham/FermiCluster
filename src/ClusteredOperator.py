@@ -340,8 +340,6 @@ class ClusteredOperator:
                 if cj.idx < ci.idx:
                     term_a.ints = -1.0*np.transpose(term_a.ints, axes=(1,0))
                     term_b.ints = -1.0*np.transpose(term_b.ints, axes=(1,0))
-                    #term_a.ints = np.transpose(term_a.ints, axes=(0,1))
-                    #term_b.ints = np.transpose(term_b.ints, axes=(0,1))
 
                 if cj.idx == ci.idx:
                     term_a.contract_string = "pq,pq->"

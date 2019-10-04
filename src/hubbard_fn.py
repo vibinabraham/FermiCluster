@@ -33,13 +33,17 @@ def get_hubbard_params(n_site,beta,U,pbc=True):
     return h_local,g_local
     # }}}
 
-def run_hubbard_scf(h_local,g_local,closed_shell_nel):
+def run_hubbard_scf(h_local,g_local,closed_shell_nel,do_scf=True):
 # {{{
     print()
     print(" ---------------------------------------------------------")
     print("                  Delocalized Mean-Field")
     print(" ---------------------------------------------------------")
-    orb, C = np.linalg.eigh(h_local)
+    if do_scf:
+        orb, C = np.linalg.eigh(h_local)
+    else:
+        C = np.eye(h_local.shape[0])
+        orb = h_local.diagonal()
     #if np.sum(h_local) == 0:
     #    print("why")
     #    orbt, C = np.linalg.eigh(t)
