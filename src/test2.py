@@ -13,17 +13,17 @@ from Cluster import *
 from ClusteredOperator import *
 from ClusteredState import *
 from tools import *
-
+from bc_cipsi import *
 import pyscf
 ttt = time.time()
 
 n_orb = 8
-U = 1.
+U = 5.
 beta = 1.0
 
 h, g = get_hubbard_params(n_orb,beta,U,pbc=False)
 np.random.seed(2)
-#tmp = np.random.rand(h.shape[0],h.shape[1])*0.01
+tmp = np.random.rand(h.shape[0],h.shape[1])*0.01
 #h += tmp + tmp.T
 
 if 0:
@@ -59,6 +59,7 @@ blocks = [range(0,4),range(4,8),range(8,12),range(12,16),range(16,20),range(20,2
 blocks = [[0,1],[2,3],[4,5],[6,7]]
 blocks = [[0,1],[2,3]]
 blocks = [[0,1],[2,3,4,5],[6,7]]
+blocks = [[0,1,6,7],[2,3,4,5]]
 blocks = [[0,1,2,3],[4,5,6,7]]
 n_blocks = len(blocks)
 clusters = []
@@ -113,90 +114,20 @@ for c in clusters:
 #ci_vector.expand_to_full_space()
 #ci_vector.expand_each_fock_space()
 
-pt_vector = ci_vector.copy()
-for it in range(10):
+ci_vector, e0, e2 = bc_cipsi(ci_vector, clustered_ham, thresh_cipsi=1e-4, thresh_ci_clip=1e-5)
+
+for ci in clusters:
     print()
-    print(" ===================================================================")
-    print("     Selected CI Iteration: %4i epsilon: %12.8f" %(it,cipsi_thresh))
-    print(" ===================================================================")
-    print(" Build full Hamiltonian")
-    H = build_full_hamiltonian(clustered_ham, ci_vector)
-
-    print(" Diagonalize Hamiltonian Matrix:")
-    e,v = np.linalg.eigh(H)
-    idx = e.argsort()
-    e = e[idx]
-    v = v[:,idx]
-    v0 = v[:,0]
-    e0 = e[0]
-    print(" Ground state of CI:                 %12.8f  CI Dim: %4i "%(e[0].real,len(ci_vector)))
-
-    ci_vector.zero()
-    ci_vector.set_vector(v0)
-    pt_vector = matvec1(clustered_ham, ci_vector)
-    #pt_vector.print()
-
-
-    if filter_ci_thresh > 0:
-        print(" Clip CI Vector: thresh = ", filter_ci_thresh)
-        print(" Old CI Dim: ", len(ci_vector))
-        ci_vector.clip(filter_ci_thresh)
-        print(" New CI Dim: ", len(ci_vector))
-
-    var = pt_vector.norm() - e0*e0
-    print(" Variance: %12.8f" % var)
-
-
-    print(" Remove CI space from pt_vector vector")
-    for fockspace,configs in pt_vector.items():
-        if fockspace in ci_vector.fblocks():
-            for config,coeff in list(configs.items()):
-                if config in ci_vector[fockspace]:
-                    del pt_vector[fockspace][config]
-
-
-    for fockspace,configs in ci_vector.items():
-        if fockspace in pt_vector:
-            for config,coeff in configs.items():
-                assert(config not in pt_vector[fockspace])
-
-    print(" Norm of CI vector = %12.8f" %ci_vector.norm())
-    print(" Dimension of CI space: ", len(ci_vector))
-    print(" Dimension of PT space: ", len(pt_vector))
-    print(" Compute Denominator")
-    #next_ci_vector = cp.deepcopy(ci_vector)
-    # compute diagonal for PT2
-    denom = 1/(e0 - build_hamiltonian_diagonal(clustered_ham, pt_vector))
-    pt_vector_v = pt_vector.get_vector()
-    pt_vector_v.shape = (pt_vector_v.shape[0])
-
-    e2 = np.multiply(denom,pt_vector_v)
-    pt_vector.set_vector(e2)
-    e2 = np.dot(pt_vector_v,e2)
-
-    print(" PT2 Energy Correction = %12.8f" %e2)
-    print(" PT2 Energy Total      = %12.8f" %(e0+e2))
-
-    print(" Choose which states to add to CI space")
-
-    old_dim = len(ci_vector)
-    for fockspace,configs in pt_vector.items():
-        for config,coeff in configs.items():
-            if coeff*coeff > cipsi_thresh:
-                if fockspace in ci_vector:
-                    ci_vector[fockspace][config] = 0
-                else:
-                    ci_vector.add_fockblock(fockspace)
-                    ci_vector[fockspace][config] = 0
-    if len(ci_vector) <= old_dim:
-        print(" Converged")
-        exit()
-    print(" Next iteration CI space dimension", len(ci_vector))
-#    print(" Do CMF:")
-#    for ci_idx, ci in enumerate(clusters):
-#        assert(ci_idx == ci.idx)
-#        print(" Extract local operator for cluster",ci.idx)
-#        opi = build_effective_operator(ci_idx, clustered_ham, ci_vector)
-#        print(" Form basis by diagonalize local Hamiltonian for cluster: ",ci_idx)
-#        ci.form_eigbasis_from_local_operator(opi,max_roots=1000)
-#        exit()
+    rdms = build_brdm(ci_vector, ci.idx)
+    norm = 0
+    for fspace,rdm in rdms.items():
+        print(" Diagonalize RDM for Cluster %2i in Fock space:"%ci.idx, fspace,flush=True)
+        n,U = np.linalg.eigh(rdm)
+        idx = n.argsort()[::-1]
+        n = n[idx]
+        U = U[:,idx]
+        norm += sum(n)
+        for ni_idx,ni in enumerate(n):
+            if abs(ni) > 1e-12:
+                print("   Rotated State %4i: %12.8f"%(ni_idx,ni))
+    print(" Final norm: %12.8f"%norm)

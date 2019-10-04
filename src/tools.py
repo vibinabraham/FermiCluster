@@ -15,7 +15,6 @@ def matvec1(h,v,term_thresh=1e-12):
 
     """
 # {{{
-    print(" Compute matrix vector product:")
     clusters = h.clusters
     sigma = ClusteredState(clusters)
     sigma = v.copy() 
@@ -274,3 +273,25 @@ def build_1rdm(ci_vector):
                 shift_r += len(configs_r) 
         shift_l += len(configs_l)
     return H
+
+
+def build_brdm(ci_vector, ci_idx):
+    """
+    Build block reduced density matrix for cluster ci_idx
+    """
+    ci = ci_vector.clusters[ci_idx]
+    rdms = OrderedDict()
+    for fspace, configs in ci_vector.items():
+        curr_dim = ci.basis[fspace[ci_idx]].shape[1]
+        rdm = np.zeros((curr_dim,curr_dim))
+        for configi,coeffi in configs.items():
+            for cj in range(curr_dim):
+                configj = list(cp.deepcopy(configi))
+                configj[ci_idx] = cj
+                try:
+                    rdm[configi[ci_idx],cj] += coeffi*configs[tuple(configj)]
+                except KeyError:
+                    pass
+        rdms[fspace[ci_idx]] = rdm 
+    return rdms
+

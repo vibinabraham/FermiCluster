@@ -85,15 +85,21 @@ class ClusteredState(OrderedDict):
         """
         delete values smaller than thresh
         """
+        idx_to_keep = []
+        idx = 0
         for fockspace,configs in self.items():
             for config,coeff in list(configs.items()):
                 if abs(coeff) < thresh:
                     del self.data[fockspace][config]
+                else:
+                    idx_to_keep.append(idx)
+                idx += 1
 
         # clean out empty fockspaces
         for fockspace,configs in list(self.items()):
             if len(configs) == 0:
                 del self.data[fockspace]
+        return idx_to_keep
 
     def zero(self):
         for fock,configs in self.data.items():
@@ -223,7 +229,9 @@ class ClusteredState(OrderedDict):
         for f in self.data:
             if len(self.data[f]) == 0:
                 continue
-            print(" Dim %4i fock_space: "%len(self.data[f]), f)
+            print(" Dim %4i fock_space: "%len(f),end='')
+            [print(" Cluster %-2i(%ia:%ib) "%(fii,fi[0],fi[1]),end='') for fii,fi in enumerate(f)] 
+            print()
             for config, value in self.data[f].items():
                 print("%20s"%str(config),end="")
                 #print_row(value)

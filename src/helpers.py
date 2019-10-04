@@ -12,7 +12,7 @@ def print_cmat(mat):
 def print_mat(mat):
     for i in range(mat.shape[0]):
         for j in range(mat.shape[1]):
-            print("%16.12f  " %(mat[i,j]),end='')
+            print("%6.3f  " %(mat[i,j]),end='')
         print()
 
 def print_row(row):
