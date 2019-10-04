@@ -282,16 +282,27 @@ def build_brdm(ci_vector, ci_idx):
     ci = ci_vector.clusters[ci_idx]
     rdms = OrderedDict()
     for fspace, configs in ci_vector.items():
+        #print()
+        #print("fspace:",fspace)
+        #print()
         curr_dim = ci.basis[fspace[ci_idx]].shape[1]
         rdm = np.zeros((curr_dim,curr_dim))
         for configi,coeffi in configs.items():
             for cj in range(curr_dim):
                 configj = list(cp.deepcopy(configi))
                 configj[ci_idx] = cj
+                configj = tuple(configj)
+                #print(configi,configj,configi[ci_idx],configj[ci_idx])
                 try:
-                    rdm[configi[ci_idx],cj] += coeffi*configs[tuple(configj)]
+                    #print(configi,configj,configi[ci_idx],configj[ci_idx],coeffi,configs[configj])
+                    rdm[configi[ci_idx],cj] += coeffi*configs[configj]
+                    #print(configi[ci_idx],cj,rdm[configi[ci_idx],cj])
                 except KeyError:
                     pass
-        rdms[fspace[ci_idx]] = rdm 
+        try:
+            rdms[fspace[ci_idx]] += rdm 
+        except KeyError:
+            rdms[fspace[ci_idx]] = rdm 
+
     return rdms
 

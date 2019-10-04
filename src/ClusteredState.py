@@ -55,7 +55,7 @@ class ClusteredState(OrderedDict):
         return l
     def copy(self):
         """
-        Create a copy of this state
+        Create a deep copy of this state
         """
         new = ClusteredState(self.clusters)
         new.data = cp.deepcopy(self.data)
