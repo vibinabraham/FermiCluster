@@ -169,8 +169,11 @@ class ClusteredTerm:
         me = 0.0
         if len(mats) == 0:
             return 0 
+       
+        # todo:
+        #    For some reason, precompiled contract expression is slower than direct einsum - figure this out
+        #me = self.contract_expression(*mats) * state_sign
         me = np.einsum(self.contract_string,*mats,self.ints) * state_sign
-        #me = oe.contract(self.contract_string,*mats,self.ints) * state_sign
         
         return me
 # }}}
@@ -391,7 +394,24 @@ class ClusteredOperator:
                     term_b.contract_string = "p,q,pq->"
                     term_a.contract_string_matvec = "xp,yq,pq->xy"
                     term_b.contract_string_matvec = "xp,yq,pq->xy"
+                
+                
+                #build Contract expression
+                shapes = []
+                if cj.idx == ci.idx:
+                    shapes.append([ci.n_orb,ci.n_orb])
+                elif ci.idx < cj.idx:
+                    shapes.append([ci.n_orb])
+                    shapes.append([cj.n_orb])
+                elif cj.idx < ci.idx:
+                    shapes.append([cj.n_orb])
+                    shapes.append([ci.n_orb])
 
+                shapes.append(term_a.ints)
+                
+                term_a.contract_expression = oe.contract_expression(term_a.contract_string,*shapes,constants=[len(shapes)-1])
+                term_b.contract_expression = oe.contract_expression(term_b.contract_string,*shapes,constants=[len(shapes)-1])
+                
                 try:
                     self.terms[delta_a].append(term_a)
                 except:
@@ -484,6 +504,7 @@ class ClusteredOperator:
                         ops_bb[cl.idx] += "b"
                         
                         clusters_idx = [ci.idx,cj.idx,ck.idx,cl.idx]
+                        shapes_list = [ci.n_orb,cj.n_orb,ck.n_orb,cl.n_orb]
                         ops_aa_list = ['A','A','a','a']
                         ops_ab_list = ['A','B','b','a']
                         ops_ba_list = ['B','A','a','b']
@@ -493,6 +514,7 @@ class ClusteredOperator:
                         sorted_idx = np.argsort(clusters_idx,kind='stable')
                        
                         
+                        shapes_list = [shapes_list[s] for s in sorted_idx]
                         ops_aa_list = [ops_aa_list[s] for s in sorted_idx]
                         ops_ab_list = [ops_ab_list[s] for s in sorted_idx]
                         ops_ba_list = [ops_ba_list[s] for s in sorted_idx]
@@ -589,7 +611,24 @@ class ClusteredOperator:
                         term_ab.contract_string_matvec = contract_string_matvec
                         term_ba.contract_string_matvec = contract_string_matvec
                         term_bb.contract_string_matvec = contract_string_matvec
-                       
+                      
+                      
+                        shapes = []
+                        shapes_seen = 0
+                        for stringi,string in str_dict.items():
+                            #print(string,[10]*len(string),vijkl.shape)
+                            shape = []
+                            for i in range(len(string)):
+                                shape.append(shapes_list[shapes_seen])
+                                shapes_seen += 1
+                            shapes.append(shape)
+                        shapes.append(vijkl)
+                        #exit()
+                        term_aa.contract_expression = oe.contract_expression(term_aa.contract_string,*shapes,constants=[len(shapes)-1])
+                        term_ab.contract_expression = oe.contract_expression(term_ab.contract_string,*shapes,constants=[len(shapes)-1])
+                        term_ba.contract_expression = oe.contract_expression(term_ba.contract_string,*shapes,constants=[len(shapes)-1])
+                        term_bb.contract_expression = oe.contract_expression(term_bb.contract_string,*shapes,constants=[len(shapes)-1])
+                        #print(term_aa.contract_expression)
                         #print(term_bb, [ci.idx,cj.idx,ck.idx,cl.idx])
                        
                         try:
@@ -616,8 +655,6 @@ class ClusteredOperator:
                             self.terms[delta_bb].append(term_bb)
                         except:                
                             self.terms[delta_bb] = [term_bb]
-
-
 
         if iprint > 2:
             print(self.print_terms_header())
