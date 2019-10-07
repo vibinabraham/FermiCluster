@@ -18,6 +18,8 @@ from tools import *
 def bc_cipsi(ci_vector, clustered_ham, thresh_cipsi=1e-4, thresh_ci_clip=1e-5):
 
     pt_vector = ci_vector.copy()
+    Hd_vector = ClusteredState(ci_vector.clusters)
+
     for it in range(10):
         print()
         print(" ===================================================================")
@@ -84,10 +86,12 @@ def bc_cipsi(ci_vector, clustered_ham, thresh_cipsi=1e-4, thresh_ci_clip=1e-5):
         print(" Norm of CI vector = %12.8f" %ci_vector.norm())
         print(" Dimension of CI space: ", len(ci_vector))
         print(" Dimension of PT space: ", len(pt_vector))
-        print(" Compute Denominator")
+        print(" Compute Denominator",flush=True)
         #next_ci_vector = cp.deepcopy(ci_vector)
         # compute diagonal for PT2
-        denom = 1/(e0 - build_hamiltonian_diagonal(clustered_ham, pt_vector))
+        #Hd = build_hamiltonian_diagonal(clustered_ham, pt_vector)
+        Hd = update_hamiltonian_diagonal(clustered_ham, pt_vector, Hd_vector)
+        denom = 1/(e0 - Hd)
         pt_vector_v = pt_vector.get_vector()
         pt_vector_v.shape = (pt_vector_v.shape[0])
     
@@ -97,7 +101,7 @@ def bc_cipsi(ci_vector, clustered_ham, thresh_cipsi=1e-4, thresh_ci_clip=1e-5):
     
         print(" PT2 Energy Correction = %12.8f" %e2)
         print(" PT2 Energy Total      = %12.8f" %(e0+e2))
-    
+
         print(" Choose which states to add to CI space")
     
         for fockspace,configs in pt_vector.items():
@@ -106,7 +110,7 @@ def bc_cipsi(ci_vector, clustered_ham, thresh_cipsi=1e-4, thresh_ci_clip=1e-5):
                     if fockspace in ci_vector:
                         ci_vector[fockspace][config] = 0
                     else:
-                        ci_vector.add_fockblock(fockspace)
+                        ci_vector.add_fockspace(fockspace)
                         ci_vector[fockspace][config] = 0
         if len(ci_vector) <= old_dim:
             print(" Converged")

@@ -23,13 +23,13 @@ beta = 1.0
 
 h, g = get_hubbard_params(n_orb,beta,U,pbc=False)
 np.random.seed(2)
-tmp = np.random.rand(h.shape[0],h.shape[1])*0.01
+#tmp = np.random.rand(h.shape[0],h.shape[1])*0.01
 #h += tmp + tmp.T
 
 if 0:
     Escf,orb,h,g,C = run_hubbard_scf(h,g,n_orb//2)
 
-do_fci = 1
+do_fci = 0
 if do_fci:
     # FCI
     from pyscf import gto, scf, ao2mo, fci, cc
@@ -58,8 +58,8 @@ blocks = [[0,1,6,7],[2,3,4,5]]
 blocks = [[0,1,2,3],[4,5],[6,7]]
 blocks = [[0,1,2,3],[4,5],[6,7]]
 blocks = [[0,1,2,3,4,5],[6,7,8,9,10,11]]
-blocks = [[0,1,2,3],[4,5,6,7]]
 blocks = [[0,1,2],[3,4,5]]
+blocks = [[0,1,2,3],[4,5,6,7]]
 blocks = [[0,1,2,3],[4,5,6,7],[8,9,10,11]]
 n_blocks = len(blocks)
 clusters = []
@@ -121,8 +121,8 @@ for c in clusters:
 #ci_vector.expand_each_fock_space()
 
 ci_vector_ref = ci_vector.copy()
-for brdm_iter in range(40):
-    ci_vector, e0, e2 = bc_cipsi(ci_vector, clustered_ham, thresh_cipsi=1e-4, thresh_ci_clip=1e-4)
+for brdm_iter in range(1):
+    ci_vector, e0, e2 = bc_cipsi(ci_vector, clustered_ham, thresh_cipsi=1e-5, thresh_ci_clip=1e-5)
     #ci_vector, e0, e2 = bc_cipsi(ci_vector_ref.copy(), clustered_ham, thresh_cipsi=1e-4, thresh_ci_clip=1e-4)
     print(" CIPSI: E0 = %12.8f E2 = %12.8f CI_DIM: %i" %(e0, e2, len(ci_vector)))
    
@@ -146,7 +146,7 @@ for brdm_iter in range(40):
     
         ci.rotate_basis(rotations)
 
-for brdm_iter in range(40):
+for brdm_iter in range(0):
     ci_vector, e0, e2 = bc_cipsi(ci_vector, clustered_ham, thresh_cipsi=1e-5, thresh_ci_clip=1e-5)
     print(" CIPSI: E0 = %12.8f E2 = %12.8f CI_DIM: %i" %(e0, e2, len(ci_vector)))
     for ci in clusters:

@@ -40,7 +40,7 @@ def matvec1(h,v,term_thresh=1e-12):
             #print(fock_l, "<--", fock_r)
             
             if fock_l not in sigma.data:
-                sigma.add_fockblock(fock_l)
+                sigma.add_fockspace(fock_l)
 
             configs_l = sigma[fock_l] 
             
@@ -224,6 +224,40 @@ def build_hamiltonian_diagonal(clustered_ham,ci_vector):
                 Hd[idx] += term.matrix_element(fockspace,config,fockspace,config)
             idx += 1
 
+    return Hd
+
+# }}}
+
+
+def update_hamiltonian_diagonal(clustered_ham,ci_vector,Hd_vector):
+    """
+    Build hamiltonian diagonal in basis in ci_vector, 
+    Use already computed values if stored in Hd_vector, otherwise compute, updating Hd_vector 
+    with new values.
+    """
+# {{{
+    clusters = ci_vector.clusters
+    Hd = np.zeros((len(ci_vector)))
+    
+    shift = 0 
+   
+    idx = 0
+    for fockspace, configs in ci_vector.items():
+        for config, coeff in configs.items():
+            delta_fock= tuple([(0,0) for ci in range(len(clusters))])
+            try:
+                Hd[idx] += Hd_vector[fockspace][config]
+            except KeyError:
+                if fockspace in Hd_vector.keys():
+                    Hd_vector[fockspace][config] = 0 
+                else:
+                    Hd_vector.add_fockspace(fockspace)
+                    Hd_vector[fockspace][config] = 0 
+                terms = clustered_ham.terms[delta_fock]
+                for term in terms:
+                    Hd[idx] += term.matrix_element(fockspace,config,fockspace,config)
+                    Hd_vector[fockspace][config] += Hd[idx] 
+            idx += 1
     return Hd
 
 # }}}

@@ -109,7 +109,7 @@ class ClusteredState(OrderedDict):
         return self.data[b]
     def fblocks(self):
         return self.data.keys()
-    def add_fockblock(self,block):
+    def add_fockspace(self,block):
         """
         Add a fock space to the current state basis
         """
@@ -163,7 +163,7 @@ class ClusteredState(OrderedDict):
                 nacurr += c[0]
                 nbcurr += c[1]
             if nacurr == na and nbcurr == nb:
-                self.add_fockblock(newfock) 
+                self.add_fockspace(newfock) 
     
     
         print("\n Make each Fock-Block the full space")
@@ -184,7 +184,7 @@ class ClusteredState(OrderedDict):
         """
         for fockspace,configs in other.items():
             if fockspace not in self.fblocks():
-                self.add_fockblock(fockspace)
+                self.add_fockspace(fockspace)
             for config,coeff in configs.items():
                 if config in self.data[fockspace]:
                     self.data[fockspace][config] += coeff
@@ -198,7 +198,7 @@ class ClusteredState(OrderedDict):
         """
         for fockspace,configs in other.items():
             if fockspace not in self.fblocks():
-                self.add_fockblock(fockspace)
+                self.add_fockspace(fockspace)
             for config,coeff in configs.items():
                 if config not in self.data[fockspace]:
                     self.data[fockspace][config] = 0
