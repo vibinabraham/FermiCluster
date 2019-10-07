@@ -255,7 +255,7 @@ def update_hamiltonian_diagonal(clustered_ham,ci_vector,Hd_vector):
                     Hd_vector[fockspace][config] = 0 
                 terms = clustered_ham.terms[delta_fock]
                 for term in terms:
-                    Hd[idx] += term.matrix_element(fockspace,config,fockspace,config)
+                    Hd[idx] += term.diag_matrix_element(fockspace,config)
                     Hd_vector[fockspace][config] += Hd[idx] 
             idx += 1
     return Hd

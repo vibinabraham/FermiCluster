@@ -176,6 +176,52 @@ class ClusteredTerm:
 # }}}
 
 
+    def diag_matrix_element(self,fock,config):
+        """
+        Compute the diagonal matrix element between <fock,config|H|fock,config>
+        where fock is the fockspace of bra. This is just a specification
+        of the particle number space of each cluster. Eg., 
+        ((2,3),(4,3),(2,2)) would have 3 clusters with 2(3), 4(3), 2(2) 
+        alpha(beta) electrons, respectively. 
+
+        Args:
+            fock (tuple(tuple)): fockspace
+            config (tuple): cluster state configuration within specified fockspace configuration
+        Returns:
+            matrix element. <IJK...|Hterm|IJK...>, where IJK, and LMN
+            are the state indices for clusters 1, 2, and 3, respectively
+        """
+        # {{{
+        assert(len(config) == self.n_clusters)
+
+        mats = []
+        # state sign is always 1 here, since an even number of creation/annihilation operators can only 
+        # contribute to diagonal
+        #state_sign = 1
+        for oi,o in enumerate(self.ops):
+            if o == '':
+                continue
+            try:
+                do = self.clusters[oi].ops[o]
+            except:
+                print(" Couldn't find:", self)
+                exit()
+                return 0
+            try:
+                d = do[(fock[oi],fock[oi])][config[oi],config[oi]] #D(I,J,:,:...)
+            except:
+                return 0
+            mats.append(d)
+
+        if len(mats) == 0:
+            return 0 
+        me = 0.0
+        me = np.einsum(self.contract_string,*mats,self.ints)
+        
+        return me
+# }}}
+
+
     def effective_cluster_operator(self, cluster_idx, fock_bra, bra, fock_ket, ket):
         """
         Compute the cluster density matrix between <fock1,config1|H|fock2,config2>
