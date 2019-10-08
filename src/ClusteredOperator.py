@@ -8,6 +8,7 @@ import opt_einsum as oe
 
 import countswaps
 from ClusteredState import *
+import numba 
 
 class LocalOperator:
     def __init__(self, cluster):
@@ -41,6 +42,32 @@ class LocalOperator:
         self.terms = unique
 # }}}
 
+@numba.njit
+def test_fun(term,fock_bra,bra,fock_ket,ket):
+
+    mats = []
+    state_sign = 1
+    for oi,o in enumerate(term.ops):
+        if o == '':
+            continue
+        if len(o) == 1 or len(o) == 3:
+            for cj in range(oi):
+                state_sign *= (-1)**(fock_ket[cj][0]+fock_ket[cj][1])
+        do = term.clusters[oi].ops[o]
+    
+        if (fock_bra[oi],fock_ket[oi]) in do:
+            d = do[(fock_bra[oi],fock_ket[oi])][bra[oi],ket[oi]] #D(I,J,:,:...)
+        else:
+            return 0
+        mats.append(d)
+
+    me = 0.0
+    if len(mats) == 0:
+        return 0 
+    
+    einsum_args = (term.contract_string,mats,term.ints, state_sign)
+
+    return einsum_args
 
 
 class ClusteredTerm:
@@ -99,8 +126,9 @@ class ClusteredTerm:
         return list of clusters active in term
         """
         return self.active
-    
-    def matrix_element(self,fock_bra,bra,fock_ket,ket):
+ 
+
+    def matrix_element2(self,fock_bra,bra,fock_ket,ket):
         """
         Compute the matrix element between <fock1,config1|H|fock2,config2>
         where fock is the 'fock-block' of bra. This is just a specification
@@ -135,36 +163,19 @@ class ClusteredTerm:
     
         mats = []
         state_sign = 1
-        #print(self.ints.shape)
         for oi,o in enumerate(self.ops):
-            #print(self.clusters[oi].ops[o][(fock_bra[oi],fock_ket[oi])][:,:,0])
-            #print("dens:")
-            #print(self.clusters[oi].ops[o][(fock_bra[oi],fock_ket[oi])][bra[oi],ket[oi],:])
-            #print("ints:")
-            #print(self.ints)
             if o == '':
                 continue
             if len(o) == 1 or len(o) == 3:
                 for cj in range(oi):
                     state_sign *= (-1)**(fock_ket[cj][0]+fock_ket[cj][1])
-                    #print(state_sign)
-                #exit()
-            #print(o) 
-            #print(self.clusters[oi].ops[o].keys())
-            try:
-                do = self.clusters[oi].ops[o]
-                #do = self.clusters[oi].ops[o][(fock_bra[oi],fock_ket[oi])][bra[oi],ket[oi]] #D(I,J,:,:...)
-            except:
-                print(" Couldn't find:", self)
-                exit()
-                return 0
-            try:
+            do = self.clusters[oi].ops[o]
+    
+            if (fock_bra[oi],fock_ket[oi]) in do:
                 d = do[(fock_bra[oi],fock_ket[oi])][bra[oi],ket[oi]] #D(I,J,:,:...)
-            except:
-                #print(" Couldn't find:", self)
+            else:
                 return 0
             mats.append(d)
-            #print(self.clusters[oi].ops[o][tuple([].extend(fock_bra[oi])).extend(fock_ket[oi]))].shape)
 
         me = 0.0
         if len(mats) == 0:
@@ -175,6 +186,44 @@ class ClusteredTerm:
         #me = self.contract_expression(*mats) * state_sign
         me = np.einsum(self.contract_string,*mats,self.ints) * state_sign
         
+        return me
+# }}}
+
+
+    def matrix_element(self,fock_bra,bra,fock_ket,ket):
+        """
+        Compute the matrix element between <fock1,config1|H|fock2,config2>
+        where fock is the 'fock-block' of bra. This is just a specification
+        of the particle number space of each cluster. Eg., 
+        ((2,3),(4,3),(2,2)) would have 3 clusters with 2(3), 4(3), 2(2) 
+        alpha(beta) electrons, respectively. 
+
+        Args:
+            fock_bra (tuple(tuple)): fock-block for bra
+            bra (tuple): cluster state configuration within specified fock block
+            fock_ket (tuple(tuple)): fock-block for ket 
+            ket (tuple): cluster state configuration within specified fock block
+        Returns:
+            matrix element. <IJK...|Hterm|LMN...>, where IJK, and LMN
+            are the state indices for clusters 1, 2, and 3, respectively, in the 
+            particle number blocks specified by fock_bra and fock_ket.
+        """
+        # {{{
+    
+        assert(len(fock_bra) == len(fock_ket))
+        assert(len(fock_ket) == len(bra))
+        assert(len(bra) == len(ket))
+        assert(len(ket) == self.n_clusters)
+        
+        for ci in range(self.n_clusters):
+            if (bra[ci]!=ket[ci]) and (ci not in self.active):
+                return 0
+        einsum_args = test_fun(self,fock_bra,bra,fock_ket,ket)
+
+        if einsum_args == 0:
+            return 0
+
+        me = np.einsum(einsum_args[0],*einsum_args[1],einsum_args[2]) * einsum_args[3] 
         return me
 # }}}
 

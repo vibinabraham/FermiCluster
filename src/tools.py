@@ -155,14 +155,15 @@ def build_full_hamiltonian(clustered_ham,ci_vector,iprint=0):
                     
                     for term in terms:
                         me = term.matrix_element(fock_l,config_l,fock_r,config_r)
+                        #me = test_fun(term,fock_l,config_l,fock_r,config_r)
                         H[idx_l,idx_r] += me
                         if idx_r>idx_l:
                             H[idx_r,idx_l] += me
-                        #print(" %4i %4i = %12.8f"%(idx_l,idx_r,me),"  :  ",config_l,config_r, " :: ", term)
                 shift_r += len(configs_r) 
         shift_l += len(configs_l)
     return H
 # }}}
+
 
 
 def build_effective_operator(cluster_idx, clustered_ham, ci_vector,iprint=0):
@@ -235,8 +236,7 @@ def build_hamiltonian_diagonal(clustered_ham,ci_vector):
 
 # }}}
 
-
-def update_hamiltonian_diagonal2(clustered_ham,ci_vector,Hd_vector):
+def update_hamiltonian_diagonal(clustered_ham,ci_vector,Hd_vector):
     """
     Build hamiltonian diagonal in basis in ci_vector, 
     Use already computed values if stored in Hd_vector, otherwise compute, updating Hd_vector 
@@ -268,7 +268,7 @@ def update_hamiltonian_diagonal2(clustered_ham,ci_vector,Hd_vector):
 
 # }}}
 
-def update_hamiltonian_diagonal(clustered_ham,ci_vector,Hd_vector):
+def update_hamiltonian_diagonal2(clustered_ham,ci_vector,Hd_vector):
     """
     Build hamiltonian diagonal in basis in ci_vector, 
     Use already computed values if stored in Hd_vector, otherwise compute, updating Hd_vector 
