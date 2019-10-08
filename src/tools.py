@@ -8,6 +8,9 @@ import opt_einsum as oe
 from ClusteredOperator import *
 from ClusteredState import *
 
+from numba import jit,njit
+
+#@jit
 def matvec1(h,v,term_thresh=1e-12):
     """
     Compute the action of H onto a sparse trial vector v
@@ -111,6 +114,7 @@ def matvec1(h,v,term_thresh=1e-12):
 # }}}
 
 
+#@jit
 def build_full_hamiltonian(clustered_ham,ci_vector,iprint=0):
     """
     Build hamiltonian in basis in ci_vector
@@ -135,11 +139,16 @@ def build_full_hamiltonian(clustered_ham,ci_vector,iprint=0):
                 if fock_ri<fock_li:
                     shift_r += len(configs_r) 
                     continue
-                try:
+                if delta_fock in clustered_ham.terms:
                     terms = clustered_ham.terms[delta_fock]
-                except KeyError:
+                else:
                     shift_r += len(configs_r) 
                     continue 
+#                try:
+#                    terms = clustered_ham.terms[delta_fock]
+#                except KeyError:
+#                    shift_r += len(configs_r) 
+#                    continue 
                 
                 for config_ri, config_r in enumerate(configs_r):        
                     idx_r = shift_r + config_ri
@@ -205,6 +214,7 @@ def build_effective_operator(cluster_idx, clustered_ham, ci_vector,iprint=0):
 
 
 
+#@jit
 def build_hamiltonian_diagonal(clustered_ham,ci_vector):
     """
     Build hamiltonian diagonal in basis in ci_vector
@@ -229,6 +239,7 @@ def build_hamiltonian_diagonal(clustered_ham,ci_vector):
 # }}}
 
 
+#@jit
 def update_hamiltonian_diagonal(clustered_ham,ci_vector,Hd_vector):
     """
     Build hamiltonian diagonal in basis in ci_vector, 
@@ -242,20 +253,18 @@ def update_hamiltonian_diagonal(clustered_ham,ci_vector,Hd_vector):
     shift = 0 
    
     idx = 0
+    
+    delta_fock= tuple([(0,0) for ci in range(len(clusters))])
     for fockspace, configs in ci_vector.items():
+        if fockspace not in Hd_vector:
+            Hd_vector.add_fockspace(fockspace)
+        
         for config, coeff in configs.items():
-            delta_fock= tuple([(0,0) for ci in range(len(clusters))])
-            try:
+            if config in Hd_vector[fockspace]:
                 Hd[idx] += Hd_vector[fockspace][config]
-            except KeyError:
-                try:
-                    Hd_vector[fockspace][config] = 0 
-                except KeyError:
-                    Hd_vector.add_fockspace(fockspace)
-                    Hd_vector[fockspace][config] = 0 
+            else:
                 terms = clustered_ham.terms[delta_fock]
                 for term in terms:
-                    #Hd[idx] += term.matrix_element(fockspace,config,fockspace,config)
                     Hd[idx] += term.diag_matrix_element(fockspace,config)
                 Hd_vector[fockspace][config] = Hd[idx] 
             idx += 1
@@ -264,10 +273,12 @@ def update_hamiltonian_diagonal(clustered_ham,ci_vector,Hd_vector):
 # }}}
 
 
+#@njit
 def build_1rdm(ci_vector):
     """
     Build 1rdm C_{I,J,K}<IJK|p'q|LMN> C_{L,M,N}
     """
+    # {{{
     dm_aa = np.zeros((ci_vector.n_orb,ci_vector.n_orb))
     dm_bb = np.zeros((ci_vector.n_orb,ci_vector.n_orb))
 
@@ -308,12 +319,14 @@ def build_1rdm(ci_vector):
                 shift_r += len(configs_r) 
         shift_l += len(configs_l)
     return H
+# }}}
 
-
+#@jit
 def build_brdm(ci_vector, ci_idx):
     """
     Build block reduced density matrix for cluster ci_idx
     """
+    # {{{
     ci = ci_vector.clusters[ci_idx]
     rdms = OrderedDict()
     for fspace, configs in ci_vector.items():
@@ -340,4 +353,4 @@ def build_brdm(ci_vector, ci_idx):
             rdms[fspace[ci_idx]] = rdm 
 
     return rdms
-
+# }}}

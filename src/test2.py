@@ -17,7 +17,7 @@ from bc_cipsi import *
 import pyscf
 ttt = time.time()
 
-n_orb = 8 
+n_orb = 12 
 U = 5.
 beta = 1.0
 
@@ -26,10 +26,10 @@ np.random.seed(2)
 #tmp = np.random.rand(h.shape[0],h.shape[1])*0.01
 #h += tmp + tmp.T
 
-if 1:
+if 0:
     Escf,orb,h,g,C = run_hubbard_scf(h,g,n_orb//2)
 
-do_fci = 1
+do_fci = 0
 if do_fci:
     # FCI
     from pyscf import gto, scf, ao2mo, fci, cc
@@ -56,10 +56,10 @@ blocks = [[0,1],[2,3,4,5],[6,7]]
 blocks = [[0,1,6,7],[2,3,4,5]]
 blocks = [[0,1,2,3],[4,5],[6,7]]
 blocks = [[0,1,2,3,4,5],[6,7,8,9,10,11]]
-blocks = [[0,1,2,3],[4,5,6,7],[8,9,10,11]]
 blocks = [[0,1,2],[3,4,5]]
 blocks = [[0,1,2,3],[4,5,6,7]]
 blocks = [[0,1,2,3],[4,5],[6,7]]
+blocks = [[0,1,2,3],[4,5,6,7],[8,9,10,11]]
 n_blocks = len(blocks)
 clusters = []
 
@@ -80,13 +80,13 @@ ci_vector = ClusteredState(clusters)
 #ci_vector.init(((2,2),(2,2),(0,0)))
 #ci_vector.init(((3,3),(0,0)))
 #ci_vector.init(((4,4),(0,0)))
-ci_vector.init(((4,4),(0,0),(0,0)))
+#ci_vector.init(((4,4),(0,0),(0,0)))
 #ci_vector.init(((2,2),(2,2)))
 #ci_vector.init(((1,1),(1,1),(1,1),(1,1)))
 #ci_vector.init(((2,2),(1,1),(1,1)))
 #ci_vector.init(((3,3),(3,3)))
 #ci_vector.init(((4,4),(2,2),(0,0)))
-#ci_vector.init(((2,2),(2,2),(2,2)))
+ci_vector.init(((2,2),(2,2),(2,2)))
 #ci_vector.init(((4,4),(4,4),(4,4),(0,0),(0,0),(0,0)))
 #ci_vector.init(((1,1),(1,1),(1,1),(1,1),(0,0),(0,0),(0,0),(0,0)))
 
