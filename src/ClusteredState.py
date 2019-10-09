@@ -19,14 +19,17 @@ class ClusteredState(OrderedDict):
                                              ^global state labels
     """
     def __init__(self,clusters):
-        self.n_clusters = ray.get(clusters.__len__.remote())
+        #self.n_clusters = len(clusters)
+        self.n_clusters = ray.get(clusters.len.remote())
+        #self.n_clusters = ray.get(clusters.__len__.remote())
         self.clusters = clusters
         self.n_orb = 0
-        print(clusters)
         #for ci,c in enumerate(self.clusters):
-        #for ci,c in ray.get(clusters.enumerate.remote()):
-        for ci in range(ray.get(clusters.__len__.remote())):
-            c = ray.get(self.clusters.get.remote(ci))
+        #for ci in range(ray.get(clusters.__len__.remote())):
+        #for ci in range(len(clusters)):
+        for ci,c in ray.get(clusters.enumerate.remote()):
+            #c = self.clusters.get(ci)
+            #c = ray.get(self.clusters.get.remote(ci))
             self.n_orb += c.n_orb
             #self.n_orb += ray.get(c.n_orb.remote())
 

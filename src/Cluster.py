@@ -22,21 +22,18 @@ class Clusters(list):
         return self.clusters[idx]
     def __len__(self):
         return len(self.clusters)
+    def __iter__(self):
+        return iter(self.clusters)
     def append(self,c):
         self.clusters.append(c)
     def get(self,idx): 
         return self.clusters[idx]
-    def __iter__(self):
-        return self
-#    def next(self):
-#        if self.i < self.n:
-#            i = self.i
-#            self.i += 1
-#            return i
-#        else:
-#            raise StopIteration()
     def enumerate(self):
         return enumerate(self.clusters)
+    def iter(self):
+        return iter(self.clusters)
+    def len(self):
+        return len(self.clusters)
 
 
 class Cluster(object):

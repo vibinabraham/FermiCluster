@@ -62,12 +62,12 @@ blocks = [[0,1,2,3],[4,5,6,7],[8,9,10,11]]
 blocks = [[0,1,2],[3,4,5]]
 blocks = [[0,1,2,3],[4,5,6,7]]
 n_blocks = len(blocks)
+#clusters = Clusters() 
 clusters = Clusters.remote() 
 
 for ci,c in enumerate(blocks):
+    #clusters.append(Cluster(ci,c))
     clusters.append.remote(Cluster(ci,c))
-    #clusters.append(Cluster.remote(ci,c))
-
 ci_vector = ClusteredState(clusters)
 #ci_vector.init(((2,2),(0,0)))
 #ci_vector.init(((2,2),(2,2),(0,0)))
@@ -93,7 +93,8 @@ ci_vector.init(((2,2),(2,2)))
 #ci_vector.init(((1,1),(1,1),(1,1),(1,1),(0,0),(0,0),(0,0),(0,0)))
 
 print(" Clusters:")
-[print(ci) for ci in ray.get(clusters)]
+#[print(ci) for ci in clusters]
+[print(ci) for ci in ray.get(clusters.iter.remote())]
 
 clustered_ham = ClusteredOperator(clusters)
 print(" Add 1-body terms")
@@ -103,7 +104,8 @@ clustered_ham.add_2b_terms(g)
 #clustered_ham.combine_common_terms(iprint=1)
 
 print(" Build cluster basis")
-for ci_idx, ci in enumerate(clusters):
+for ci_idx, ci in ray.get(clusters.enumerate.remote()):
+#for ci_idx, ci in enumerate(clusters):
     assert(ci_idx == ci.idx)
     print(" Extract local operator for cluster",ci.idx)
     opi = clustered_ham.extract_local_operator(ci_idx)
@@ -115,7 +117,8 @@ for ci_idx, ci in enumerate(clusters):
 
 #clustered_ham.add_ops_to_clusters()
 print(" Build these local operators")
-for c in clusters:
+for c in ray.get(clusters.iter.remote()):
+#for c in clusters:
     print(" Build mats for cluster ",c.idx)
     c.build_op_matrices()
 

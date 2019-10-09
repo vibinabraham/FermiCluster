@@ -63,7 +63,8 @@ class ClusteredTerm:
         """
         assert(len(ops)==len(delta))
         self.clusters = clusters
-        self.n_clusters = len(self.clusters)
+        self.n_clusters = ray.get(self.clusters.len.remote())
+        #self.n_clusters = len(self.clusters)
         self.delta = delta
         self.ops = ops
         self.ints = ints
@@ -320,11 +321,13 @@ class ClusteredOperator:
                 ^this needs cleaned up
     """
     def __init__(self,clusters):
-        self.n_clusters = len(clusters)
+        self.n_clusters = ray.get(clusters.len.remote())
+        #self.n_clusters = len(clusters)
         self.clusters = clusters
         self.terms = OrderedDict()
         self.n_orb = 0
-        for ci,c in enumerate(self.clusters):
+        #for ci,c in enumerate(self.clusters):
+        for ci,c in ray.get(self.clusters.enumerate.remote()):
             self.n_orb += c.n_orb
             #self.n_orb += ray.get(c.n_orb.remote())
 
@@ -342,12 +345,14 @@ class ClusteredOperator:
 
         delta_tmp = []
         ops_tmp = []
-        for ci in self.clusters:
+        for ci in ray.get(self.clusters.iter.remote()):
             delta_tmp.append([0,0])
             ops_tmp.append("")
 
-        for ci in self.clusters:
-            for cj in self.clusters:
+        #for ci in self.clusters:
+        #    for cj in self.clusters:
+        for cj in ray.get(self.clusters.iter.remote()):
+            for cj in ray.get(self.clusters.iter.remote()):
                 delta_a = list(cp.deepcopy(delta_tmp)) #alpha hopping
                 delta_b = list(cp.deepcopy(delta_tmp)) #beta hopping
                 ops_a = cp.deepcopy(ops_tmp) #alpha hopping
@@ -445,14 +450,19 @@ class ClusteredOperator:
 
         delta_tmp = []
         ops_tmp = []
-        for ci in self.clusters:
+        #for ci in self.clusters:
+        for ci in ray.get(self.clusters.iter.remote()):
             delta_tmp.append([0,0])
             ops_tmp.append("")
 
-        for ci in self.clusters:
-            for cj in self.clusters:
-                for ck in self.clusters:
-                    for cl in self.clusters:
+#        for ci in self.clusters:
+#            for cj in self.clusters:
+#                for ck in self.clusters:
+#                    for cl in self.clusters:
+        for ci in ray.get(self.clusters.iter.remote()):
+            for cj in ray.get(self.clusters.iter.remote()):
+                for ck in ray.get(self.clusters.iter.remote()):
+                    for cl in ray.get(self.clusters.iter.remote()):
                         delta_aa = list(cp.deepcopy(delta_tmp)) 
                         delta_bb = list(cp.deepcopy(delta_tmp)) 
                         delta_ab = list(cp.deepcopy(delta_tmp)) 
@@ -686,15 +696,15 @@ class ClusteredOperator:
         """
         # {{{
         out = ""
-        for di,d in enumerate(self.clusters):
+        for di,d in ray.get(self.clusters.enumerate.remote()):
             out += "%2i_____"%di
         out += "\n"
-        for di,d in enumerate(self.clusters):
+        for di,d in ray.get(self.clusters.enumerate.remote()):
             out += " Δa"
             out += " Δb"
             out += ":"
         out += "|"
-        for oi,o in enumerate(self.clusters):
+        for oi,o in ray.get(self.clusters.enumerate.remote()):
             out += " %4i,"%oi
         return out
 # }}}
