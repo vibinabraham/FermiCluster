@@ -9,6 +9,36 @@ from Hamiltonian import *
 from davidson import *
 from helpers import *
 
+import ray
+
+@ray.remote
+class Clusters(list):
+    """
+    Class for storing a list of Clusters to be accessible from all processes
+    """
+    def __init__(self):
+        self.clusters = []
+    def __getitem__(self,idx): 
+        return self.clusters[idx]
+    def __len__(self):
+        return len(self.clusters)
+    def append(self,c):
+        self.clusters.append(c)
+    def get(self,idx): 
+        return self.clusters[idx]
+    def __iter__(self):
+        return self
+#    def next(self):
+#        if self.i < self.n:
+#            i = self.i
+#            self.i += 1
+#            return i
+#        else:
+#            raise StopIteration()
+    def enumerate(self):
+        return enumerate(self.clusters)
+
+
 class Cluster(object):
 
     def __init__(self,idx,bl):
@@ -60,6 +90,8 @@ class Cluster(object):
         if len(self.orb_list) == 0:
             has = "|"
         return "IDX%03i:DIM%04i:%s" %(self.idx, self.dim, has)
+    def n_orb(self):
+        return self.n_orb
 
     def add_operator(self,op):
         if op in self.ops:
