@@ -19,7 +19,7 @@ def bc_cipsi(ci_vector, clustered_ham, thresh_cipsi=1e-4, thresh_ci_clip=1e-5):
 
     pt_vector = ci_vector.copy()
     Hd_vector = ClusteredState(ci_vector.clusters)
-
+    e_last = 0
     for it in range(10):
         print()
         print(" ===================================================================")
@@ -60,7 +60,9 @@ def bc_cipsi(ci_vector, clustered_ham, thresh_cipsi=1e-4, thresh_ci_clip=1e-5):
                 
                 ci_vector.zero()
                 ci_vector.set_vector(v0)
-    
+   
+        echange = e0 - e_last
+        e_last = e0
         print(" Compute Matrix Vector Product:", flush=True)
         pt_vector = matvec1(clustered_ham, ci_vector)
         #pt_vector.print()
@@ -112,7 +114,7 @@ def bc_cipsi(ci_vector, clustered_ham, thresh_cipsi=1e-4, thresh_ci_clip=1e-5):
                     else:
                         ci_vector.add_fockspace(fockspace)
                         ci_vector[fockspace][config] = 0
-        if len(ci_vector) <= old_dim:
+        if len(ci_vector) <= old_dim and echange < 1e-8:
             print(" Converged")
             break 
         print(" Next iteration CI space dimension", len(ci_vector))
