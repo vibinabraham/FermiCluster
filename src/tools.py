@@ -16,15 +16,15 @@ import ray
 def matvec1(h,v,term_thresh=1e-12):
     """
     Compute the action of H onto a sparse trial vector v
-    returns a ClusteredState object. 
+    returns a ClusteredState object.
 
     """
 # {{{
     clusters = h.clusters
     sigma = ClusteredState(clusters)
-    sigma = v.copy() 
+    sigma = v.copy()
     sigma.zero()
-   
+
     if 0:
         # use this to debug
         sigma.expand_to_full_space()
@@ -41,22 +41,22 @@ def matvec1(h,v,term_thresh=1e-12):
                     break
             if good == False:
                 continue
-            
+
             #print(fock_l, "<--", fock_r)
-            
+
             if fock_l not in sigma.data:
                 sigma.add_fockspace(fock_l)
 
-            configs_l = sigma[fock_l] 
-            
+            configs_l = sigma[fock_l]
+
             for term in h.terms[terms]:
                 #print(" term: ", term)
                 for conf_ri, conf_r in enumerate(v[fock_r]):
                     #print("  ", conf_r)
-                    
+
                     #if abs(v[fock_r][conf_r]) < 5e-2:
                     #    continue
-                    # get state sign 
+                    # get state sign
                     state_sign = 1
                     for oi,o in enumerate(term.ops):
                         if o == '':
@@ -64,7 +64,7 @@ def matvec1(h,v,term_thresh=1e-12):
                         if len(o) == 1 or len(o) == 3:
                             for cj in range(oi):
                                 state_sign *= (-1)**(fock_r[cj][0]+fock_r[cj][1])
-                    
+
                     #print('state_sign ', state_sign)
                     opii = -1
                     mats = []
@@ -82,9 +82,9 @@ def matvec1(h,v,term_thresh=1e-12):
                             good = False
                             break
                     if good == False:
-                        continue                        
+                        continue
                         #break
-                   
+
                     if len(mats) == 0:
                         continue
                     #print('mats:', end='')
@@ -93,26 +93,26 @@ def matvec1(h,v,term_thresh=1e-12):
                     #print('ints:', term.ints.shape)
                     #print("contract_string       :", term.contract_string)
                     #print("contract_string_matvec:", term.contract_string_matvec)
-                    
-                    
+
+
                     #tmp = oe.contract(term.contract_string_matvec, *mats, term.ints)
                     tmp = np.einsum(term.contract_string_matvec, *mats, term.ints)
-                    
+
 
                     v_coeff = v[fock_r][conf_r]
                     tmp = state_sign * tmp.ravel() * v_coeff
 
-                    new_configs = [[i] for i in conf_r] 
+                    new_configs = [[i] for i in conf_r]
                     for cacti,cact in enumerate(term.active):
                         new_configs[cact] = range(mats[cacti].shape[0])
                     for sp_idx, spi in enumerate(itertools.product(*new_configs)):
                         #print(" New config: %12.8f" %tmp[sp_idx], spi)
                         if abs(tmp[sp_idx]) > term_thresh:
                             if spi not in configs_l:
-                                configs_l[spi] = tmp[sp_idx] 
+                                configs_l[spi] = tmp[sp_idx]
                             else:
-                                configs_l[spi] += tmp[sp_idx] 
-    return sigma 
+                                configs_l[spi] += tmp[sp_idx]
+    return sigma
 # }}}
 
 
@@ -123,41 +123,41 @@ def build_full_hamiltonian(clustered_ham,ci_vector,iprint=0):
 # {{{
     clusters = ci_vector.clusters
     H = np.zeros((len(ci_vector),len(ci_vector)))
-    
-    shift_l = 0 
+
+    shift_l = 0
     for fock_li, fock_l in enumerate(ci_vector.data):
         configs_l = ci_vector[fock_l]
         if iprint > 0:
             print(fock_l)
-       
+
         for config_li, config_l in enumerate(configs_l):
-            idx_l = shift_l + config_li 
-            
-            shift_r = 0 
+            idx_l = shift_l + config_li
+
+            shift_r = 0
             for fock_ri, fock_r in enumerate(ci_vector.data):
                 configs_r = ci_vector[fock_r]
                 delta_fock= tuple([(fock_l[ci][0]-fock_r[ci][0], fock_l[ci][1]-fock_r[ci][1]) for ci in range(len(clusters))])
                 if fock_ri<fock_li:
-                    shift_r += len(configs_r) 
+                    shift_r += len(configs_r)
                     continue
                 try:
                     terms = clustered_ham.terms[delta_fock]
                 except KeyError:
-                    shift_r += len(configs_r) 
-                    continue 
-                
-                for config_ri, config_r in enumerate(configs_r):        
+                    shift_r += len(configs_r)
+                    continue
+
+                for config_ri, config_r in enumerate(configs_r):
                     idx_r = shift_r + config_ri
                     if idx_r<idx_l:
                         continue
-                    
+
                     for term in terms:
                         me = term.matrix_element(fock_l,config_l,fock_r,config_r)
                         H[idx_l,idx_r] += me
                         if idx_r>idx_l:
                             H[idx_r,idx_l] += me
                         #print(" %4i %4i = %12.8f"%(idx_l,idx_r,me),"  :  ",config_l,config_r, " :: ", term)
-                shift_r += len(configs_r) 
+                shift_r += len(configs_r)
         shift_l += len(configs_l)
     return H
 # }}}
@@ -166,46 +166,46 @@ def build_full_hamiltonian(clustered_ham,ci_vector,iprint=0):
 def build_effective_operator(cluster_idx, clustered_ham, ci_vector,iprint=0):
     """
     Build effective operator, doing a partial trace over all clusters except cluster_idx
-    
+
         H = sum_i o_i h_i
     """
 # {{{
     clusters = ci_vector.clusters
     H = np.zeros((len(ci_vector),len(ci_vector)))
-   
+
     new_op = ClusteredOperator(clustered_ham.clusters)
-    shift_l = 0 
+    shift_l = 0
     for fock_li, fock_l in enumerate(ci_vector.data):
         configs_l = ci_vector[fock_l]
         if iprint > 0:
             print(fock_l)
-       
+
         for config_li, config_l in enumerate(configs_l):
-            idx_l = shift_l + config_li 
-            
-            shift_r = 0 
+            idx_l = shift_l + config_li
+
+            shift_r = 0
             for fock_ri, fock_r in enumerate(ci_vector.data):
                 configs_r = ci_vector[fock_r]
                 delta_fock= tuple([(fock_l[ci][0]-fock_r[ci][0], fock_l[ci][1]-fock_r[ci][1]) for ci in range(len(clusters))])
                 if fock_ri<fock_li:
-                    shift_r += len(configs_r) 
+                    shift_r += len(configs_r)
                     continue
                 try:
                     terms = clustered_ham.terms[delta_fock]
                 except KeyError:
-                    shift_r += len(configs_r) 
-                    continue 
-                
-                for config_ri, config_r in enumerate(configs_r):        
+                    shift_r += len(configs_r)
+                    continue
+
+                for config_ri, config_r in enumerate(configs_r):
                     idx_r = shift_r + config_ri
                     if idx_r<idx_l:
                         continue
-                    
+
                     for term in terms:
                         new_term = term.effective_cluster_operator(cluster_idx, fock_l, config_l, fock_r, config_r)
-                shift_r += len(configs_r) 
+                shift_r += len(configs_r)
         shift_l += len(configs_l)
-    return new_op 
+    return new_op
 # }}}
 
 
@@ -217,9 +217,9 @@ def build_hamiltonian_diagonal(clustered_ham,ci_vector):
 # {{{
     clusters = ci_vector.clusters
     Hd = np.zeros((len(ci_vector)))
-    
-    shift = 0 
-   
+
+    shift = 0
+
     idx = 0
     for fockspace, configs in ci_vector.items():
         for config, coeff in configs.items():
@@ -236,16 +236,16 @@ def build_hamiltonian_diagonal(clustered_ham,ci_vector):
 
 def update_hamiltonian_diagonal(clustered_ham,ci_vector,Hd_vector):
     """
-    Build hamiltonian diagonal in basis in ci_vector, 
-    Use already computed values if stored in Hd_vector, otherwise compute, updating Hd_vector 
+    Build hamiltonian diagonal in basis in ci_vector,
+    Use already computed values if stored in Hd_vector, otherwise compute, updating Hd_vector
     with new values.
     """
 # {{{
     clusters = ci_vector.clusters
     Hd = np.zeros((len(ci_vector)))
-    
-    shift = 0 
-   
+
+    shift = 0
+
     idx = 0
     for fockspace, configs in ci_vector.items():
         for config, coeff in configs.items():
@@ -254,15 +254,15 @@ def update_hamiltonian_diagonal(clustered_ham,ci_vector,Hd_vector):
                 Hd[idx] += Hd_vector[fockspace][config]
             except KeyError:
                 try:
-                    Hd_vector[fockspace][config] = 0 
+                    Hd_vector[fockspace][config] = 0
                 except KeyError:
                     Hd_vector.add_fockspace(fockspace)
-                    Hd_vector[fockspace][config] = 0 
+                    Hd_vector[fockspace][config] = 0
                 terms = clustered_ham.terms[delta_fock]
                 for term in terms:
                     #Hd[idx] += term.matrix_element(fockspace,config,fockspace,config)
                     Hd[idx] += term.diag_matrix_element(fockspace,config)
-                Hd_vector[fockspace][config] = Hd[idx] 
+                Hd_vector[fockspace][config] = Hd[idx]
             idx += 1
     return Hd
 
@@ -271,57 +271,59 @@ def update_hamiltonian_diagonal(clustered_ham,ci_vector,Hd_vector):
 
 def update_hamiltonian_diagonal_joblib(clustered_ham,ci_vector,Hd_vector):
     """
-    Build hamiltonian diagonal in basis in ci_vector, 
-    Use already computed values if stored in Hd_vector, otherwise compute, updating Hd_vector 
+    Build hamiltonian diagonal in basis in ci_vector,
+    Use already computed values if stored in Hd_vector, otherwise compute, updating Hd_vector
     with new values.
     """
 # {{{
     clusters = ci_vector.clusters
     Hd = np.zeros((len(ci_vector)))
-    
-    shift = 0 
-   
+
+    shift = 0
+
     idx = 0
     delta_fock= tuple([(0,0) for ci in range(len(clusters))])
-   
+
+    ray.init()
     new_terms = OrderedDict()
     @ray.remote
+    #def compute_new_terms(fockspace,configs):
     def compute_new_terms(fockspace,configs,Hd_vector):
 
-        Hd_vector_curr = OrderedDict() 
+        Hd_vector_curr = OrderedDict()
         Hd_vector_curr[fockspace] = OrderedDict()
         for config, coeff in configs.items():
             compute_stuff = True
             if fockspace in Hd_vector:
                 if config in Hd_vector[fockspace]:
                     compute_stuff = False
-           
+
             if compute_stuff == False:
                 continue
 
             val = 0
             for term in clustered_ham.terms[delta_fock]:
                 val += term.diag_matrix_element(fockspace,config)
-            
-            Hd_vector_curr[fockspace][config] = val 
-    
-        return Hd_vector_curr 
-    
-    
-    new_terms_list = []
-#    for fockspace, configs in ci_vector.items():
-#        new_terms_list.append(compute_new_terms(fockspace,configs))
 
-    ray.init()
-    Hd_vector_id = ray.put(Hd_vector)
-    #object_id = ray.put(clusters)
+            Hd_vector_curr[fockspace][config] = val
 
-    tasks = ray.get([compute_new_terms.remote(fockspace,configs,Hd_vector_id) for fockspace,configs in ci_vector.items()])
-    #[new_terms_list.append(compute_new_terms.remote(fockspace,configs)) for fockspace,configs in ci_vector.items()]
-   
+        return Hd_vector_curr
+
+
+    tasks = []
+    #for fockspace, configs in ci_vector.items():
+    #    tasks.append(compute_new_terms(fockspace,configs,Hd_vector))
+
+    #Hd_vector_id = ray.put(Hd_vector)
+    #clustered_ham_id = ray.put(clustered_ham)
+
+    #tasks = ray.get([compute_new_terms.remote(fockspace,configs) for fockspace,configs in ci_vector.items()])
+    tasks = ray.get([compute_new_terms.remote(fockspace,configs,Hd_vector) for fockspace,configs in ci_vector.items()])
+
     for i in tasks:
         for fockspace,configs in i.items():
-            new_terms[fockspace] = configs 
+            new_terms[fockspace] = configs
+
     ray.shutdown()
 
     #joblib.Parallel(n_jobs=2)(delayed(sqrt)(i ** 2) for i in range(10))
@@ -334,14 +336,14 @@ def update_hamiltonian_diagonal_joblib(clustered_ham,ci_vector,Hd_vector):
     for fockspace, configs in ci_vector.items():
         if fockspace not in Hd_vector:
             Hd_vector[fockspace] = {}
-        
+
         for config, coeff in configs.items():
             try:
                 Hd[idx] += Hd_vector[fockspace][config]
             except KeyError:
                 Hd[idx] += new_terms[fockspace][config]
-            
-            Hd_vector[fockspace][config] = Hd[idx] 
+
+            Hd_vector[fockspace][config] = Hd[idx]
             idx += 1
     return Hd
 
@@ -356,40 +358,40 @@ def build_1rdm(ci_vector):
     dm_bb = np.zeros((ci_vector.n_orb,ci_vector.n_orb))
 
 
-    shift_l = 0 
+    shift_l = 0
     for fock_li, fock_l in enumerate(ci_vector.data):
         configs_l = ci_vector[fock_l]
         if iprint > 0:
             print(fock_l)
-       
+
         for config_li, config_l in enumerate(configs_l):
-            idx_l = shift_l + config_li 
-            
-            shift_r = 0 
+            idx_l = shift_l + config_li
+
+            shift_r = 0
             for fock_ri, fock_r in enumerate(ci_vector.data):
                 configs_r = ci_vector[fock_r]
                 delta_fock= tuple([(fock_l[ci][0]-fock_r[ci][0], fock_l[ci][1]-fock_r[ci][1]) for ci in range(len(clusters))])
                 if fock_ri<fock_li:
-                    shift_r += len(configs_r) 
+                    shift_r += len(configs_r)
                     continue
                 try:
                     terms = clustered_ham.terms[delta_fock]
                 except KeyError:
-                    shift_r += len(configs_r) 
-                    continue 
-                
-                for config_ri, config_r in enumerate(configs_r):        
+                    shift_r += len(configs_r)
+                    continue
+
+                for config_ri, config_r in enumerate(configs_r):
                     idx_r = shift_r + config_ri
                     if idx_r<idx_l:
                         continue
-                    
+
                     for term in terms:
                         me = term.matrix_element(fock_l,config_l,fock_r,config_r)
                         H[idx_l,idx_r] += me
                         if idx_r>idx_l:
                             H[idx_r,idx_l] += me
                         #print(" %4i %4i = %12.8f"%(idx_l,idx_r,me),"  :  ",config_l,config_r, " :: ", term)
-                shift_r += len(configs_r) 
+                shift_r += len(configs_r)
         shift_l += len(configs_l)
     return H
 
@@ -419,9 +421,8 @@ def build_brdm(ci_vector, ci_idx):
                 except KeyError:
                     pass
         try:
-            rdms[fspace[ci_idx]] += rdm 
+            rdms[fspace[ci_idx]] += rdm
         except KeyError:
-            rdms[fspace[ci_idx]] = rdm 
+            rdms[fspace[ci_idx]] = rdm
 
     return rdms
-

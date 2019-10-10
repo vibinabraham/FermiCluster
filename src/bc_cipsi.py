@@ -18,17 +18,16 @@ from tools import *
 def bc_cipsi(ci_vector, clustered_ham, thresh_cipsi=1e-4, thresh_ci_clip=1e-5):
 
     pt_vector = ci_vector.copy()
-    Hd_vector = {} 
-    #Hd_vector = ClusteredState(ci_vector.clusters)
-
-    for it in range(10):
+    Hd_vector = {}
+    e_last = 0
+    for it in range(20):
         print()
         print(" ===================================================================")
         print("     Selected CI Iteration: %4i epsilon: %12.8f" %(it,thresh_cipsi))
         print(" ===================================================================")
         print(" Build full Hamiltonian",flush=True)
         H = build_full_hamiltonian(clustered_ham, ci_vector)
-    
+
         print(" Diagonalize Hamiltonian Matrix:",flush=True)
         e,v = np.linalg.eigh(H)
         idx = e.argsort()
@@ -37,12 +36,12 @@ def bc_cipsi(ci_vector, clustered_ham, thresh_cipsi=1e-4, thresh_ci_clip=1e-5):
         v0 = v[:,0]
         e0 = e[0]
         print(" Ground state of CI:                 %12.8f  CI Dim: %4i "%(e[0].real,len(ci_vector)))
-    
+
         ci_vector.zero()
         ci_vector.set_vector(v0)
-    
+
         old_dim = len(ci_vector)
-    
+
         if thresh_ci_clip > 0:
             print(" Clip CI Vector: thresh = ", thresh_ci_clip)
             print(" Old CI Dim: ", len(ci_vector))
@@ -58,32 +57,34 @@ def bc_cipsi(ci_vector, clustered_ham, thresh_cipsi=1e-4, thresh_ci_clip=1e-5):
                 v0 = v[:,0]
                 e0 = e[0]
                 print(" Ground state of CI:                 %12.8f  CI Dim: %4i "%(e[0].real,len(ci_vector)))
-                
+
                 ci_vector.zero()
                 ci_vector.set_vector(v0)
-    
+
+        echange = e0 - e_last
+        e_last = e0
         print(" Compute Matrix Vector Product:", flush=True)
         pt_vector = matvec1(clustered_ham, ci_vector)
         #pt_vector.print()
-        
-        
+
+
         var = pt_vector.norm() - e0*e0
         print(" Variance: %12.8f" % var,flush=True)
-    
-    
+
+
         print(" Remove CI space from pt_vector vector")
         for fockspace,configs in pt_vector.items():
             if fockspace in ci_vector.fblocks():
                 for config,coeff in list(configs.items()):
                     if config in ci_vector[fockspace]:
                         del pt_vector[fockspace][config]
-    
-    
+
+
         for fockspace,configs in ci_vector.items():
             if fockspace in pt_vector:
                 for config,coeff in configs.items():
                     assert(config not in pt_vector[fockspace])
-    
+
         print(" Norm of CI vector = %12.8f" %ci_vector.norm())
         print(" Dimension of CI space: ", len(ci_vector))
         print(" Dimension of PT space: ", len(pt_vector))
@@ -95,16 +96,16 @@ def bc_cipsi(ci_vector, clustered_ham, thresh_cipsi=1e-4, thresh_ci_clip=1e-5):
         denom = 1/(e0 - Hd)
         pt_vector_v = pt_vector.get_vector()
         pt_vector_v.shape = (pt_vector_v.shape[0])
-    
+
         e2 = np.multiply(denom,pt_vector_v)
         pt_vector.set_vector(e2)
         e2 = np.dot(pt_vector_v,e2)
-    
+
         print(" PT2 Energy Correction = %12.8f" %e2)
         print(" PT2 Energy Total      = %12.8f" %(e0+e2))
 
         print(" Choose which states to add to CI space")
-    
+
         for fockspace,configs in pt_vector.items():
             for config,coeff in configs.items():
                 if coeff*coeff > thresh_cipsi:
@@ -113,9 +114,9 @@ def bc_cipsi(ci_vector, clustered_ham, thresh_cipsi=1e-4, thresh_ci_clip=1e-5):
                     else:
                         ci_vector.add_fockspace(fockspace)
                         ci_vector[fockspace][config] = 0
-        if len(ci_vector) <= old_dim:
+        if len(ci_vector) <= old_dim and echange < 1e-8:
             print(" Converged")
-            break 
+            break
         print(" Next iteration CI space dimension", len(ci_vector))
     #    print(" Do CMF:")
     #    for ci_idx, ci in enumerate(clusters):
