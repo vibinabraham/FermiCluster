@@ -122,11 +122,13 @@ for c in clusters:
 
 ci_vector_ref = ci_vector.copy()
 
+#ray.init()
+
+
 e_last = 0
 for brdm_iter in range(20):
     ci_vector, e0, e2 = bc_cipsi(ci_vector_ref.copy(), clustered_ham, thresh_cipsi=1e-4, thresh_ci_clip=1e-4)
     print(" CIPSI: E0 = %12.8f E2 = %12.8f CI_DIM: %i" %(e0, e2, len(ci_vector)))
-   
     for ci in clusters:
         print()
         rdms = build_brdm(ci_vector, ci.idx)
@@ -211,3 +213,4 @@ for brdm_iter in range(10):
         print(" Converged BRDM iterations")
         break
 
+#ray.shutdown()

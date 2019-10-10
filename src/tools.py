@@ -284,17 +284,18 @@ def update_hamiltonian_diagonal_joblib(clustered_ham,ci_vector,Hd_vector):
     idx = 0
     delta_fock= tuple([(0,0) for ci in range(len(clusters))])
    
+    ray.init()
     new_terms = OrderedDict()
     @ray.remote
-    def compute_new_terms(fockspace,configs,Hd_vector_id):
+    #def compute_new_terms(fockspace,configs):
+    def compute_new_terms(fockspace,configs,Hd_vector):
 
         Hd_vector_curr = OrderedDict() 
         Hd_vector_curr[fockspace] = OrderedDict()
-        Hd_vec = Hd_vector_id
         for config, coeff in configs.items():
             compute_stuff = True
-            if fockspace in Hd_vec:
-                if config in Hd_vec[fockspace]:
+            if fockspace in Hd_vector:
+                if config in Hd_vector[fockspace]:
                     compute_stuff = False
            
             if compute_stuff == False:
@@ -309,20 +310,20 @@ def update_hamiltonian_diagonal_joblib(clustered_ham,ci_vector,Hd_vector):
         return Hd_vector_curr 
     
     
-    new_terms_list = []
-#    for fockspace, configs in ci_vector.items():
-#        new_terms_list.append(compute_new_terms(fockspace,configs))
+    tasks = []
+    #for fockspace, configs in ci_vector.items():
+    #    tasks.append(compute_new_terms(fockspace,configs,Hd_vector))
 
-    ray.init()
-    Hd_vector_id = ray.put(Hd_vector)
-    #object_id = ray.put(clusters)
+    #Hd_vector_id = ray.put(Hd_vector)
+    #clustered_ham_id = ray.put(clustered_ham)
 
-    tasks = ray.get([compute_new_terms.remote(fockspace,configs,Hd_vector_id) for fockspace,configs in ci_vector.items()])
-    #[new_terms_list.append(compute_new_terms.remote(fockspace,configs)) for fockspace,configs in ci_vector.items()]
+    #tasks = ray.get([compute_new_terms.remote(fockspace,configs) for fockspace,configs in ci_vector.items()])
+    tasks = ray.get([compute_new_terms.remote(fockspace,configs,Hd_vector) for fockspace,configs in ci_vector.items()])
    
     for i in tasks:
         for fockspace,configs in i.items():
             new_terms[fockspace] = configs 
+    
     ray.shutdown()
 
     #joblib.Parallel(n_jobs=2)(delayed(sqrt)(i ** 2) for i in range(10))

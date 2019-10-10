@@ -20,7 +20,7 @@ def bc_cipsi(ci_vector, clustered_ham, thresh_cipsi=1e-4, thresh_ci_clip=1e-5):
     pt_vector = ci_vector.copy()
     Hd_vector = ClusteredState(ci_vector.clusters)
     e_last = 0
-    for it in range(10):
+    for it in range(20):
         print()
         print(" ===================================================================")
         print("     Selected CI Iteration: %4i epsilon: %12.8f" %(it,thresh_cipsi))
