@@ -269,7 +269,8 @@ def update_hamiltonian_diagonal(clustered_ham,ci_vector,Hd_vector):
 # }}}
 
 
-def update_hamiltonian_diagonal_joblib(clustered_ham,ci_vector,Hd_vector):
+#def update_hamiltonian_diagonal_joblib(clustered_ham,ci_vector,Hd_vector):
+def update_hamiltonian_diagonal_joblib(clustered_ham_id,ci_vector,Hd_vector):
     """
     Build hamiltonian diagonal in basis in ci_vector,
     Use already computed values if stored in Hd_vector, otherwise compute, updating Hd_vector
@@ -279,16 +280,16 @@ def update_hamiltonian_diagonal_joblib(clustered_ham,ci_vector,Hd_vector):
     clusters = ci_vector.clusters
     Hd = np.zeros((len(ci_vector)))
 
+    clustered_ham = ray.get(clustered_ham_id)
     shift = 0
 
     idx = 0
     delta_fock= tuple([(0,0) for ci in range(len(clusters))])
 
-    ray.init()
     new_terms = OrderedDict()
     @ray.remote
     #def compute_new_terms(fockspace,configs):
-    def compute_new_terms(fockspace,configs,Hd_vector):
+    def compute_new_terms(fockspace,configs,Hd_vector,terms):
 
         Hd_vector_curr = OrderedDict()
         Hd_vector_curr[fockspace] = OrderedDict()
@@ -302,7 +303,8 @@ def update_hamiltonian_diagonal_joblib(clustered_ham,ci_vector,Hd_vector):
                 continue
 
             val = 0
-            for term in clustered_ham.terms[delta_fock]:
+            for term in terms:
+            #for term in clustered_ham.terms[delta_fock]:
                 val += term.diag_matrix_element(fockspace,config)
 
             Hd_vector_curr[fockspace][config] = val
@@ -316,15 +318,18 @@ def update_hamiltonian_diagonal_joblib(clustered_ham,ci_vector,Hd_vector):
 
     #Hd_vector_id = ray.put(Hd_vector)
     #clustered_ham_id = ray.put(clustered_ham)
+    terms_id = ray.put(clustered_ham.terms[delta_fock])
 
     #tasks = ray.get([compute_new_terms.remote(fockspace,configs) for fockspace,configs in ci_vector.items()])
-    tasks = ray.get([compute_new_terms.remote(fockspace,configs,Hd_vector) for fockspace,configs in ci_vector.items()])
+    print(" Compute new terms for denominator",flush=True)
+    tasks = ray.get([compute_new_terms.remote(fockspace,configs,Hd_vector,terms_id) for fockspace,configs in ci_vector.items()])
 
+    print(" Add new terms to dictionary",flush=True)
     for i in tasks:
         for fockspace,configs in i.items():
             new_terms[fockspace] = configs
 
-    ray.shutdown()
+    #ray.shutdown()
 
     #joblib.Parallel(n_jobs=2)(delayed(sqrt)(i ** 2) for i in range(10))
 
@@ -333,6 +338,7 @@ def update_hamiltonian_diagonal_joblib(clustered_ham,ci_vector,Hd_vector):
 #                            (img_train, df_cap, vocab_size, size=size_per_thread)
 #                            for i in range(0, n_jobs))
 
+    print(" Combine new terms into diagonal",flush=True)
     for fockspace, configs in ci_vector.items():
         if fockspace not in Hd_vector:
             Hd_vector[fockspace] = {}

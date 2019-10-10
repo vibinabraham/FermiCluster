@@ -17,6 +17,8 @@ from tools import *
 
 def bc_cipsi(ci_vector, clustered_ham, thresh_cipsi=1e-4, thresh_ci_clip=1e-5):
 
+    ray.init() 
+    clustered_ham_id = ray.put(clustered_ham)
     pt_vector = ci_vector.copy()
     Hd_vector = {}
     e_last = 0
@@ -92,7 +94,8 @@ def bc_cipsi(ci_vector, clustered_ham, thresh_cipsi=1e-4, thresh_ci_clip=1e-5):
         #next_ci_vector = cp.deepcopy(ci_vector)
         # compute diagonal for PT2
         #Hd = build_hamiltonian_diagonal(clustered_ham, pt_vector)
-        Hd = update_hamiltonian_diagonal_joblib(clustered_ham, pt_vector, Hd_vector)
+        Hd = update_hamiltonian_diagonal_joblib(clustered_ham_id, pt_vector, Hd_vector)
+        #Hd = update_hamiltonian_diagonal_joblib(clustered_ham_id, pt_vector, Hd_vector)
         denom = 1/(e0 - Hd)
         pt_vector_v = pt_vector.get_vector()
         pt_vector_v.shape = (pt_vector_v.shape[0])
@@ -126,4 +129,5 @@ def bc_cipsi(ci_vector, clustered_ham, thresh_cipsi=1e-4, thresh_ci_clip=1e-5):
     #        print(" Form basis by diagonalize local Hamiltonian for cluster: ",ci_idx)
     #        ci.form_eigbasis_from_local_operator(opi,max_roots=1000)
     #        exit()
+    ray.shutdown() 
     return ci_vector, e0, e0+e2
