@@ -286,15 +286,14 @@ def update_hamiltonian_diagonal_joblib(clustered_ham,ci_vector,Hd_vector):
    
     new_terms = OrderedDict()
     @ray.remote
-    def compute_new_terms(fockspace,configs,Hd_vector_id):
+    def compute_new_terms(fockspace,configs,Hd_vector):
 
         Hd_vector_curr = OrderedDict() 
         Hd_vector_curr[fockspace] = OrderedDict()
-        Hd_vec = Hd_vector_id
         for config, coeff in configs.items():
             compute_stuff = True
-            if fockspace in Hd_vec:
-                if config in Hd_vec[fockspace]:
+            if fockspace in Hd_vector:
+                if config in Hd_vector[fockspace]:
                     compute_stuff = False
            
             if compute_stuff == False:
@@ -334,7 +333,7 @@ def update_hamiltonian_diagonal_joblib(clustered_ham,ci_vector,Hd_vector):
 
     for fockspace, configs in ci_vector.items():
         if fockspace not in Hd_vector:
-            Hd_vector.add_fockspace(fockspace)
+            Hd_vector[fockspace] = {}
         
         for config, coeff in configs.items():
             try:

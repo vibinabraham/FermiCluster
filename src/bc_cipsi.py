@@ -18,7 +18,8 @@ from tools import *
 def bc_cipsi(ci_vector, clustered_ham, thresh_cipsi=1e-4, thresh_ci_clip=1e-5):
 
     pt_vector = ci_vector.copy()
-    Hd_vector = ClusteredState(ci_vector.clusters)
+    Hd_vector = {} 
+    #Hd_vector = ClusteredState(ci_vector.clusters)
 
     for it in range(10):
         print()
