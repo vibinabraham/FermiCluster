@@ -8,7 +8,10 @@ import opt_einsum as oe
 from ClusteredOperator import *
 from ClusteredState import *
 
-import joblib
+from multiprocessing import Pool
+
+import ray
+#import joblib
 
 def matvec1(h,v,term_thresh=1e-12):
     """
@@ -282,17 +285,18 @@ def update_hamiltonian_diagonal_joblib(clustered_ham,ci_vector,Hd_vector):
     delta_fock= tuple([(0,0) for ci in range(len(clusters))])
    
     new_terms = OrderedDict()
-    def compute_new_terms(fockspace,configs):
+    @ray.remote
+    def compute_new_terms(fockspace,configs,Hd_vector_id):
 
         Hd_vector_curr = OrderedDict() 
-        Hd_vector_curr = OrderedDict()
-      
+        Hd_vector_curr[fockspace] = OrderedDict()
+        Hd_vec = Hd_vector_id
         for config, coeff in configs.items():
-           
             compute_stuff = True
-            if fockspace in Hd_vector:
-                if config in Hd_vector[fockspace]:
+            if fockspace in Hd_vec:
+                if config in Hd_vec[fockspace]:
                     compute_stuff = False
+           
             if compute_stuff == False:
                 continue
 
@@ -300,13 +304,33 @@ def update_hamiltonian_diagonal_joblib(clustered_ham,ci_vector,Hd_vector):
             for term in clustered_ham.terms[delta_fock]:
                 val += term.diag_matrix_element(fockspace,config)
             
-            Hd_vector_curr[config] = val 
+            Hd_vector_curr[fockspace][config] = val 
     
         return Hd_vector_curr 
     
     
-    for fockspace, configs in ci_vector.items():
-        new_terms[fockspace] = compute_new_terms(fockspace,configs)
+    new_terms_list = []
+#    for fockspace, configs in ci_vector.items():
+#        new_terms_list.append(compute_new_terms(fockspace,configs))
+
+    ray.init()
+    Hd_vector_id = ray.put(Hd_vector)
+    #object_id = ray.put(clusters)
+
+    tasks = ray.get([compute_new_terms.remote(fockspace,configs,Hd_vector_id) for fockspace,configs in ci_vector.items()])
+    #[new_terms_list.append(compute_new_terms.remote(fockspace,configs)) for fockspace,configs in ci_vector.items()]
+   
+    for i in tasks:
+        for fockspace,configs in i.items():
+            new_terms[fockspace] = configs 
+    ray.shutdown()
+
+    #joblib.Parallel(n_jobs=2)(delayed(sqrt)(i ** 2) for i in range(10))
+
+#    returns = Parallel(n_jobs=4, backend='threading')(
+#                            delayed(generate_batch)
+#                            (img_train, df_cap, vocab_size, size=size_per_thread)
+#                            for i in range(0, n_jobs))
 
     for fockspace, configs in ci_vector.items():
         if fockspace not in Hd_vector:
