@@ -8,6 +8,8 @@ import opt_einsum as oe
 from ClusteredOperator import *
 from ClusteredState import *
 
+import joblib
+
 def matvec1(h,v,term_thresh=1e-12):
     """
     Compute the action of H onto a sparse trial vector v
@@ -258,6 +260,65 @@ def update_hamiltonian_diagonal(clustered_ham,ci_vector,Hd_vector):
                     #Hd[idx] += term.matrix_element(fockspace,config,fockspace,config)
                     Hd[idx] += term.diag_matrix_element(fockspace,config)
                 Hd_vector[fockspace][config] = Hd[idx] 
+            idx += 1
+    return Hd
+
+# }}}
+
+
+def update_hamiltonian_diagonal_joblib(clustered_ham,ci_vector,Hd_vector):
+    """
+    Build hamiltonian diagonal in basis in ci_vector, 
+    Use already computed values if stored in Hd_vector, otherwise compute, updating Hd_vector 
+    with new values.
+    """
+# {{{
+    clusters = ci_vector.clusters
+    Hd = np.zeros((len(ci_vector)))
+    
+    shift = 0 
+   
+    idx = 0
+    delta_fock= tuple([(0,0) for ci in range(len(clusters))])
+   
+    new_terms = OrderedDict()
+    def compute_new_terms(fockspace,configs):
+
+        Hd_vector_curr = OrderedDict() 
+        Hd_vector_curr = OrderedDict()
+      
+        for config, coeff in configs.items():
+           
+            compute_stuff = True
+            if fockspace in Hd_vector:
+                if config in Hd_vector[fockspace]:
+                    compute_stuff = False
+            if compute_stuff == False:
+                continue
+
+            val = 0
+            for term in clustered_ham.terms[delta_fock]:
+                val += term.diag_matrix_element(fockspace,config)
+            
+            Hd_vector_curr[config] = val 
+    
+        return Hd_vector_curr 
+    
+    
+    for fockspace, configs in ci_vector.items():
+        new_terms[fockspace] = compute_new_terms(fockspace,configs)
+
+    for fockspace, configs in ci_vector.items():
+        if fockspace not in Hd_vector:
+            Hd_vector.add_fockspace(fockspace)
+        
+        for config, coeff in configs.items():
+            try:
+                Hd[idx] += Hd_vector[fockspace][config]
+            except KeyError:
+                Hd[idx] += new_terms[fockspace][config]
+            
+            Hd_vector[fockspace][config] = Hd[idx] 
             idx += 1
     return Hd
 
