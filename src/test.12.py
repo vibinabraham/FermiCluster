@@ -17,7 +17,7 @@ from bc_cipsi import *
 import pyscf
 ttt = time.time()
 
-n_orb = 24 
+n_orb = 12 
 U = 5.
 beta = 1.0
 
@@ -49,16 +49,17 @@ if do_fci:
 blocks = [[0,5],[1,4],[2,3]]
 blocks = [[0],[1],[2],[3],[4],[5]]
 blocks = [[0],[1],[2],[3],[4],[5],[6],[7]]
+blocks = [range(0,4),range(4,8),range(8,12),range(12,16),range(16,20),range(20,24)]
 blocks = [[0,1],[2,3],[4,5],[6,7]]
 blocks = [[0,1],[2,3]]
 blocks = [[0,1],[2,3,4,5],[6,7]]
 blocks = [[0,1,6,7],[2,3,4,5]]
 blocks = [[0,1,2,3],[4,5],[6,7]]
-blocks = [[0,1,2,3,4,5],[6,7,8,9,10,11]]
 blocks = [[0,1,2,3],[4,5,6,7],[8,9,10,11]]
 blocks = [[0,1,2],[3,4,5]]
 blocks = [[0,1,2,3],[4,5],[6,7]]
-blocks = [[0,1,2,3],[4,5,6,7]]
+blocks = [[0,1,2,3],[4,5,6,7],[8,9,10,11]]
+blocks = [[0,1,2,3,4,5],[6,7,8,9,10,11]]
 n_blocks = len(blocks)
 clusters = []
 
@@ -80,7 +81,8 @@ ci_vector = ClusteredState(clusters)
 #ci_vector.init(((3,3),(0,0)))
 #ci_vector.init(((4,4),(0,0)))
 #ci_vector.init(((4,4),(0,0),(0,0)))
-ci_vector.init(((2,2),(2,2)))
+ci_vector.init(((3,3),(3,3)))
+#ci_vector.init(((2,2),(2,2),(2,2)))
 #ci_vector.init(((1,1),(1,1),(1,1),(1,1)))
 #ci_vector.init(((2,2),(1,1),(1,1)))
 #ci_vector.init(((3,3),(3,3)))
@@ -88,7 +90,6 @@ ci_vector.init(((2,2),(2,2)))
 #ci_vector.init(((2,2),(2,2),(2,2)))
 #ci_vector.init(((4,4),(4,4),(4,4),(0,0),(0,0),(0,0)))
 #ci_vector.init(((1,1),(1,1),(1,1),(1,1),(0,0),(0,0),(0,0),(0,0)))
-ci_vector.init(((2,2),(2,2),(2,2),(2,2),(2,2),(2,2)))
 
 print(" Clusters:")
 [print(ci) for ci in clusters]
@@ -152,9 +153,4 @@ for brdm_iter in range(20):
         print(" Final norm: %12.8f"%norm)
     
         ci.rotate_basis(rotations)
-    delta_e = e0 - e_last
-    e_last = e0
-    if abs(delta_e) < 1e-8:
-        print(" Converged BRDM iterations")
-        break
 
