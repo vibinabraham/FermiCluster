@@ -15,12 +15,13 @@ from ClusteredState import *
 from tools import *
 
 
-def bc_cipsi(ci_vector, clustered_ham, thresh_cipsi=1e-4, thresh_ci_clip=1e-5):
+def bc_cipsi(ci_vector, clustered_ham, thresh_cipsi=1e-4, thresh_ci_clip=1e-5, thresh_conv=1e-8, max_iter=30):
 
     pt_vector = ci_vector.copy()
     Hd_vector = ClusteredState(ci_vector.clusters)
 
-    for it in range(10):
+    e_prev = 0
+    for it in range(max_iter):
         print()
         print(" ===================================================================")
         print("     Selected CI Iteration: %4i epsilon: %12.8f" %(it,thresh_cipsi))
@@ -112,7 +113,10 @@ def bc_cipsi(ci_vector, clustered_ham, thresh_cipsi=1e-4, thresh_ci_clip=1e-5):
                     else:
                         ci_vector.add_fockspace(fockspace)
                         ci_vector[fockspace][config] = 0
-        if len(ci_vector) <= old_dim:
+        
+        delta_e = e0 - e_prev
+        e_prev = e0
+        if len(ci_vector) <= old_dim and abs(delta_e) < thresh_conv:
             print(" Converged")
             break 
         print(" Next iteration CI space dimension", len(ci_vector))
@@ -124,4 +128,4 @@ def bc_cipsi(ci_vector, clustered_ham, thresh_cipsi=1e-4, thresh_ci_clip=1e-5):
     #        print(" Form basis by diagonalize local Hamiltonian for cluster: ",ci_idx)
     #        ci.form_eigbasis_from_local_operator(opi,max_roots=1000)
     #        exit()
-    return ci_vector, e0, e0+e2
+    return ci_vector, pt_vector, e0, e0+e2
