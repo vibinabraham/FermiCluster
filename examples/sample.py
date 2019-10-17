@@ -17,7 +17,7 @@ from bc_cipsi import *
 import pyscf
 ttt = time.time()
 
-n_orb = 24 
+n_orb = 8 
 U = 5.
 beta = 1.0
 
@@ -88,7 +88,7 @@ ci_vector.init(((2,2),(2,2)))
 #ci_vector.init(((2,2),(2,2),(2,2)))
 #ci_vector.init(((4,4),(4,4),(4,4),(0,0),(0,0),(0,0)))
 #ci_vector.init(((1,1),(1,1),(1,1),(1,1),(0,0),(0,0),(0,0),(0,0)))
-ci_vector.init(((2,2),(2,2),(2,2),(2,2),(2,2),(2,2)))
+#ci_vector.init(((2,2),(2,2),(2,2),(2,2),(2,2),(2,2)))
 
 print(" Clusters:")
 [print(ci) for ci in clusters]
@@ -123,6 +123,7 @@ for c in clusters:
 e_prev = 0
 thresh_conv = 1e-8
 ci_vector_ref = ci_vector.copy()
+e_last = 0
 for brdm_iter in range(20):
     ci_vector, pt_vector, e0, e2 = bc_cipsi(ci_vector_ref.copy(), clustered_ham, thresh_cipsi=1e-4, thresh_ci_clip=1e-4)
     print(" CIPSI: E0 = %12.8f E2 = %12.8f CI_DIM: %i" %(e0, e2, len(ci_vector)))
