@@ -97,3 +97,7 @@ def test_1():
     print(" CIPSI: E0 = %12.8f E2 = %12.8f CI_DIM: %i" %(e0, e2, len(ci_vector)))
     assert(abs(e0 +7.53860928)<1e-7)
     assert(abs(e2 +7.64040316)<1e-7)
+
+
+if __name__== "__main__":
+    test_1() 
