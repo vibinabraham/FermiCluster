@@ -19,3 +19,6 @@ Block correlated CIPSI under construction
 4. run tests
     
         pytest test/*.py
+```
+pytest test/*.py
+```
