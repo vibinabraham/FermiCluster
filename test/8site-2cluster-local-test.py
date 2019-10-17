@@ -27,8 +27,8 @@ def test_1():
 
     h, g = get_hubbard_params(n_orb,beta,U,pbc=False)
     np.random.seed(2)
-    #tmp = np.random.rand(h.shape[0],h.shape[1])*0.01
-    #h += tmp + tmp.T
+    tmp = np.random.rand(h.shape[0],h.shape[1])*0.0001
+    h += tmp + tmp.T
 
     if 0:
         Escf,orb,h,g,C = run_hubbard_scf(h,g,n_orb//2)
