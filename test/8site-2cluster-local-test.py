@@ -10,7 +10,6 @@ import copy as cp
 import sys
 
 from hubbard_fn import *
-from ci_fn import *
 
 from Cluster import *
 from ClusteredOperator import *
