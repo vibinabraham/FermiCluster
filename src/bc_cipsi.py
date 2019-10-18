@@ -5,7 +5,7 @@ import time
 from math import factorial
 import copy as cp
 import sys
-
+import time
 from hubbard_fn import *
 
 from Cluster import *
@@ -14,9 +14,13 @@ from ClusteredState import *
 from tools import *
 
 import dask
+from dask.distributed import Client, progress
 
 def bc_cipsi(ci_vector, clustered_ham, thresh_cipsi=1e-4, thresh_ci_clip=1e-5, thresh_conv=1e-8, max_iter=30):
 
+    #client = Client(processes=False)
+    client = Client(processes=True)
+    
     pt_vector = ci_vector.copy()
     Hd_vector = ClusteredState(ci_vector.clusters)
     e_prev = 0
@@ -89,8 +93,13 @@ def bc_cipsi(ci_vector, clustered_ham, thresh_cipsi=1e-4, thresh_ci_clip=1e-5, t
         print(" Compute Denominator",flush=True)
         #next_ci_vector = cp.deepcopy(ci_vector)
         # compute diagonal for PT2
-        Hd = build_hamiltonian_diagonal(clustered_ham, pt_vector)
-        #Hd = update_hamiltonian_diagonal(clustered_ham, pt_vector, Hd_vector)
+        
+        start = time.time()
+        #Hd = build_hamiltonian_diagonal(clustered_ham, pt_vector, client)
+        Hd = update_hamiltonian_diagonal(clustered_ham, pt_vector, Hd_vector)
+        end = time.time()
+        print(" Time spent in demonimator: ", end - start)
+        
         denom = 1/(e0 - Hd)
         pt_vector_v = pt_vector.get_vector()
         pt_vector_v.shape = (pt_vector_v.shape[0])
@@ -126,4 +135,5 @@ def bc_cipsi(ci_vector, clustered_ham, thresh_cipsi=1e-4, thresh_ci_clip=1e-5, t
     #        print(" Form basis by diagonalize local Hamiltonian for cluster: ",ci_idx)
     #        ci.form_eigbasis_from_local_operator(opi,max_roots=1000)
     #        exit()
+    client.close()
     return ci_vector, pt_vector, e0, e0+e2

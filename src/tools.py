@@ -12,6 +12,9 @@ import dask
 import dask.delayed
 import numba
 
+#import concurrent.futures
+from dask.distributed import Client, progress
+
 def matvec1(h,v,term_thresh=1e-12):
     """
     Compute the action of H onto a sparse trial vector v
@@ -209,7 +212,7 @@ def build_effective_operator(cluster_idx, clustered_ham, ci_vector,iprint=0):
 
 
 
-def build_hamiltonian_diagonal(clustered_ham,ci_vector):
+def build_hamiltonian_diagonal(clustered_ham,ci_vector,client):
     """
     Build hamiltonian diagonal in basis in ci_vector
     """
@@ -220,16 +223,102 @@ def build_hamiltonian_diagonal(clustered_ham,ci_vector):
     shift = 0 
    
     idx = 0
-   
+
+ 
     def get_element(terms, fockspace, config):
         a = 0
         for term in terms:
             a += term.matrix_element(fockspace,config,fockspace,config)
         return a
 
-    #from dask.distributed import Client, progress
-    #client = Client(threads_per_worker=4, n_workers=1)
-    #client
+    #@numba.jit
+    def get_elements(terms, fockspaces, configs):
+        m_elements = []
+        for i in range(len(configs)):
+            fockspace = fockspaces[i]
+            config = configs[i]
+            a = 0
+            for term in terms:
+                a += term.matrix_element(fockspace,config,fockspace,config)
+            m_elements.append(a)
+        return m_elements 
+
+
+    #pool = concurrent.futures.ThreadPoolExecutor(8)
+    #client = Client(processes=False)
+    #print(client)
+    #future = client.submit(func, big_data)    # bad
+    #big_future = client.scatter(big_data)     # good
+    #future = client.submit(func, big_future)  # good
+
+    tasks = []
+    delta_fock= tuple([(0,0) for ci in range(len(clusters))])
+    terms = clustered_ham.terms[delta_fock]
+    
+    print(" Scatter terms:",flush=True)
+    #terms_future = client.scatter(terms)     # good
+    print(" done.",flush=True)
+   
+    flist = [] # fockspaces
+    clist = [] # configs
+    tlist = [] # tasks
+    batch_size = 10000 
+    check = []
+    print(" Define futures:",flush=True)
+    for fockspace, configs in ci_vector.items():
+        for config, coeff in configs.items():
+          
+            flist.append(fockspace)
+            clist.append(config)
+           
+            
+            #a = dask.delayed(get_element)(terms,fockspace,config)
+            if len(clist) == batch_size:
+                #a = dask.delayed(get_elements)(terms,flist,clist)
+                #a = pool.submit(get_elements, *(terms,flist,clist))
+                #a = client.submit(get_elements, *(terms_future,flist,clist))
+                a = client.submit(get_elements, *(terms,flist,clist))
+                tasks.append(a)
+                check.append(clist)
+                clist = []
+                flist = []
+            #Hd[idx] = get_element(terms,fockspace,config)
+            #idx += 1
+    #a = dask.delayed(get_elements)(terms,flist,clist)
+    #a = pool.submit(get_elements, *(terms,flist,clist))
+    #a = client.submit(get_elements, *(terms_future,flist,clist))
+    a = client.submit(get_elements, *(terms,flist,clist))
+    tasks.append(a)
+    print(" done.",flush=True)
+    print(" Now compute tasks:",flush=True)
+    #result = dask.compute(*tasks)
+    #result = dask.compute(*tasks,scheduler='processes')
+    Hd = np.asarray(list(itertools.chain(*client.gather(tasks))))
+    #Hd = np.asarray(list(itertools.chain(*result)))
+    print(" done.",flush=True)
+    return Hd
+
+# }}}
+
+
+def build_hamiltonian_diagonal_dask(clustered_ham,ci_vector):
+    """
+    Build hamiltonian diagonal in basis in ci_vector
+    """
+# {{{
+    clusters = ci_vector.clusters
+    Hd = np.zeros((len(ci_vector)))
+    
+    shift = 0 
+   
+    idx = 0
+
+ 
+    def get_element(terms, fockspace, config):
+        a = 0
+        for term in terms:
+            a += term.matrix_element(fockspace,config,fockspace,config)
+        return a
 
     #@numba.jit
     def get_elements(terms, fockspaces, configs):
@@ -272,7 +361,8 @@ def build_hamiltonian_diagonal(clustered_ham,ci_vector):
     tasks.append(a)
     check.append(clist)
     print(" Now compute tasks:",flush=True)
-    result = dask.compute(*tasks,scheduler='processes')
+    result = dask.compute(*tasks)
+    #result = dask.compute(*tasks,scheduler='processes')
     Hd = np.asarray(list(itertools.chain(*result)))
     print(" done.",flush=True)
     return Hd
