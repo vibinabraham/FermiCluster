@@ -8,6 +8,10 @@ import opt_einsum as oe
 from ClusteredOperator import *
 from ClusteredState import *
 
+import dask
+import dask.delayed
+import numba
+
 def matvec1(h,v,term_thresh=1e-12):
     """
     Compute the action of H onto a sparse trial vector v
@@ -216,14 +220,61 @@ def build_hamiltonian_diagonal(clustered_ham,ci_vector):
     shift = 0 
    
     idx = 0
+   
+    def get_element(terms, fockspace, config):
+        a = 0
+        for term in terms:
+            a += term.matrix_element(fockspace,config,fockspace,config)
+        return a
+
+    #from dask.distributed import Client, progress
+    #client = Client(threads_per_worker=4, n_workers=1)
+    #client
+
+    #@numba.jit
+    def get_elements(terms, fockspaces, configs):
+        m_elements = []
+        for i in range(len(configs)):
+            fockspace = fockspaces[i]
+            config = configs[i]
+            a = 0
+            for term in terms:
+                a += term.matrix_element(fockspace,config,fockspace,config)
+            m_elements.append(a)
+        return m_elements 
+
+    tasks = []
+    delta_fock= tuple([(0,0) for ci in range(len(clusters))])
+    terms = clustered_ham.terms[delta_fock]
+   
+    flist = [] # fockspaces
+    clist = [] # configs
+    tlist = [] # tasks
+    batch_size = 10000 
+    check = []
     for fockspace, configs in ci_vector.items():
         for config, coeff in configs.items():
-            delta_fock= tuple([(0,0) for ci in range(len(clusters))])
-            terms = clustered_ham.terms[delta_fock]
-            for term in terms:
-                Hd[idx] += term.matrix_element(fockspace,config,fockspace,config)
-            idx += 1
-
+          
+            flist.append(fockspace)
+            clist.append(config)
+           
+            
+            #a = dask.delayed(get_element)(terms,fockspace,config)
+            if len(clist) == batch_size:
+                a = dask.delayed(get_elements)(terms,flist,clist)
+                tasks.append(a)
+                check.append(clist)
+                clist = []
+                flist = []
+            #Hd[idx] = get_element(terms,fockspace,config)
+            #idx += 1
+    a = dask.delayed(get_elements)(terms,flist,clist)
+    tasks.append(a)
+    check.append(clist)
+    print(" Now compute tasks:",flush=True)
+    result = dask.compute(*tasks,scheduler='processes')
+    Hd = np.asarray(list(itertools.chain(*result)))
+    print(" done.",flush=True)
     return Hd
 
 # }}}
