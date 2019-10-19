@@ -2,7 +2,7 @@ import numpy as np
 import scipy
 import itertools
 import copy as cp
-from collections import OrderedDict
+from collections import OrderedDict,abc
 from helpers import *
 
 class ClusteredState(OrderedDict):
@@ -48,6 +48,47 @@ class ClusteredState(OrderedDict):
     def __setitem__(self,fock_config,c):
         self.data[fock_config]=c
         #self._len += len(c)
+
+
+    def __iter__(self):
+        self._curr_fock_idx = 0
+        self._curr_conf_idx = 0
+        self._curr_idx = -1 
+        self._max_iter = len(self)
+        self._fock_iter = iter(self.data)
+        self._curr_fock = next(self._fock_iter) 
+        self._conf_iter = iter(self.data[self._curr_fock])
+        return self
+
+#    def __next__(self):
+#        if self._curr_idx < self._max_iter-1:
+#            self._curr_idx += 1
+#            #next(self._conf_iter)
+#            try:
+#                curr_conf = next(self._conf_iter)
+#                return self._curr_fock, curr_conf 
+#            except StopIteration:
+#                self._curr_fock = next(self._curr_fock)
+#                self._conf_iter = iter(self._fock_iter)
+#                return self._curr_fock, next(self._conf_iter)
+#        else:
+#            raise StopIteration
+
+    def __next__(self):
+       
+        try:
+            curr_conf = next(self._conf_iter)
+            return self._curr_fock, curr_conf, self.data[self._curr_fock][curr_conf]
+        except StopIteration:
+            try:
+                self._curr_fock = next(self._fock_iter)
+                self._conf_iter = iter(self.data[self._curr_fock])
+                assert(len(self.data[self._curr_fock])>0)
+                curr_conf = next(self._conf_iter)
+                return self._curr_fock, curr_conf, self.data[self._curr_fock][curr_conf]
+            except StopIteration:
+                raise StopIteration
+
     def __len__(self):
         l = 0
         for b,c in self.data.items():

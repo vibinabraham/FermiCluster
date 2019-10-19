@@ -250,7 +250,7 @@ def build_hamiltonian_diagonal(clustered_ham,ci_vector):
     flist = [] # fockspaces
     clist = [] # configs
     tlist = [] # tasks
-    batch_size = 10000 
+    batch_size = 1000 
     check = []
     for fockspace, configs in ci_vector.items():
         for config, coeff in configs.items():
