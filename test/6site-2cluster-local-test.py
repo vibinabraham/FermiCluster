@@ -115,3 +115,5 @@ def test_5():
 def test_6():
     assert(run(1,.1,pbc=False))
 
+if __name__=="__main__":
+    run(1,5)

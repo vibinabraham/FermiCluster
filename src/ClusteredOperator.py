@@ -206,13 +206,12 @@ class ClusteredTerm:
                 continue
             try:
                 do = self.clusters[oi].ops[o]
-            except:
+            except KeyError:
                 print(" Couldn't find:", self)
                 exit()
-                return 0
             try:
                 d = do[(fock[oi],fock[oi])][config[oi],config[oi]] #D(I,J,:,:...)
-            except:
+            except KeyError:
                 return 0
             mats.append(d)
 

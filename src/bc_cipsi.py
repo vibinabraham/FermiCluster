@@ -15,11 +15,14 @@ from tools import *
 
 import dask
 from dask.distributed import Client, progress
+import concurrent.futures
 
 def bc_cipsi(ci_vector, clustered_ham, thresh_cipsi=1e-4, thresh_ci_clip=1e-5, thresh_conv=1e-8, max_iter=30):
 
     #client = Client(processes=False)
-    client = Client(processes=True)
+    #client = Client(processes=False,asynchronous=True)
+    #client = Client(processes=True)
+    client = concurrent.futures.ProcessPoolExecutor(4)
 
     pt_vector = ci_vector.copy()
     Hd_vector = ClusteredState(ci_vector.clusters)
@@ -66,8 +69,8 @@ def bc_cipsi(ci_vector, clustered_ham, thresh_cipsi=1e-4, thresh_ci_clip=1e-5, t
                 ci_vector.set_vector(v0)
 
 
-        for i,j,k in ci_vector:
-            print(" iterator:", " Fock Space:", i, " Config:", j, " Coeff: %12.8f"%k)
+        #for i,j,k in ci_vector:
+        #$    print(" iterator:", " Fock Space:", i, " Config:", j, " Coeff: %12.8f"%k)
 
 
         print(" Compute Matrix Vector Product:", flush=True)
@@ -100,8 +103,10 @@ def bc_cipsi(ci_vector, clustered_ham, thresh_cipsi=1e-4, thresh_ci_clip=1e-5, t
         # compute diagonal for PT2
 
         start = time.time()
+        pt_vector.prune_empty_fock_spaces()
+        Hd = build_hamiltonian_diagonal_concurrent(clustered_ham, pt_vector, client)
         #Hd = build_hamiltonian_diagonal(clustered_ham, pt_vector, client)
-        Hd = update_hamiltonian_diagonal(clustered_ham, pt_vector, Hd_vector)
+        #Hd = update_hamiltonian_diagonal(clustered_ham, pt_vector, Hd_vector)
         end = time.time()
         print(" Time spent in demonimator: ", end - start)
 
@@ -140,5 +145,5 @@ def bc_cipsi(ci_vector, clustered_ham, thresh_cipsi=1e-4, thresh_ci_clip=1e-5, t
     #        print(" Form basis by diagonalize local Hamiltonian for cluster: ",ci_idx)
     #        ci.form_eigbasis_from_local_operator(opi,max_roots=1000)
     #        exit()
-    client.close()
+    #client.close()
     return ci_vector, pt_vector, e0, e0+e2

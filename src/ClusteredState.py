@@ -83,6 +83,10 @@ class ClusteredState(OrderedDict):
             try:
                 self._curr_fock = next(self._fock_iter)
                 self._conf_iter = iter(self.data[self._curr_fock])
+                # Check to make sure that there are no empty fock_spaces
+                # as that would require a recursive check
+                # If this assert fails, either make this function recursive
+                # or simply run "self.prune_empty_fock_spaces()"
                 assert(len(self.data[self._curr_fock])>0)
                 curr_conf = next(self._conf_iter)
                 return self._curr_fock, curr_conf, self.data[self._curr_fock][curr_conf]
@@ -136,11 +140,17 @@ class ClusteredState(OrderedDict):
                     idx_to_keep.append(idx)
                 idx += 1
 
-        # clean out empty fockspaces
+        self.prune_empty_fock_spaces()
+        return idx_to_keep
+    
+    def prune_empty_fock_spaces(self):
+        """
+        remove fock_spaces that don't have any configurations 
+        """
         for fockspace,configs in list(self.items()):
             if len(configs) == 0:
                 del self.data[fockspace]
-        return idx_to_keep
+        return 
 
     def zero(self):
         for fock,configs in self.data.items():
