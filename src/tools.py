@@ -12,8 +12,10 @@ import dask
 import dask.delayed
 import numba
 
-#import concurrent.futures
+import concurrent.futures
 from dask.distributed import Client, progress
+
+import ray
 
 def matvec1(h,v,term_thresh=1e-12):
     """
@@ -212,6 +214,151 @@ def build_effective_operator(cluster_idx, clustered_ham, ci_vector,iprint=0):
 
 
 
+def build_hamiltonian_diagonal_ray1(clustered_ham,ci_vector):
+    """
+    Build hamiltonian diagonal in basis in ci_vector
+    """
+# {{{
+    clusters = ci_vector.clusters
+    Hd = np.zeros((len(ci_vector)))
+    
+    shift = 0 
+   
+    idx = 0
+
+    delta_fock= tuple([(0,0) for ci in range(len(clusters))])
+    terms = clustered_ham.terms[delta_fock]
+    
+    #ray.put(terms) 
+    #def get_element(fockspace, config, coeff):
+    def get_element(args):
+        fockspace = args[0]
+        config = args[1]
+        a = 0
+        for term in terms:
+            a += term.matrix_element(fockspace,config,fockspace,config)
+        return a
+
+    #@numba.jit
+    @ray.remote
+    def get_elements(states):
+        m_elements = []
+        for fockspace,config,coeff in states:
+            a = 0
+            for term in terms:
+                a += term.diag_matrix_element(fockspace,config)
+            m_elements.append(a)
+        return m_elements 
+
+
+    tasks = []
+    flist = [] # fockspaces
+    clist = [] # configs
+    tlist = [] # tasks
+    batch_size = 100 
+    check = []
+    
+    print(" Submit jobs:",flush=True)
+    batch_idx = 0
+    results = []
+    for fockspace,config,coeff in ci_vector:
+        clist.append((fockspace,config,coeff))
+        batch_idx+=1
+        tmp = []
+        if batch_idx == batch_size:
+            tasks.append(get_elements.remote(clist))
+            clist = []
+            batch_idx = 0
+    tasks.append(get_elements.remote(clist))
+   
+    print(" done.",flush=True)
+    print(" Now compute tasks:",flush=True)
+    results = []
+    for t in tasks:
+        results.append(ray.get(t))
+    results = list(itertools.chain(*results))
+    #results = list(itertools.chain(*client.gather(tasks)))
+    #results = list(itertools.chain(*client.gather(tasks)))
+    print(" done.",flush=True)
+    
+    Hd = np.asarray(results)
+    
+    return Hd
+
+# }}}
+
+def build_hamiltonian_diagonal_dask1(clustered_ham,ci_vector,client):
+    """
+    Build hamiltonian diagonal in basis in ci_vector
+    """
+# {{{
+    clusters = ci_vector.clusters
+    Hd = np.zeros((len(ci_vector)))
+    
+    shift = 0 
+   
+    idx = 0
+
+    delta_fock= tuple([(0,0) for ci in range(len(clusters))])
+    terms = clustered_ham.terms[delta_fock]
+    
+ 
+    #def get_element(fockspace, config, coeff):
+    def get_element(args):
+        fockspace = args[0]
+        config = args[1]
+        a = 0
+        for term in terms:
+            a += term.matrix_element(fockspace,config,fockspace,config)
+        return a
+
+    #@numba.jit
+    def get_elements(states):
+        m_elements = []
+        for fockspace,config,coeff in states:
+            a = 0
+            for term in terms:
+                a += term.diag_matrix_element(fockspace,config)
+            m_elements.append(a)
+        return m_elements 
+
+
+    #pool = concurrent.futures.ThreadPoolExecutor(8)
+
+    tasks = []
+    flist = [] # fockspaces
+    clist = [] # configs
+    tlist = [] # tasks
+    batch_size = 100 
+    check = []
+    
+    print(" Define futures:",flush=True)
+    batch_idx = 0
+    results = []
+    for fockspace,config,coeff in ci_vector:
+        clist.append((fockspace,config,coeff))
+        batch_idx+=1
+        tmp = []
+        if batch_idx == batch_size:
+            #results.append(get_elements(clist))
+            tasks.append(client.submit(get_elements,clist))
+            clist = []
+            batch_idx = 0
+
+    tasks.append(client.submit(get_elements,clist))
+    #results.append(get_elements(clist))
+    print(" done.",flush=True)
+    print(" Now compute tasks:",flush=True)
+    results = list(itertools.chain(*client.gather(tasks)))
+    #results = list(itertools.chain(*results))
+    print(" done.",flush=True)
+    
+    Hd = np.asarray(results)
+    
+    return Hd
+
+# }}}
+
 def build_hamiltonian_diagonal_concurrent(clustered_ham,ci_vector,client):
     """
     Build hamiltonian diagonal in basis in ci_vector
@@ -272,7 +419,11 @@ def build_hamiltonian_diagonal_concurrent(clustered_ham,ci_vector,client):
     print(" Now compute tasks:",flush=True)
     #result = dask.compute(*tasks)
     #result = dask.compute(*tasks,scheduler='processes')
-    Hd = np.asarray(list(map(get_element, ci_vector)))
+    #Hd = np.asarray(list(map(get_element, ci_vector)))
+    with concurrent.futures.ProcessPoolExecutor() as executor:
+        result = executor.map(get_element, ci_vector, chunksize=10000)
+    Hd = np.asarray(list(result))
+
     #Hd = np.asarray(list(itertools.chain(*result)))
 
     #Hd = np.asarray(list(itertools.chain(*client.gather(tasks))))

@@ -16,13 +16,32 @@ from tools import *
 import dask
 from dask.distributed import Client, progress
 import concurrent.futures
+import ray
 
-def bc_cipsi(ci_vector, clustered_ham, thresh_cipsi=1e-4, thresh_ci_clip=1e-5, thresh_conv=1e-8, max_iter=30):
+import pickle
+
+@ray.remote
+class RayActor:
+    def __init__(self,h):
+        self.h = h
+
+
+def bc_cipsi(ci_vector, clustered_ham, thresh_cipsi=1e-4, thresh_ci_clip=1e-5, thresh_conv=1e-8, max_iter=30, client=None):
 
     #client = Client(processes=False)
     #client = Client(processes=False,asynchronous=True)
     #client = Client(processes=True)
-    client = concurrent.futures.ProcessPoolExecutor(4)
+    #client = concurrent.futures.ProcessPoolExecutor(4)
+    ray.init()
+
+#    pickle_out = open("h.pickle","wb")
+#    serial = pickle.dump(clustered_ham,pickle_out)
+#    pickle_out.close()
+#    
+#    pickle_in = open("h.pickle","rb")
+#    clustered_ham = pickle.load(pickle_in)
+#    pickle_in.close()
+    #clustered_ham_ray = RayActor.remote(a)
 
     pt_vector = ci_vector.copy()
     Hd_vector = ClusteredState(ci_vector.clusters)
@@ -104,7 +123,9 @@ def bc_cipsi(ci_vector, clustered_ham, thresh_cipsi=1e-4, thresh_ci_clip=1e-5, t
 
         start = time.time()
         pt_vector.prune_empty_fock_spaces()
-        Hd = build_hamiltonian_diagonal_concurrent(clustered_ham, pt_vector, client)
+        Hd = build_hamiltonian_diagonal_ray1(clustered_ham, pt_vector)
+        #Hd = build_hamiltonian_diagonal_dask1(clustered_ham, pt_vector, client)
+        #Hd = build_hamiltonian_diagonal_concurrent(clustered_ham, pt_vector, client)
         #Hd = build_hamiltonian_diagonal(clustered_ham, pt_vector, client)
         #Hd = update_hamiltonian_diagonal(clustered_ham, pt_vector, Hd_vector)
         end = time.time()
