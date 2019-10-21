@@ -42,6 +42,12 @@ def bc_cipsi(ci_vector, clustered_ham, thresh_cipsi=1e-4, thresh_ci_clip=1e-5, t
 #    clustered_ham = pickle.load(pickle_in)
 #    pickle_in.close()
     #clustered_ham_ray = RayActor.remote(a)
+    
+    
+    print(" Compute diagonal elements",flush=True)
+    # compute local states energies
+    precompute_cluster_basis_energies(clustered_ham)
+    print(" done.",flush=True)
 
     pt_vector = ci_vector.copy()
     Hd_vector = ClusteredState(ci_vector.clusters)
@@ -123,11 +129,18 @@ def bc_cipsi(ci_vector, clustered_ham, thresh_cipsi=1e-4, thresh_ci_clip=1e-5, t
 
         start = time.time()
         pt_vector.prune_empty_fock_spaces()
+            
+        #import cProfile
+        #pr = cProfile.Profile()
+        #pr.enable()
+            
         #Hd = build_hamiltonian_diagonal_ray1(clustered_ham, pt_vector)
         #Hd = build_hamiltonian_diagonal_dask1(clustered_ham, pt_vector, client)
         #Hd = build_hamiltonian_diagonal_concurrent(clustered_ham, pt_vector, client)
-        Hd = build_hamiltonian_diagonal(clustered_ham, pt_vector, client)
-        #Hd = update_hamiltonian_diagonal(clustered_ham, pt_vector, Hd_vector)
+        #Hd = build_hamiltonian_diagonal(clustered_ham, pt_vector, client)
+        Hd = update_hamiltonian_diagonal(clustered_ham, pt_vector, Hd_vector)
+        #pr.disable()
+        #pr.print_stats(sort='time')
         end = time.time()
         print(" Time spent in demonimator: ", end - start)
 

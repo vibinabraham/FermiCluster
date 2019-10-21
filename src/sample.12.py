@@ -112,13 +112,15 @@ if __name__=="__main__":
         print(" Form basis by diagonalize local Hamiltonian for cluster: ",ci_idx)
         ci.form_eigbasis_from_local_operator(opi,max_roots=1000)
     
-    
     #clustered_ham.add_ops_to_clusters()
     print(" Build these local operators")
     for c in clusters:
         print(" Build mats for cluster ",c.idx)
         c.build_op_matrices()
     
+    # compute local states energies
+    precompute_cluster_basis_energies(clustered_ham)
+
     #ci_vector.expand_to_full_space()
     #ci_vector.expand_each_fock_space()
     
@@ -126,7 +128,7 @@ if __name__=="__main__":
     thresh_conv = 1e-8
     ci_vector_ref = ci_vector.copy()
     e_last = 0
-    for brdm_iter in range(20):
+    for brdm_iter in range(1):
         #ci_vector, pt_vector, e0, e2 = bc_cipsi(ci_vector_ref.copy(), clustered_ham, thresh_cipsi=1e-4, thresh_ci_clip=1e-4)
         ci_vector, pt_vector, e0, e2 = bc_cipsi(ci_vector_ref.copy(), clustered_ham, thresh_cipsi=1e-4, thresh_ci_clip=1e-4, client=client)
         print(" CIPSI: E0 = %12.8f E2 = %12.8f CI_DIM: %i" %(e0, e2, len(ci_vector)))
