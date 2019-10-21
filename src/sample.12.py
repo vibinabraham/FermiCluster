@@ -121,46 +121,5 @@ if __name__=="__main__":
     #ci_vector.expand_to_full_space()
     #ci_vector.expand_each_fock_space()
     
-    e_prev = 0
-    thresh_conv = 1e-8
-    ci_vector_ref = ci_vector.copy()
-    e_last = 0
-    for brdm_iter in range(20):
-        ci_vector, pt_vector, e0, e2 = bc_cipsi(ci_vector_ref.copy(), clustered_ham, thresh_cipsi=1e-5, thresh_ci_clip=1e-5)
-        #ci_vector, pt_vector, e0, e2 = bc_cipsi(ci_vector_ref.copy(), clustered_ham, thresh_cipsi=1e-4, thresh_ci_clip=1e-4, client=client)
-        print(" CIPSI: E0 = %12.8f E2 = %12.8f CI_DIM: %i" %(e0, e2, len(ci_vector)))
-      
-        if abs(e_prev-e2) < thresh_conv:
-            print(" Converged BRDMs")
-            break
-        e_prev = e2
-        pt_vector.add(ci_vector)
-        pt_vector.clip(1e-6)
-        for ci in clusters:
-            print()
-            print(" Compute BRDM",flush=True)
-            rdms = build_brdm(pt_vector, ci.idx)
-            print(" done.",flush=True)
-            #rdms = build_brdm(ci_vector, ci.idx)
-            norm = 0
-            rotations = {}
-            for fspace,rdm in rdms.items():
-                print(" Diagonalize RDM for Cluster %2i in Fock space:"%ci.idx, fspace,flush=True)
-                n,U = np.linalg.eigh(rdm)
-                idx = n.argsort()[::-1]
-                n = n[idx]
-                U = U[:,idx]
-                norm += sum(n)
-                for ni_idx,ni in enumerate(n):
-                    if abs(ni) > 1e-12:
-                        print("   Rotated State %4i: %12.8f"%(ni_idx,ni))
-                rotations[fspace] = U
-            print(" Final norm: %12.8f"%norm)
-        
-            ci.rotate_basis(rotations)
-        delta_e = e0 - e_last
-        e_last = e0
-        if abs(delta_e) < 1e-8:
-            print(" Converged BRDM iterations")
-            break
+    ci_vector, pt_vector, e0, e2 = bc_cipsi_tucker(ci_vector.copy(), clustered_ham, thresh_cipsi=1e-5, thresh_ci_clip=1e-5)
     

@@ -260,10 +260,18 @@ class ClusteredState(OrderedDict):
         Compute norm of state
         """
         norm = 0
-        for fockspace,configs in self.items():
-            for config,coeff in configs.items():
-                norm += coeff*coeff
+        for fockspace,config,coeff in self:
+            norm += coeff*coeff
         return norm
+
+    def normalize(self):
+        """
+        Normalize state
+        """
+        norm = self.norm()
+        for fockspace,config,coeff in self:
+            self[fockspace][config] = coeff/np.sqrt(norm)
+        return
 
     def print(self):
         """ Pretty print """
