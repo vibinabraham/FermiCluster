@@ -18,7 +18,7 @@ ttt = time.time()
 
 if __name__=="__main__":
     #client = Client(processes=True)
-    client = Client(processes=False)
+    #client = Client(processes=False)
     n_orb =  12 
     U = 5.
     beta = 1.0
@@ -118,9 +118,6 @@ if __name__=="__main__":
         print(" Build mats for cluster ",c.idx)
         c.build_op_matrices()
     
-    # compute local states energies
-    precompute_cluster_basis_energies(clustered_ham)
-
     #ci_vector.expand_to_full_space()
     #ci_vector.expand_each_fock_space()
     
@@ -128,9 +125,9 @@ if __name__=="__main__":
     thresh_conv = 1e-8
     ci_vector_ref = ci_vector.copy()
     e_last = 0
-    for brdm_iter in range(1):
-        #ci_vector, pt_vector, e0, e2 = bc_cipsi(ci_vector_ref.copy(), clustered_ham, thresh_cipsi=1e-4, thresh_ci_clip=1e-4)
-        ci_vector, pt_vector, e0, e2 = bc_cipsi(ci_vector_ref.copy(), clustered_ham, thresh_cipsi=1e-4, thresh_ci_clip=1e-4, client=client)
+    for brdm_iter in range(20):
+        ci_vector, pt_vector, e0, e2 = bc_cipsi(ci_vector_ref.copy(), clustered_ham, thresh_cipsi=1e-5, thresh_ci_clip=1e-5)
+        #ci_vector, pt_vector, e0, e2 = bc_cipsi(ci_vector_ref.copy(), clustered_ham, thresh_cipsi=1e-4, thresh_ci_clip=1e-4, client=client)
         print(" CIPSI: E0 = %12.8f E2 = %12.8f CI_DIM: %i" %(e0, e2, len(ci_vector)))
       
         if abs(e_prev-e2) < thresh_conv:
@@ -138,9 +135,12 @@ if __name__=="__main__":
             break
         e_prev = e2
         pt_vector.add(ci_vector)
+        pt_vector.clip(1e-6)
         for ci in clusters:
             print()
+            print(" Compute BRDM",flush=True)
             rdms = build_brdm(pt_vector, ci.idx)
+            print(" done.",flush=True)
             #rdms = build_brdm(ci_vector, ci.idx)
             norm = 0
             rotations = {}

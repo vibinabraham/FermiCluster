@@ -616,6 +616,7 @@ def update_hamiltonian_diagonal(clustered_ham,ci_vector,Hd_vector):
 
 # }}}
 
+
 def precompute_cluster_basis_energies(clustered_ham):
     """
     For each cluster grab the local operator from clustered_ham, and store the expectation values 
@@ -623,6 +624,9 @@ def precompute_cluster_basis_energies(clustered_ham):
     """
     # {{{
     for ci in clustered_ham.clusters:
+        for fspace in ci.basis:
+            dim = ci.basis[fspace].shape[1]
+            ci.energies[fspace] = np.zeros((dim))
         opi = clustered_ham.extract_local_operator(ci.idx)
         for t in opi.terms:
             assert(len(t.ops)==1)
