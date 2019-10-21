@@ -18,6 +18,7 @@ ttt = time.time()
 
 if __name__=="__main__":
     #client = Client(processes=True)
+    client = Client(processes=False)
     n_orb =  12 
     U = 5.
     beta = 1.0
@@ -126,8 +127,8 @@ if __name__=="__main__":
     ci_vector_ref = ci_vector.copy()
     e_last = 0
     for brdm_iter in range(20):
-        ci_vector, pt_vector, e0, e2 = bc_cipsi(ci_vector_ref.copy(), clustered_ham, thresh_cipsi=1e-4, thresh_ci_clip=1e-4)
-        #ci_vector, pt_vector, e0, e2 = bc_cipsi(ci_vector_ref.copy(), clustered_ham, thresh_cipsi=1e-4, thresh_ci_clip=1e-4, client=client)
+        #ci_vector, pt_vector, e0, e2 = bc_cipsi(ci_vector_ref.copy(), clustered_ham, thresh_cipsi=1e-4, thresh_ci_clip=1e-4)
+        ci_vector, pt_vector, e0, e2 = bc_cipsi(ci_vector_ref.copy(), clustered_ham, thresh_cipsi=1e-4, thresh_ci_clip=1e-4, client=client)
         print(" CIPSI: E0 = %12.8f E2 = %12.8f CI_DIM: %i" %(e0, e2, len(ci_vector)))
       
         if abs(e_prev-e2) < thresh_conv:

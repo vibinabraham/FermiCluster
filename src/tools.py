@@ -482,8 +482,7 @@ def build_hamiltonian_diagonal(clustered_ham,ci_vector,client):
     flist = [] # fockspaces
     clist = [] # configs
     tlist = [] # tasks
-    batch_size = 10000 
-    check = []
+    batch_size = 10000000 
     print(" Define futures:",flush=True)
     for fockspace, configs in ci_vector.items():
         for config, coeff in configs.items():
@@ -492,29 +491,18 @@ def build_hamiltonian_diagonal(clustered_ham,ci_vector,client):
             clist.append(config)
            
             
-            #a = dask.delayed(get_element)(terms,fockspace,config)
             if len(clist) == batch_size:
-                #a = dask.delayed(get_elements)(terms,flist,clist)
-                #a = pool.submit(get_elements, *(terms,flist,clist))
                 a = client.submit(get_elements, *(terms_future,flist,clist))
-                #a = client.submit(get_elements, *(terms,flist,clist))
                 tasks.append(a)
-                check.append(clist)
                 clist = []
                 flist = []
-            #Hd[idx] = get_element(terms,fockspace,config)
-            #idx += 1
-    #a = dask.delayed(get_elements)(terms,flist,clist)
-    #a = pool.submit(get_elements, *(terms,flist,clist))
+    
     a = client.submit(get_elements, *(terms_future,flist,clist))
-    #a = client.submit(get_elements, *(terms,flist,clist))
+    
     tasks.append(a)
     print(" done.",flush=True)
     print(" Now compute tasks:",flush=True)
-    #result = dask.compute(*tasks)
-    #result = dask.compute(*tasks,scheduler='processes')
     Hd = np.asarray(list(itertools.chain(*client.gather(tasks))))
-    #Hd = np.asarray(list(itertools.chain(*result)))
     print(" done.",flush=True)
     return Hd
 

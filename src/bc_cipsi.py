@@ -32,7 +32,7 @@ def bc_cipsi(ci_vector, clustered_ham, thresh_cipsi=1e-4, thresh_ci_clip=1e-5, t
     #client = Client(processes=False,asynchronous=True)
     #client = Client(processes=True)
     #client = concurrent.futures.ProcessPoolExecutor(4)
-    ray.init()
+    #ray.init()
 
 #    pickle_out = open("h.pickle","wb")
 #    serial = pickle.dump(clustered_ham,pickle_out)
@@ -123,10 +123,10 @@ def bc_cipsi(ci_vector, clustered_ham, thresh_cipsi=1e-4, thresh_ci_clip=1e-5, t
 
         start = time.time()
         pt_vector.prune_empty_fock_spaces()
-        Hd = build_hamiltonian_diagonal_ray1(clustered_ham, pt_vector)
+        #Hd = build_hamiltonian_diagonal_ray1(clustered_ham, pt_vector)
         #Hd = build_hamiltonian_diagonal_dask1(clustered_ham, pt_vector, client)
         #Hd = build_hamiltonian_diagonal_concurrent(clustered_ham, pt_vector, client)
-        #Hd = build_hamiltonian_diagonal(clustered_ham, pt_vector, client)
+        Hd = build_hamiltonian_diagonal(clustered_ham, pt_vector, client)
         #Hd = update_hamiltonian_diagonal(clustered_ham, pt_vector, Hd_vector)
         end = time.time()
         print(" Time spent in demonimator: ", end - start)
