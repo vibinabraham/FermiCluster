@@ -39,7 +39,7 @@ def bc_cipsi_tucker(ci_vector, clustered_ham,
     ci_vector_ref = ci_vector.copy()
     for brdm_iter in range(max_tucker_iter):
         ci_vector, pt_vector, e0, e2 = bc_cipsi(ci_vector_ref.copy(), clustered_ham, 
-                thresh_cipsi=1e-4, thresh_ci_clip=1e-4, thresh_conv=thresh_cipsi_conv, max_iter=max_cipsi_iter)
+                thresh_cipsi=thresh_cipsi, thresh_ci_clip=thresh_ci_clip, thresh_conv=thresh_cipsi_conv, max_iter=max_cipsi_iter)
         #ci_vector, pt_vector, e0, e2 = bc_cipsi(ci_vector_ref.copy(), clustered_ham, thresh_cipsi=1e-4, thresh_ci_clip=1e-4, client=client)
         print(" CIPSI: E0 = %12.8f E2 = %12.8f CI_DIM: %i" %(e0, e2, len(ci_vector)))
       
@@ -51,6 +51,7 @@ def bc_cipsi_tucker(ci_vector, clustered_ham,
         print(" Reduce size of 1st order wavefunction")
         print(" Before:",len(pt_vector))
         pt_vector.clip(tucker_state_clip)
+        pt_vector.normalize()
         print(" After:",len(pt_vector))
         for ci in clustered_ham.clusters:
             print()
