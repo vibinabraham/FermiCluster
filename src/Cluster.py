@@ -229,53 +229,6 @@ class Cluster(object):
                 b1 = self.ops['b'][(na,nb-2),(na,nb-1)]
                 self.ops['bb'][(na,nb-2),(na,nb)] = oe.contract('abp,bcq->acpq',b1,b2)
                
-               
-#        #  AAaa,BBbb
-#        for na in range(0,self.n_orb+1):
-#            for nb in range(0,self.n_orb+1):
-#                self.ops['AAaa'][(na,nb),(na,nb)] = build_ccaa_ss(self.n_orb, (na,nb),(na,nb),self.basis,'a')
-#                self.ops['BBbb'][(na,nb),(na,nb)] = build_ccaa_ss(self.n_orb, (na,nb),(na,nb),self.basis,'b')
-#                #print(self.ops['BBbb'][(na,nb),(na,nb)])
-#        
-        #  AAaa
-        for na in range(2,self.n_orb+1):
-            for nb in range(0,self.n_orb+1):
-                aa = self.ops['aa'][(na-2,nb),(na,nb)]
-                AA = self.ops['AA'][(na,nb),(na-2,nb)]
-               
-                # <IJ|p'q'rs|KL>
-                self.ops['AAaa'][(na,nb),(na,nb)] = oe.contract('IJpq,JKrs->IKpqrs',AA,aa)
-        #  BBbb
-        for na in range(0,self.n_orb+1):
-            for nb in range(2,self.n_orb+1):
-                b2 = self.ops['b'][(na,nb-1),(na,nb)]
-                b1 = self.ops['b'][(na,nb-2),(na,nb-1)]
-                B2 = self.ops['B'][(na,nb-1),(na,nb-2)]
-                B1 = self.ops['B'][(na,nb),(na,nb-1)]
-               
-                # <IJ|p'q'rs|KL>
-                self.ops['BBbb'][(na,nb),(na,nb)] = oe.contract('abp,bcq,cdr,des->aepqrs',B1,B2,b1,b2)
-        #  ABba
-        for na in range(1,self.n_orb+1):
-            for nb in range(1,self.n_orb+1):
-                a = self.ops['a'][(na-1,nb),(na,nb)]
-                b = self.ops['b'][(na-1,nb-1),(na-1,nb)]
-                B = self.ops['B'][(na-1,nb),(na-1,nb-1)]
-                A = self.ops['A'][(na,nb),(na-1,nb)]
-               
-                # <IJ|p'q'rs|KL>
-                self.ops['ABba'][(na,nb),(na,nb)] = oe.contract('abp,bcq,cdr,des->aepqrs',A,B,b,a)
-        #  BAab
-        for na in range(1,self.n_orb+1):
-            for nb in range(1,self.n_orb+1):
-                b = self.ops['b'][(na,nb-1),(na,nb)]
-                a = self.ops['a'][(na-1,nb-1),(na,nb-1)]
-                A = self.ops['A'][(na,nb-1),(na-1,nb-1)]
-                B = self.ops['B'][(na,nb),(na,nb-1)]
-               
-                # <IJ|p'q'rs|KL>
-                self.ops['BAab'][(na,nb),(na,nb)] = oe.contract('abp,bcq,cdr,des->aepqrs',B,A,a,b)
-        
         
         #  AB
         for na in range(1,self.n_orb+1):
@@ -306,106 +259,135 @@ class Cluster(object):
                 self.ops['ab'][(na-1,nb-1),(na,nb)] = oe.contract('abp,bcq->acpq',a,b)
         
 
+               
+#        #  AAaa,BBbb
+#        for na in range(0,self.n_orb+1):
+#            for nb in range(0,self.n_orb+1):
+#                self.ops['AAaa'][(na,nb),(na,nb)] = build_ccaa_ss(self.n_orb, (na,nb),(na,nb),self.basis,'a')
+#                self.ops['BBbb'][(na,nb),(na,nb)] = build_ccaa_ss(self.n_orb, (na,nb),(na,nb),self.basis,'b')
+#                #print(self.ops['BBbb'][(na,nb),(na,nb)])
+#        
+        #  AAaa
+        for na in range(2,self.n_orb+1):
+            for nb in range(0,self.n_orb+1):
+                aa = self.ops['aa'][(na-2,nb),(na,nb)]
+                AA = self.ops['AA'][(na,nb),(na-2,nb)]
+               
+                # <IJ|p'q'rs|KL>
+                self.ops['AAaa'][(na,nb),(na,nb)] = oe.contract('IJpq,JKrs->IKpqrs',AA,aa)
+        
+        #  BBbb
+        for na in range(0,self.n_orb+1):
+            for nb in range(2,self.n_orb+1):
+                bb = self.ops['bb'][(na,nb-2),(na,nb)]
+                BB = self.ops['BB'][(na,nb),(na,nb-2)]
+               
+                # <IJ|p'q'rs|KL>
+                self.ops['BBbb'][(na,nb),(na,nb)] = oe.contract('IJpq,JKrs->IKpqrs',BB,bb)
+
+        #  ABba
+        for na in range(1,self.n_orb+1):
+            for nb in range(1,self.n_orb+1):
+                ba = self.ops['ba'][(na-1,nb-1),(na,nb)]
+                AB = self.ops['AB'][(na,nb),(na-1,nb-1)]
+               
+                # <IJ|p'q'rs|KL>
+                self.ops['ABba'][(na,nb),(na,nb)] = oe.contract('IJpq,JKrs->IKpqrs',AB,ba)
+        #  BAab
+        for na in range(1,self.n_orb+1):
+            for nb in range(1,self.n_orb+1):
+                ab = self.ops['ab'][(na-1,nb-1),(na,nb)]
+                BA = self.ops['BA'][(na,nb),(na-1,nb-1)]
+               
+                # <IJ|p'q'rs|KL>
+                self.ops['BAab'][(na,nb),(na,nb)] = oe.contract('IJpq,JKrs->IKpqrs',BA,ab)
+        
         #  AAa
         for na in range(2,self.n_orb+1):
             for nb in range(0,self.n_orb+1):
                 a  = self.ops['a'][(na-2,nb),(na-1,nb)]
-                A1 = self.ops['A'][(na-1,nb),(na-2,nb)]
-                A2 = self.ops['A'][(na,nb),(na-1,nb)]
-                self.ops['AAa'][(na,nb),(na-1,nb)] = oe.contract('abp,bcq,cdr->adpqr',A2,A1,a)
+                AA = self.ops['AA'][(na,nb),(na-2,nb)]
+                self.ops['AAa'][(na,nb),(na-1,nb)] = oe.contract('IJpq,JKr->IKpqr',AA,a)
         
         #  BBb
         for na in range(0,self.n_orb+1):
             for nb in range(2,self.n_orb+1):
                 b  = self.ops['b'][(na,nb-2),(na,nb-1)]
-                B1 = self.ops['B'][(na,nb-1),(na,nb-2)]
-                B2 = self.ops['B'][(na,nb),(na,nb-1)]
-                self.ops['BBb'][(na,nb),(na,nb-1)] = oe.contract('abp,bcq,cdr->adpqr',B2,B1,b)
+                BB = self.ops['BB'][(na,nb),(na,nb-2)]
+                self.ops['BBb'][(na,nb),(na,nb-1)] = oe.contract('IJpq,JKr->IKpqr',BB,b)
         
         #  ABa
         for na in range(1,self.n_orb+1):
             for nb in range(1,self.n_orb+1):
                 a = self.ops['a'][(na-1,nb-1),(na,nb-1)]
-                B = self.ops['B'][(na-1,nb),(na-1,nb-1)]
-                A = self.ops['A'][(na,nb),(na-1,nb)]
-                self.ops['ABa'][(na,nb),(na,nb-1)] = oe.contract('abp,bcq,cdr->adpqr',A,B,a)
+                AB = self.ops['AB'][(na,nb),(na-1,nb-1)]
+                self.ops['ABa'][(na,nb),(na,nb-1)] = oe.contract('IJpq,JKr->IKpqr',AB,a)
 
         #  ABb
         for na in range(1,self.n_orb+1):
             for nb in range(1,self.n_orb+1):
                 b = self.ops['b'][(na-1,nb-1),(na-1,nb)]
-                B = self.ops['B'][(na-1,nb),(na-1,nb-1)]
-                A = self.ops['A'][(na,nb),(na-1,nb)]
-                self.ops['ABb'][(na,nb),(na-1,nb)] = oe.contract('abp,bcq,cdr->adpqr',A,B,b)
+                AB = self.ops['AB'][(na,nb),(na-1,nb-1)]
+                self.ops['ABb'][(na,nb),(na-1,nb)] = oe.contract('IJpq,JKr->IKpqr',AB,b)
         
         #  BAa
         for na in range(1,self.n_orb+1):
             for nb in range(1,self.n_orb+1):
                 a = self.ops['a'][(na-1,nb-1),(na,nb-1)]
-                A = self.ops['A'][(na,nb-1),(na-1,nb-1)]
-                B = self.ops['B'][(na,nb),(na,nb-1)]
-                self.ops['BAa'][(na,nb),(na,nb-1)] = oe.contract('abp,bcq,cdr->adpqr',B,A,a)
+                BA = self.ops['BA'][(na,nb),(na-1,nb-1)]
+                self.ops['BAa'][(na,nb),(na,nb-1)] = oe.contract('IJpq,JKr->IKpqr',BA,a)
         
         #  BAb
         for na in range(1,self.n_orb+1):
             for nb in range(1,self.n_orb+1):
                 b = self.ops['b'][(na-1,nb-1),(na-1,nb)]
-                A = self.ops['A'][(na,nb-1),(na-1,nb-1)]
-                B = self.ops['B'][(na,nb),(na,nb-1)]
-                self.ops['BAb'][(na,nb),(na-1,nb)] = oe.contract('abp,bcq,cdr->adpqr',B,A,b)
+                BA = self.ops['BA'][(na,nb),(na-1,nb-1)]
+                self.ops['BAb'][(na,nb),(na-1,nb)] = oe.contract('IJpq,JKr->IKpqr',BA,b)
 
 
         
         #  Aaa
         for na in range(2,self.n_orb+1):
             for nb in range(0,self.n_orb+1):
-                a1 = self.ops['a'][(na-1,nb),(na,nb)]
-                a2 = self.ops['a'][(na-2,nb),(na-1,nb)]
+                aa = self.ops['aa'][(na-2,nb),(na,nb)]
                 A  = self.ops['A'][(na-1,nb),(na-2,nb)]
-                self.ops['Aaa'][(na-1,nb),(na,nb)] = oe.contract('abp,bcq,cdr->adpqr',A,a2,a1)
+                self.ops['Aaa'][(na-1,nb),(na,nb)] = oe.contract('IJp,JKqr->IKpqr',A,aa)
         
         #  Bbb
         for na in range(0,self.n_orb+1):
             for nb in range(2,self.n_orb+1):
-                b1 = self.ops['b'][(na,nb-1),(na,nb)]
-                b2 = self.ops['b'][(na,nb-2),(na,nb-1)]
+                bb = self.ops['bb'][(na,nb-2),(na,nb)]
                 B  = self.ops['B'][(na,nb-1),(na,nb-2)]
-                self.ops['Bbb'][(na,nb-1),(na,nb)] = oe.contract('abp,bcq,cdr->adpqr',B,b2,b1)
+                self.ops['Bbb'][(na,nb-1),(na,nb)] = oe.contract('IJp,JKqr->IKpqr',B,bb)
         
         #  Aba
         for na in range(1,self.n_orb+1):
             for nb in range(1,self.n_orb+1):
-                a = self.ops['a'][(na-1,nb),(na,nb)]
-                b = self.ops['b'][(na-1,nb-1),(na-1,nb)]
+                ba = self.ops['ba'][(na-1,nb-1),(na,nb)]
                 A = self.ops['A'][(na,nb-1),(na-1,nb-1)]
-                self.ops['Aba'][(na,nb-1),(na,nb)] = oe.contract('abp,bcq,cdr->adpqr',A,b,a)
+                self.ops['Aba'][(na,nb-1),(na,nb)] = oe.contract('IJp,JKqr->IKpqr',A,ba)
         
         #  Aab
         for na in range(1,self.n_orb+1):
             for nb in range(1,self.n_orb+1):
-                b = self.ops['b'][(na,nb-1),(na,nb)]
-                a = self.ops['a'][(na-1,nb-1),(na,nb-1)]
+                ab = self.ops['ab'][(na-1,nb-1),(na,nb)]
                 A = self.ops['A'][(na,nb-1),(na-1,nb-1)]
-                self.ops['Aab'][(na,nb-1),(na,nb)] = oe.contract('abp,bcq,cdr->adpqr',A,a,b)
+                self.ops['Aab'][(na,nb-1),(na,nb)] = oe.contract('IJp,JKqr->IKpqr',A,ab)
         
         #  Bba
         for na in range(1,self.n_orb+1):
             for nb in range(1,self.n_orb+1):
-                a = self.ops['a'][(na-1,nb),(na,nb)]
-                b = self.ops['b'][(na-1,nb-1),(na-1,nb)]
-                B = self.ops['B'][(na-1,nb),(na-1,nb-1)]
-                self.ops['Bba'][(na-1,nb),(na,nb)] = oe.contract('abp,bcq,cdr->adpqr',B,b,a)
+                ba = self.ops['ba'][(na-1,nb-1),(na,nb)]
+                B  = self.ops['B'][(na-1,nb),(na-1,nb-1)]
+                self.ops['Bba'][(na-1,nb),(na,nb)] = oe.contract('IJp,JKqr->IKpqr',B,ba)
         
         #  Bab
         for na in range(1,self.n_orb+1):
             for nb in range(1,self.n_orb+1):
-                b = self.ops['b'][(na,nb-1),(na,nb)]
-                a = self.ops['a'][(na-1,nb-1),(na,nb-1)]
+                ab = self.ops['ab'][(na-1,nb-1),(na,nb)]
                 B = self.ops['B'][(na-1,nb),(na-1,nb-1)]
-                self.ops['Bab'][(na-1,nb),(na,nb)] = oe.contract('abp,bcq,cdr->adpqr',B,a,b)
+                self.ops['Bab'][(na-1,nb),(na,nb)] = oe.contract('IJp,JKqr->IKpqr',B,ab)
         
-        #Add remaining operators ....
-
 
 
 ###################################################################################################################
