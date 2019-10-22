@@ -128,7 +128,7 @@ class ClusteredState(OrderedDict):
         return 
     def clip(self,thresh):
         """
-        delete values smaller than thresh
+        delete values smaller than thresh, and return the list of kept indices
         """
         idx_to_keep = []
         idx = 0

@@ -121,14 +121,19 @@ if __name__=="__main__":
     
     #ci_vector.expand_to_full_space()
     #ci_vector.expand_each_fock_space()
+   
+    ci_vector_ref = ci_vector.copy()
     
-    
-    ci_vector, pt_vector, e0, e2 = bc_cipsi_tucker(ci_vector.copy(), clustered_ham, thresh_cipsi=1e-4, thresh_ci_clip=1e-4, max_tucker_iter = 5)
+    ci_vector, pt_vector, e0, e2 = bc_cipsi_tucker(ci_vector_ref.copy(), clustered_ham, thresh_cipsi=1e-4, thresh_ci_clip=1e-4, max_tucker_iter = 5)
     print(" =============================================================================")
     print(" Tighten convergence")
     print(" =============================================================================")
-    ci_vector, pt_vector, e0, e2 = bc_cipsi_tucker(ci_vector.copy(), clustered_ham, thresh_cipsi=1e-5, thresh_ci_clip=1e-5, max_tucker_iter = 5)
+    ci_vector, pt_vector, e0, e2 = bc_cipsi_tucker(ci_vector_ref.copy(), clustered_ham, thresh_cipsi=1e-5, thresh_ci_clip=1e-5, max_tucker_iter = 5)
     print(" =============================================================================")
     print(" Tighten convergence")
     print(" =============================================================================")
-    ci_vector, pt_vector, e0, e2 = bc_cipsi_tucker(ci_vector.copy(), clustered_ham, thresh_cipsi=1e-6, thresh_ci_clip=1e-6, max_tucker_iter = 5)
+    ci_vector, pt_vector, e0, e2 = bc_cipsi_tucker(ci_vector_ref.copy(), clustered_ham, thresh_cipsi=1e-6, thresh_ci_clip=1e-6, max_tucker_iter = 2)
+    print(" =============================================================================")
+    print(" Tighten convergence")
+    print(" =============================================================================")
+    ci_vector, pt_vector, e0, e2 = bc_cipsi_tucker(ci_vector_ref.copy(), clustered_ham, thresh_cipsi=1e-7, thresh_ci_clip=1e-7, max_tucker_iter = 2)
