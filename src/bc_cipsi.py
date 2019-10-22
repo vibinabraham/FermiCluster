@@ -158,6 +158,7 @@ def bc_cipsi(ci_vector, clustered_ham, thresh_cipsi=1e-4, thresh_ci_clip=1e-5, t
 
         print(" Compute Matrix Vector Product:", flush=True)
         pt_vector = matvec1(clustered_ham, ci_vector)
+        pt_vector.prune_empty_fock_spaces()
         #pt_vector.print()
 
 
