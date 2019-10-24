@@ -12,7 +12,7 @@ python:
 install: 
   - pip install -e .
 script: 
-  - pytest
+  - pytest test/*.py
 
 notifications:
     email: false
