@@ -25,8 +25,8 @@ def run(beta, U, pbc=True):
 
     h, g = get_hubbard_params(n_orb,beta,U,pbc=True)
     np.random.seed(2)
-    #tmp = np.random.rand(h.shape[0],h.shape[1])*0.01
-    #h += tmp + tmp.T
+    tmp = np.random.rand(h.shape[0],h.shape[1])*0.01
+    h += tmp + tmp.T
 
     if 1:
         Escf,orb,h,g,C = run_hubbard_scf(h,g,n_orb//2)
@@ -94,6 +94,8 @@ def run(beta, U, pbc=True):
     if abs(e0 - efci)<1e-7:
         return True
     else:
+        print("%12.8f"%e0)
+        print("%12.8f"%efci)
         return False
 # }}}
 

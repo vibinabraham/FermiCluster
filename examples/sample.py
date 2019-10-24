@@ -16,7 +16,7 @@ from bc_cipsi import *
 import pyscf
 ttt = time.time()
 
-n_orb = 8 
+n_orb = 6
 U = 5.
 beta = 1.0
 
@@ -25,7 +25,7 @@ np.random.seed(2)
 #tmp = np.random.rand(h.shape[0],h.shape[1])*0.01
 #h += tmp + tmp.T
 
-if 0:
+if 1:
     Escf,orb,h,g,C = run_hubbard_scf(h,g,n_orb//2)
 
 do_fci = 0
@@ -49,15 +49,15 @@ blocks = [[0,5],[1,4],[2,3]]
 blocks = [[0],[1],[2],[3],[4],[5]]
 blocks = [[0],[1],[2],[3],[4],[5],[6],[7]]
 blocks = [[0,1],[2,3],[4,5],[6,7]]
-blocks = [[0,1],[2,3]]
 blocks = [[0,1],[2,3,4,5],[6,7]]
 blocks = [[0,1,6,7],[2,3,4,5]]
 blocks = [[0,1,2,3],[4,5],[6,7]]
 blocks = [[0,1,2,3,4,5],[6,7,8,9,10,11]]
 blocks = [[0,1,2,3],[4,5,6,7],[8,9,10,11]]
-blocks = [[0,1,2],[3,4,5]]
 blocks = [[0,1,2,3],[4,5],[6,7]]
 blocks = [[0,1,2,3],[4,5,6,7]]
+blocks = [[0,1,2],[3,4,5]]
+#blocks = [[0,1],[2,3]]
 n_blocks = len(blocks)
 clusters = []
 
@@ -79,7 +79,7 @@ ci_vector = ClusteredState(clusters)
 #ci_vector.init(((3,3),(0,0)))
 #ci_vector.init(((4,4),(0,0)))
 #ci_vector.init(((4,4),(0,0),(0,0)))
-ci_vector.init(((2,2),(2,2)))
+ci_vector.init(((3,3),(0,0)))
 #ci_vector.init(((1,1),(1,1),(1,1),(1,1)))
 #ci_vector.init(((2,2),(1,1),(1,1)))
 #ci_vector.init(((3,3),(3,3)))
@@ -123,8 +123,8 @@ e_prev = 0
 thresh_conv = 1e-8
 ci_vector_ref = ci_vector.copy()
 e_last = 0
-for brdm_iter in range(20):
-    ci_vector, pt_vector, e0, e2 = bc_cipsi(ci_vector_ref.copy(), clustered_ham, thresh_cipsi=1e-4, thresh_ci_clip=1e-4)
+for brdm_iter in range(1):
+    ci_vector, pt_vector, e0, e2 = bc_cipsi(ci_vector_ref.copy(), clustered_ham, thresh_cipsi=1e-4, thresh_ci_clip=1e-4,max_iter=2)
     print(" CIPSI: E0 = %12.8f E2 = %12.8f CI_DIM: %i" %(e0, e2, len(ci_vector)))
   
     if abs(e_prev-e2) < thresh_conv:

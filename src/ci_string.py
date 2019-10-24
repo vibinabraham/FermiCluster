@@ -1000,9 +1000,9 @@ def build_ca_os(no,bra_space,ket_space,basis,spin_case):
         for q in range_no:
             bra_b.dcopy(ket_b)
             if spin_case == 'ab':
-                bra_b.a(p)
+                bra_b.a(q)
             else:
-                bra_b.c(p)
+                bra_b.c(q)
             if bra_b.sign() == 0:
                 continue
             L = bra_b.linear_index()
@@ -1019,7 +1019,10 @@ def build_ca_os(no,bra_space,ket_space,basis,spin_case):
     #                               = v(IJs) Da(IKp) Dbv(JKqt)
     #                               = vDa(JsKp) Dbv(JqKt)
     #                               = D(stpq)
-    tdm = (-1)**NAK * oe.contract('ijs,ikp,jlq,klt->stpq',v1,Da,Db,v2)
+    if spin_case == 'ab':
+        tdm = (-1)**NAK * oe.contract('ijs,ikp,jlq,klt->stpq',v1,Da,Db,v2)
+    if spin_case == 'ba':
+        tdm = (-1)**(NAK+1) * oe.contract('ijs,ikp,jlq,klt->stqp',v1,Da,Db,v2)
 
     v2.shape = (ket_a_max*ket_b_max,nv2)
     v1.shape = (bra_a_max*bra_b_max,nv1)
