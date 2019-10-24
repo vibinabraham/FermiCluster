@@ -5,7 +5,7 @@ import time
 from math import factorial
 import copy as cp
 
-def get_hubbard_params(n_site,beta,U):
+def get_hubbard_params(n_site,beta,U,pbc=True):
 # {{{
     #gets the interactions for linear hubbard
     print(" ---------------------------------------------------------")
@@ -20,8 +20,9 @@ def get_hubbard_params(n_site,beta,U):
     for i in range(0,n_site-1):
         t[i,i+1] = 1 
         t[i+1,i] = 1 
-    t[n_site-1,0] = 1 
-    t[0,n_site-1] = 1 
+    if pbc:
+        t[n_site-1,0] = 1 
+        t[0,n_site-1] = 1 
 
     h_local = -beta  * t 
 
@@ -32,13 +33,17 @@ def get_hubbard_params(n_site,beta,U):
     return h_local,g_local
     # }}}
 
-def run_hubbard_scf(h_local,g_local,closed_shell_nel):
+def run_hubbard_scf(h_local,g_local,closed_shell_nel,do_scf=True):
 # {{{
     print()
     print(" ---------------------------------------------------------")
     print("                  Delocalized Mean-Field")
     print(" ---------------------------------------------------------")
-    orb, C = np.linalg.eigh(h_local)
+    if do_scf:
+        orb, C = np.linalg.eigh(h_local)
+    else:
+        C = np.eye(h_local.shape[0])
+        orb = h_local.diagonal()
     #if np.sum(h_local) == 0:
     #    print("why")
     #    orbt, C = np.linalg.eigh(t)
