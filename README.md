@@ -1,3 +1,4 @@
+[![Build Status](https://travis-ci.org/vibinabraham/bc-ci.svg?branch=master)](https://travis-ci.org/vibinabraham/bc-ci)
 # bc-ci
 Block correlated CIPSI under construction
 
