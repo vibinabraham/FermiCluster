@@ -279,6 +279,16 @@ class Cluster(object):
 #                # <IJ|p'q'rs|KL>
 #                self.ops['BAab'][(na,nb),(na,nb)] = oe.contract('abp,bcq,cdr,des->aepqrs',B,A,a,b)
         
+        #  AA
+        for na in range(2,self.n_orb+1):
+            for nb in range(0,self.n_orb+1):
+                self.ops['aa'][(na-2,nb),(na,nb)] = build_aa_ss(self.n_orb, (na-2,nb),(na,nb),self.basis,'a')
+                self.ops['AA'][(na,nb),(na-2,nb)] = cp.deepcopy(np.swapaxes(self.ops['aa'][(na-2,nb),(na,nb)],0,1))
+        print(self.ops['aa'][(na-2,nb),(na,nb)])
+        for na in range(0,self.n_orb+1):
+            for nb in range(2,self.n_orb+1):
+                self.ops['bb'][(na,nb-2),(na,nb)] = build_aa_ss(self.n_orb, (na,nb-2),(na,nb),self.basis,'b')
+                self.ops['BB'][(na,nb),(na,nb-2)] = cp.deepcopy(np.swapaxes(self.ops['bb'][(na,nb-2),(na,nb)],0,1))
         
         #  AA
         for na in range(2,self.n_orb+1):
@@ -286,6 +296,7 @@ class Cluster(object):
                 A2 = self.ops['A'][(na-1,nb),(na-2,nb)]
                 A1 = self.ops['A'][(na,nb),(na-1,nb)]
                 self.ops['AA'][(na,nb),(na-2,nb)] = oe.contract('abp,bcq->acpq',A1,A2)
+        print(self.ops['AA'][(na,nb),(na-2,nb)])
         
         #  aa
         for na in range(2,self.n_orb+1):
@@ -307,6 +318,7 @@ class Cluster(object):
                 b2 = self.ops['b'][(na,nb-1),(na,nb)]
                 b1 = self.ops['b'][(na,nb-2),(na,nb-1)]
                 self.ops['bb'][(na,nb-2),(na,nb)] = oe.contract('abp,bcq->acpq',b1,b2)
+
         #  AB
         for na in range(1,self.n_orb+1):
             for nb in range(1,self.n_orb+1):
