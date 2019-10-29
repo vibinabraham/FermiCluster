@@ -1367,3 +1367,531 @@ def build_aa_os(no,bra_space,ket_space,basis,spin_case):
    
     return tdm
 # }}}
+
+def build_cca_ss(no,bra_space,ket_space,basis,spin_case):
+    """
+    Compute a(v1,v2,pqr) = <v1|p'q'r|v2>
+    
+    if spin_case a
+    D(v1,v2,pqrs) =          v(I,J,s) <IJ|p'q'r|I'J'> v(I',J',t)
+                             v(I,J,s) <I|p'q'r|I'> v(I',J',t) 
+    if spin_case b
+    D(v1,v2,pqrs) =          v(I,J,s) <IJ|p'q'r|I'J'> v(I',J',t)
+                             v(I,J,s) <J|p'q'r|J'> v(I',J',t) 
+
+    Input: 
+        no = n_orbs
+        bra_space = (n_alpha,n_beta) for bra
+        ket_space = (n_alpha,n_beta) for ket
+        spin_case: 'a' or 'b'
+        basis = dict of basis vectors
+    """
+    # {{{ 
+    bra_a = ci_string(no, bra_space[0])
+    bra_b = ci_string(no, bra_space[1])
+    ket_a = ci_string(no, ket_space[0])
+    ket_b = ci_string(no, ket_space[1])
+   
+    if spin_case == "a":
+        assert(bra_a.ne == ket_a.ne+1) 
+        assert(bra_b.ne == ket_b.ne) 
+    elif spin_case == "b":
+        assert(bra_a.ne == ket_a.ne) 
+        assert(bra_b.ne == ket_b.ne+1) 
+   
+    # avoid python function call overhead
+    ket_a_max = ket_a.max()
+    ket_b_max = ket_b.max()
+    bra_a_max = bra_a.max()
+    bra_b_max = bra_b.max()
+    
+    range_no = range(no)
+  
+    _abs = abs
+   
+    v1 = basis[bra_space] 
+    v2 = basis[ket_space] 
+
+    assert(v1.shape[0] == len(bra_a)*len(bra_b))
+    assert(v2.shape[0] == len(ket_a)*len(ket_b))
+    nv1 = v1.shape[1]
+    nv2 = v2.shape[1]
+
+    
+    #alpha term 
+    if spin_case == "a":
+        ket = cp.deepcopy(ket_a)
+        bra = cp.deepcopy(bra_a)
+    elif spin_case == "b":
+        ket = cp.deepcopy(ket_b)
+        bra = cp.deepcopy(bra_b)
+    
+    tdm_1spin = np.zeros((bra.max(),ket.max(),no,no,no))
+    ket.reset()
+    bra.reset()
+    for K in range(ket.max()): 
+        for p in range_no:
+            for q in range_no:
+                for r in range_no:
+                    bra.dcopy(ket)
+
+                    bra.a(r)
+                    if bra.sign() == 0:
+                        continue
+                    
+                    bra.c(q)
+                    if bra.sign() == 0:
+                        continue
+                    
+                    bra.c(p)
+                    if bra.sign() == 0:
+                        continue
+                    
+                    L = bra.linear_index()
+                    sign = bra.sign()
+                    tdm_1spin[L,K,p,q,r] += sign
+
+        ket.incr()
+  
+    v2.shape = (ket_a_max,ket_b_max,nv2)
+    v1.shape = (bra_a_max,bra_b_max,nv1)
+    
+    if spin_case == "a":
+        # v(IJt) <IJ|pqrs|KL> v(KLu)  = v(IJt) <I|pqrs|K> v(KJu) = A(tupqrs)
+        tdm = np.einsum('ijm,ikpqr,kjn->mnpqr',v1,tdm_1spin,v2)
+    elif spin_case == "b":
+        # v(IJt) <IJ|pqrs|KL> v(KLu)   = v(IJt) tdm(JLpqrs) v(ILu) = A(tupqrs)
+        sign = (-1)**ket_a.ne
+        tdm = oe.contract('ijm,jlpqr,iln->mnpqr',v1,tdm_1spin,v2) * sign
+
+ 
+    v2.shape = (ket_a_max*ket_b_max,nv2)
+    v1.shape = (bra_a_max*bra_b_max,nv1)
+   
+    return tdm
+# }}}
+
+def build_caa_ss(no,bra_space,ket_space,basis,spin_case):
+    """
+    Compute a(v1,v2,pqr) = <v1|p'q'r|v2>
+    
+    if spin_case a
+    D(v1,v2,pqrs) =          v(I,J,s) <IJ|p'q'r|I'J'> v(I',J',t)
+                             v(I,J,s) <I|p'q'r|I'> v(I',J',t) 
+    if spin_case b
+    D(v1,v2,pqrs) =          v(I,J,s) <IJ|p'q'r|I'J'> v(I',J',t)
+                             v(I,J,s) <J|p'q'r|J'> v(I',J',t) 
+
+    Input: 
+        no = n_orbs
+        bra_space = (n_alpha,n_beta) for bra
+        ket_space = (n_alpha,n_beta) for ket
+        spin_case: 'a' or 'b'
+        basis = dict of basis vectors
+    """
+    # {{{ 
+    bra_a = ci_string(no, bra_space[0])
+    bra_b = ci_string(no, bra_space[1])
+    ket_a = ci_string(no, ket_space[0])
+    ket_b = ci_string(no, ket_space[1])
+   
+    if spin_case == "a":
+        assert(bra_a.ne == ket_a.ne-1) 
+        assert(bra_b.ne == ket_b.ne) 
+    elif spin_case == "b":
+        assert(bra_a.ne == ket_a.ne) 
+        assert(bra_b.ne == ket_b.ne-1) 
+   
+    # avoid python function call overhead
+    ket_a_max = ket_a.max()
+    ket_b_max = ket_b.max()
+    bra_a_max = bra_a.max()
+    bra_b_max = bra_b.max()
+    
+    range_no = range(no)
+  
+    _abs = abs
+   
+    v1 = basis[bra_space] 
+    v2 = basis[ket_space] 
+
+    assert(v1.shape[0] == len(bra_a)*len(bra_b))
+    assert(v2.shape[0] == len(ket_a)*len(ket_b))
+    nv1 = v1.shape[1]
+    nv2 = v2.shape[1]
+
+    
+    #alpha term 
+    if spin_case == "a":
+        ket = cp.deepcopy(ket_a)
+        bra = cp.deepcopy(bra_a)
+    elif spin_case == "b":
+        ket = cp.deepcopy(ket_b)
+        bra = cp.deepcopy(bra_b)
+    
+    tdm_1spin = np.zeros((bra.max(),ket.max(),no,no,no))
+    ket.reset()
+    bra.reset()
+    for K in range(ket.max()): 
+        for p in range_no:
+            for q in range_no:
+                for r in range_no:
+                    bra.dcopy(ket)
+
+                    bra.a(r)
+                    if bra.sign() == 0:
+                        continue
+                    
+                    bra.a(q)
+                    if bra.sign() == 0:
+                        continue
+                    
+                    bra.c(p)
+                    if bra.sign() == 0:
+                        continue
+                    
+                    L = bra.linear_index()
+                    sign = bra.sign()
+                    tdm_1spin[L,K,p,q,r] += sign
+
+        ket.incr()
+  
+    v2.shape = (ket_a_max,ket_b_max,nv2)
+    v1.shape = (bra_a_max,bra_b_max,nv1)
+    
+    if spin_case == "a":
+        # v(IJt) <IJ|pqrs|KL> v(KLu)  = v(IJt) <I|pqrs|K> v(KJu) = A(tupqrs)
+        tdm = np.einsum('ijm,ikpqr,kjn->mnpqr',v1,tdm_1spin,v2)
+    elif spin_case == "b":
+        # v(IJt) <IJ|pqrs|KL> v(KLu)   = v(IJt) tdm(JLpqrs) v(ILu) = A(tupqrs)
+        tdm = oe.contract('ijm,jlpqr,iln->mnpqr',v1,tdm_1spin,v2) * (-1)**ket_a.ne
+
+ 
+    v2.shape = (ket_a_max*ket_b_max,nv2)
+    v1.shape = (bra_a_max*bra_b_max,nv1)
+   
+    return tdm
+# }}}
+
+def build_cca_os(no,bra_space,ket_space,basis,spin_case):
+    """
+    Compute D(v1,v2,pqr) = <v1|p'q'r|v2> where p,q have different spins
+
+    if spin_case abb
+    D(v1,v2,p,q,r) =          v(I,J,m) <IJ|p'q'r|I'J'> v(I',J',n)
+                          v(I,J,m) <I|p'|I'><J|q'r|J'> v(I',J',n) * sign 
+                          sign = (-1)^2*N(I')
+    
+    if spin_case baa
+    D(v1,v2,p,q,r) =          v(I,J,m) <IJ|p'q'r|I'J'> v(I',J',n)
+                          v(I,J,m) <I|q'r|I'><J|p'|J'> v(I',J',n) * sign
+                          sign = (-1)^*N(I')
+
+    where N(I') is Number of Alpha electrons in the ket_space
+        
+    Input: 
+        no = n_orbs
+        bra_space = (n_alpha,n_beta) for bra
+        ket_space = (n_alpha,n_beta) for ket
+        basis = dict of basis vectors
+        spin_case: 'abb' or 'baa'
+
+    """
+    # {{{ 
+    bra_a = ci_string(no, bra_space[0])
+    bra_b = ci_string(no, bra_space[1])
+    ket_a = ci_string(no, ket_space[0])
+    ket_b = ci_string(no, ket_space[1])
+  
+
+    assert(spin_case == 'abb' or spin_case == 'baa')
+    if spin_case == "abb":
+        assert(bra_a.ne == ket_a.ne+1) 
+        assert(bra_b.ne == ket_b.ne) 
+    elif spin_case == "baa":
+        assert(bra_a.ne == ket_a.ne) 
+        assert(bra_b.ne == ket_b.ne+1) 
+
+   
+    # avoid python function call overhead
+    ket_a_max = ket_a.max()
+    ket_b_max = ket_b.max()
+    bra_a_max = bra_a.max()
+    bra_b_max = bra_b.max()
+    
+    range_no = range(no)
+  
+    _abs = abs
+   
+    v1 = basis[bra_space] 
+    v2 = basis[ket_space] 
+
+    assert(v1.shape[0] == len(bra_a)*len(bra_b))
+    assert(v2.shape[0] == len(ket_a)*len(ket_b))
+    nv1 = v1.shape[1]
+    nv2 = v2.shape[1]
+
+    NAK = ket_space[0]
+        
+    if spin_case == 'abb':
+        #alpha term 
+        Da = np.zeros((bra_a.max(),ket_a.max(),no))
+
+        ket_a.reset()
+        bra_a.reset()
+        for K in range(ket_a.max()): 
+            for p in range_no:
+                bra_a.dcopy(ket_a)
+                bra_a.c(p)
+                if bra_a.sign() == 0:
+                    continue
+                L = bra_a.linear_index()
+                sign = bra_a.sign()
+                Da[L,K,p] += sign
+
+            ket_a.incr()
+
+
+        #beta term 
+        Db = np.zeros((bra_b.max(),ket_b.max(),no,no))
+
+        ket_b.reset()
+        bra_b.reset()
+        for K in range(ket_b.max()): 
+            for p in range_no:
+                for q in range_no:
+                    bra_b.dcopy(ket_b)
+                    bra_b.a(q)
+                    if bra_b.sign() == 0:
+                        continue
+                    bra_b.c(p)
+                    if bra_b.sign() == 0:
+                        continue
+
+                    L = bra_b.linear_index()
+                    sign = bra_b.sign()
+                    #print(ket_b._config,bra_b._config,sign)
+                    Db[L,K,p,q] += sign
+            ket_b.incr()
+
+    elif spin_case == 'baa':
+        #alpha term 
+        Da = np.zeros((bra_a.max(),ket_a.max(),no,no))
+
+        ket_a.reset()
+        bra_a.reset()
+        for K in range(ket_a.max()): 
+            for p in range_no:
+                for q in range_no:
+                    bra_a.dcopy(ket_a)
+                    bra_a.a(q)
+                    if bra_a.sign() == 0:
+                        continue
+                    bra_a.c(p)
+                    if bra_a.sign() == 0:
+                        continue
+                    L = bra_a.linear_index()
+                    sign = bra_a.sign()
+                    Da[L,K,p,q] += sign
+
+            ket_a.incr()
+
+
+        #beta term 
+        Db = np.zeros((bra_b.max(),ket_b.max(),no))
+
+        ket_b.reset()
+        bra_b.reset()
+        for K in range(ket_b.max()): 
+            for p in range_no:
+                bra_b.dcopy(ket_b)
+                bra_b.c(p)
+                if bra_b.sign() == 0:
+                    continue
+
+                L = bra_b.linear_index()
+                sign = bra_b.sign()
+                #print(ket_b._config,bra_b._config,sign)
+                Db[L,K,p] += sign
+            ket_b.incr()
+
+    v2.shape = (ket_a_max,ket_b_max,nv2)
+    v1.shape = (bra_a_max,bra_b_max,nv1)
+
+
+    # v(IJm) Da(IKps) Db(JLqr) v(KLn) = D(mnpqrs)
+    if spin_case == 'abb':
+        sig = (-1)**(2*(NAK))
+        tdm = sig*  oe.contract('ijm,ikp,jlqr,kln->mnpqr',v1,Da,Db,v2)
+
+    if spin_case == 'baa':
+        sig = (-1)**(NAK)
+        tdm = sig * oe.contract('ijm,ikqr,jlp,kln->mnpqr',v1,Da,Db,v2)
+
+    v2.shape = (ket_a_max*ket_b_max,nv2)
+    v1.shape = (bra_a_max*bra_b_max,nv1)
+   
+    return tdm
+# }}}
+
+def build_caa_os(no,bra_space,ket_space,basis,spin_case):
+    """
+    Compute D(v1,v2,qrs) = <v1|q'r s|v2> where p,q have different spins
+
+    if spin_case aab
+    D(v1,v2,q,r,s) =          v(I,J,m) <IJ|q'r s|I'J'> v(I',J',n)
+                          v(I,J,m) <I|s|I'><J|q'r|J'> v(I',J',n) * sign 
+                          sign = (-1)^*(N(I')
+    
+    if spin_case bba
+    D(v1,v2,q,r,s) =          v(I,J,m) <IJ|q'r s|I'J'> v(I',J',n)
+                          v(I,J,m) <I|q'r|I'><J|s|J'> v(I',J',n) * sign
+                          sign = (-1)^2*(N(I')+1)
+
+    where N(I') is Number of Alpha electrons in the ket_space
+        
+    Input: 
+        no = n_orbs
+        bra_space = (n_alpha,n_beta) for bra
+        ket_space = (n_alpha,n_beta) for ket
+        basis = dict of basis vectors
+        spin_case: 'bba' or 'aab'
+
+    """
+    # {{{ 
+    bra_a = ci_string(no, bra_space[0])
+    bra_b = ci_string(no, bra_space[1])
+    ket_a = ci_string(no, ket_space[0])
+    ket_b = ci_string(no, ket_space[1])
+  
+
+    assert(spin_case == 'bba' or spin_case == 'aab')
+    assert(ket_a.no == ket_b.no) 
+    assert(bra_a.no == ket_a.no)
+    if spin_case == "aab":
+        assert(bra_a.ne == ket_a.ne) 
+        assert(bra_b.ne == ket_b.ne-1) 
+    elif spin_case == "bba":
+        assert(bra_a.ne == ket_a.ne-1) 
+        assert(bra_b.ne == ket_b.ne) 
+   
+    # avoid python function call overhead
+    ket_a_max = ket_a.max()
+    ket_b_max = ket_b.max()
+    bra_a_max = bra_a.max()
+    bra_b_max = bra_b.max()
+    
+    range_no = range(no)
+  
+    _abs = abs
+   
+    v1 = basis[bra_space] 
+    v2 = basis[ket_space] 
+
+    assert(v1.shape[0] == len(bra_a)*len(bra_b))
+    assert(v2.shape[0] == len(ket_a)*len(ket_b))
+    nv1 = v1.shape[1]
+    nv2 = v2.shape[1]
+
+    NAK = ket_space[0]
+    
+    if spin_case == 'aab':
+        #alpha term 
+        Da = np.zeros((bra_a.max(),ket_a.max(),no,no))
+
+        ket_a.reset()
+        bra_a.reset()
+        for K in range(ket_a.max()): 
+            for p in range_no:
+                for q in range_no:
+                    bra_a.dcopy(ket_a)
+                    bra_a.a(q)
+                    if bra_a.sign() == 0:
+                        continue
+                    bra_a.c(p)
+                    if bra_a.sign() == 0:
+                        continue
+                    L = bra_a.linear_index()
+                    sign = bra_a.sign()
+                    Da[L,K,p,q] += sign
+
+            ket_a.incr()
+
+
+        #beta term 
+        Db = np.zeros((bra_b.max(),ket_b.max(),no))
+
+        ket_b.reset()
+        bra_b.reset()
+        for K in range(ket_b.max()): 
+            for q in range_no:
+                bra_b.dcopy(ket_b)
+                bra_b.a(q)
+                if bra_b.sign() == 0:
+                    continue
+
+                L = bra_b.linear_index()
+                sign = bra_b.sign()
+                #print(ket_b._config,bra_b._config,sign)
+                Db[L,K,q] += sign
+            ket_b.incr()
+
+    if spin_case == 'bba':
+        #alpha term 
+        Da = np.zeros((bra_a.max(),ket_a.max(),no))
+
+        ket_a.reset()
+        bra_a.reset()
+        for K in range(ket_a.max()): 
+            for q in range_no:
+                bra_a.dcopy(ket_a)
+                bra_a.a(q)
+                if bra_a.sign() == 0:
+                    continue
+                L = bra_a.linear_index()
+                sign = bra_a.sign()
+                Da[L,K,q] += sign
+
+            ket_a.incr()
+
+
+        #beta term 
+        Db = np.zeros((bra_b.max(),ket_b.max(),no,no))
+
+        ket_b.reset()
+        bra_b.reset()
+        for K in range(ket_b.max()): 
+            for p in range_no:
+                for q in range_no:
+                    bra_b.dcopy(ket_b)
+                    bra_b.a(q)
+                    if bra_b.sign() == 0:
+                        continue
+                    bra_b.c(p)
+                    if bra_b.sign() == 0:
+                        continue
+
+                    L = bra_b.linear_index()
+                    sign = bra_b.sign()
+                    #print(ket_b._config,bra_b._config,sign)
+                    Db[L,K,p,q] += sign
+            ket_b.incr()
+
+    v2.shape = (ket_a_max,ket_b_max,nv2)
+    v1.shape = (bra_a_max,bra_b_max,nv1)
+   
+
+    # v(IJm) Da(IKps) Db(JLqr) v(KLn) = D(mnpqrs)
+    if spin_case == 'bba':
+        sig = (-1)**(2*(NAK+1))
+        tdm = sig*  oe.contract('ijm,iks,jlqr,kln->mnqrs',v1,Da,Db,v2)
+
+    if spin_case == 'aab':
+        sig = (-1)**(NAK)
+        tdm = sig * oe.contract('ijm,ikqr,jls,kln->mnqrs',v1,Da,Db,v2)
+
+    v2.shape = (ket_a_max*ket_b_max,nv2)
+    v1.shape = (bra_a_max*bra_b_max,nv1)
+   
+    return tdm
+# }}}

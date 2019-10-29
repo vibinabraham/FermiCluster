@@ -324,10 +324,6 @@ class Cluster(object):
                 self.ops['AB'][(na,nb),(na-1,nb-1)] = cp.deepcopy(np.swapaxes(self.ops['ba'][(na-1,nb-1),(na,nb)],0,1))
                 self.ops['BA'][(na,nb),(na-1,nb-1)] = cp.deepcopy(np.swapaxes(self.ops['ab'][(na-1,nb-1),(na,nb)],0,1))
 
-        print("old")
-        print(self.ops['AB'][(na,nb),(na-1,nb-1)])
-        print("old")
-
 #        #  ab
 #        for na in range(1,self.n_orb+1):
 #            for nb in range(1,self.n_orb+1):
@@ -359,22 +355,33 @@ class Cluster(object):
 #                self.ops['BA'][(na,nb),(na-1,nb-1)] = oe.contract('abp,bcq->acpq',B,A)
         
         
-
         #  AAa
         for na in range(2,self.n_orb+1):
             for nb in range(0,self.n_orb+1):
-                a  = self.ops['a'][(na-2,nb),(na-1,nb)]
-                A1 = self.ops['A'][(na-1,nb),(na-2,nb)]
-                A2 = self.ops['A'][(na,nb),(na-1,nb)]
-                self.ops['AAa'][(na,nb),(na-1,nb)] = oe.contract('abp,bcq,cdr->adpqr',A2,A1,a)
-        
+                self.ops['AAa'][(na,nb),(na-1,nb)] = build_cca_ss(self.n_orb, (na,nb),(na-1,nb),self.basis,'a')
+                #self.ops['Aaa'][(na-1,nb),(na,nb)] = cp.deepcopy(np.swapaxes(self.ops['AAa'][(na,nb),(na-1,nb)],0,1))
+                #   have to fix the swapaxes
+
         #  BBb
         for na in range(0,self.n_orb+1):
             for nb in range(2,self.n_orb+1):
-                b  = self.ops['b'][(na,nb-2),(na,nb-1)]
-                B1 = self.ops['B'][(na,nb-1),(na,nb-2)]
-                B2 = self.ops['B'][(na,nb),(na,nb-1)]
-                self.ops['BBb'][(na,nb),(na,nb-1)] = oe.contract('abp,bcq,cdr->adpqr',B2,B1,b)
+                self.ops['BBb'][(na,nb),(na,nb-1)] = build_cca_ss(self.n_orb, (na,nb),(na,nb-1),self.basis,'b')
+
+#        #  AAa
+#        for na in range(2,self.n_orb+1):
+#            for nb in range(0,self.n_orb+1):
+#                a  = self.ops['a'][(na-2,nb),(na-1,nb)]
+#                A1 = self.ops['A'][(na-1,nb),(na-2,nb)]
+#                A2 = self.ops['A'][(na,nb),(na-1,nb)]
+#                self.ops['AAa'][(na,nb),(na-1,nb)] = oe.contract('abp,bcq,cdr->adpqr',A2,A1,a)
+#        
+#        #  BBb
+#        for na in range(0,self.n_orb+1):
+#            for nb in range(2,self.n_orb+1):
+#                b  = self.ops['b'][(na,nb-2),(na,nb-1)]
+#                B1 = self.ops['B'][(na,nb-1),(na,nb-2)]
+#                B2 = self.ops['B'][(na,nb),(na,nb-1)]
+#                self.ops['BBb'][(na,nb),(na,nb-1)] = oe.contract('abp,bcq,cdr->adpqr',B2,B1,b)
         
         #  ABa
         for na in range(1,self.n_orb+1):
@@ -384,21 +391,31 @@ class Cluster(object):
                 A = self.ops['A'][(na,nb),(na-1,nb)]
                 self.ops['ABa'][(na,nb),(na,nb-1)] = oe.contract('abp,bcq,cdr->adpqr',A,B,a)
 
+
         #  ABb
         for na in range(1,self.n_orb+1):
             for nb in range(1,self.n_orb+1):
-                b = self.ops['b'][(na-1,nb-1),(na-1,nb)]
-                B = self.ops['B'][(na-1,nb),(na-1,nb-1)]
-                A = self.ops['A'][(na,nb),(na-1,nb)]
-                self.ops['ABb'][(na,nb),(na-1,nb)] = oe.contract('abp,bcq,cdr->adpqr',A,B,b)
-        
+                self.ops['ABb'][(na,nb),(na-1,nb)] = build_cca_os(self.n_orb, (na,nb),(na-1,nb),self.basis,'abb')
         #  BAa
         for na in range(1,self.n_orb+1):
             for nb in range(1,self.n_orb+1):
-                a = self.ops['a'][(na-1,nb-1),(na,nb-1)]
-                A = self.ops['A'][(na,nb-1),(na-1,nb-1)]
-                B = self.ops['B'][(na,nb),(na,nb-1)]
-                self.ops['BAa'][(na,nb),(na,nb-1)] = oe.contract('abp,bcq,cdr->adpqr',B,A,a)
+                self.ops['BAa'][(na,nb),(na,nb-1)] = build_cca_os(self.n_orb, (na,nb),(na,nb-1),self.basis,'baa')
+
+#        #  ABb
+#        for na in range(1,self.n_orb+1):
+#            for nb in range(1,self.n_orb+1):
+#                b = self.ops['b'][(na-1,nb-1),(na-1,nb)]
+#                B = self.ops['B'][(na-1,nb),(na-1,nb-1)]
+#                A = self.ops['A'][(na,nb),(na-1,nb)]
+#                self.ops['ABb'][(na,nb),(na-1,nb)] = oe.contract('abp,bcq,cdr->adpqr',A,B,b)
+#
+#        #  BAa
+#        for na in range(1,self.n_orb+1):
+#            for nb in range(1,self.n_orb+1):
+#                a = self.ops['a'][(na-1,nb-1),(na,nb-1)]
+#                A = self.ops['A'][(na,nb-1),(na-1,nb-1)]
+#                B = self.ops['B'][(na,nb),(na,nb-1)]
+#                self.ops['BAa'][(na,nb),(na,nb-1)] = oe.contract('abp,bcq,cdr->adpqr',B,A,a)
         
         #  BAb
         for na in range(1,self.n_orb+1):
@@ -409,22 +426,32 @@ class Cluster(object):
                 self.ops['BAb'][(na,nb),(na-1,nb)] = oe.contract('abp,bcq,cdr->adpqr',B,A,b)
 
 
-        
         #  Aaa
         for na in range(2,self.n_orb+1):
             for nb in range(0,self.n_orb+1):
-                a1 = self.ops['a'][(na-1,nb),(na,nb)]
-                a2 = self.ops['a'][(na-2,nb),(na-1,nb)]
-                A  = self.ops['A'][(na-1,nb),(na-2,nb)]
-                self.ops['Aaa'][(na-1,nb),(na,nb)] = oe.contract('abp,bcq,cdr->adpqr',A,a2,a1)
+                self.ops['Aaa'][(na-1,nb),(na,nb)] = build_caa_ss(self.n_orb, (na-1,nb),(na,nb),self.basis,'a')
         
         #  Bbb
         for na in range(0,self.n_orb+1):
             for nb in range(2,self.n_orb+1):
-                b1 = self.ops['b'][(na,nb-1),(na,nb)]
-                b2 = self.ops['b'][(na,nb-2),(na,nb-1)]
-                B  = self.ops['B'][(na,nb-1),(na,nb-2)]
-                self.ops['Bbb'][(na,nb-1),(na,nb)] = oe.contract('abp,bcq,cdr->adpqr',B,b2,b1)
+                self.ops['Bbb'][(na,nb-1),(na,nb)] = build_caa_ss(self.n_orb, (na,nb-1),(na,nb),self.basis,'b')
+        
+        
+#        #  Aaa
+#        for na in range(2,self.n_orb+1):
+#            for nb in range(0,self.n_orb+1):
+#                a1 = self.ops['a'][(na-1,nb),(na,nb)]
+#                a2 = self.ops['a'][(na-2,nb),(na-1,nb)]
+#                A  = self.ops['A'][(na-1,nb),(na-2,nb)]
+#                self.ops['Aaa'][(na-1,nb),(na,nb)] = oe.contract('abp,bcq,cdr->adpqr',A,a2,a1)
+#        
+#        #  Bbb
+#        for na in range(0,self.n_orb+1):
+#            for nb in range(2,self.n_orb+1):
+#                b1 = self.ops['b'][(na,nb-1),(na,nb)]
+#                b2 = self.ops['b'][(na,nb-2),(na,nb-1)]
+#                B  = self.ops['B'][(na,nb-1),(na,nb-2)]
+#                self.ops['Bbb'][(na,nb-1),(na,nb)] = oe.contract('abp,bcq,cdr->adpqr',B,b2,b1)
         
         #  Aba
         for na in range(1,self.n_orb+1):
@@ -434,21 +461,32 @@ class Cluster(object):
                 A = self.ops['A'][(na,nb-1),(na-1,nb-1)]
                 self.ops['Aba'][(na,nb-1),(na,nb)] = oe.contract('abp,bcq,cdr->adpqr',A,b,a)
         
+
         #  Aab
         for na in range(1,self.n_orb+1):
             for nb in range(1,self.n_orb+1):
-                b = self.ops['b'][(na,nb-1),(na,nb)]
-                a = self.ops['a'][(na-1,nb-1),(na,nb-1)]
-                A = self.ops['A'][(na,nb-1),(na-1,nb-1)]
-                self.ops['Aab'][(na,nb-1),(na,nb)] = oe.contract('abp,bcq,cdr->adpqr',A,a,b)
-        
+                self.ops['Aab'][(na,nb-1),(na,nb)] = build_caa_os(self.n_orb, (na,nb-1),(na,nb),self.basis,'aab')
+
         #  Bba
         for na in range(1,self.n_orb+1):
             for nb in range(1,self.n_orb+1):
-                a = self.ops['a'][(na-1,nb),(na,nb)]
-                b = self.ops['b'][(na-1,nb-1),(na-1,nb)]
-                B = self.ops['B'][(na-1,nb),(na-1,nb-1)]
-                self.ops['Bba'][(na-1,nb),(na,nb)] = oe.contract('abp,bcq,cdr->adpqr',B,b,a)
+                self.ops['Bba'][(na-1,nb),(na,nb)] = build_caa_os(self.n_orb, (na-1,nb),(na,nb),self.basis,'bba')
+
+#        #  Aab
+#        for na in range(1,self.n_orb+1):
+#            for nb in range(1,self.n_orb+1):
+#                b = self.ops['b'][(na,nb-1),(na,nb)]
+#                a = self.ops['a'][(na-1,nb-1),(na,nb-1)]
+#                A = self.ops['A'][(na,nb-1),(na-1,nb-1)]
+#                self.ops['Aab'][(na,nb-1),(na,nb)] = oe.contract('abp,bcq,cdr->adpqr',A,a,b)
+#        
+#        #  Bba
+#        for na in range(1,self.n_orb+1):
+#            for nb in range(1,self.n_orb+1):
+#                a = self.ops['a'][(na-1,nb),(na,nb)]
+#                b = self.ops['b'][(na-1,nb-1),(na-1,nb)]
+#                B = self.ops['B'][(na-1,nb),(na-1,nb-1)]
+#                self.ops['Bba'][(na-1,nb),(na,nb)] = oe.contract('abp,bcq,cdr->adpqr',B,b,a)
         
         #  Bab
         for na in range(1,self.n_orb+1):
