@@ -1604,13 +1604,19 @@ def build_cca_os(no,bra_space,ket_space,basis,spin_case):
     ket_b = ci_string(no, ket_space[1])
   
 
-    assert(spin_case == 'abb' or spin_case == 'baa')
+    assert(spin_case == 'abb' or spin_case == 'baa' or spin_case =='aba' or spin_case == 'bab')
     if spin_case == "abb":
         assert(bra_a.ne == ket_a.ne+1) 
         assert(bra_b.ne == ket_b.ne) 
     elif spin_case == "baa":
         assert(bra_a.ne == ket_a.ne) 
         assert(bra_b.ne == ket_b.ne+1) 
+    elif spin_case == "aba":
+        assert(bra_a.ne == ket_a.ne) 
+        assert(bra_b.ne == ket_b.ne+1) 
+    if spin_case == "bab":
+        assert(bra_a.ne == ket_a.ne+1) 
+        assert(bra_b.ne == ket_b.ne) 
 
    
     # avoid python function call overhead
@@ -1633,7 +1639,7 @@ def build_cca_os(no,bra_space,ket_space,basis,spin_case):
 
     NAK = ket_space[0]
         
-    if spin_case == 'abb':
+    if spin_case == 'abb' or spin_case == 'bab':
         #alpha term 
         Da = np.zeros((bra_a.max(),ket_a.max(),no))
 
@@ -1674,7 +1680,7 @@ def build_cca_os(no,bra_space,ket_space,basis,spin_case):
                     Db[L,K,p,q] += sign
             ket_b.incr()
 
-    elif spin_case == 'baa':
+    elif spin_case == 'baa' or spin_case == 'aba':
         #alpha term 
         Da = np.zeros((bra_a.max(),ket_a.max(),no,no))
 
@@ -1728,6 +1734,14 @@ def build_cca_os(no,bra_space,ket_space,basis,spin_case):
         sig = (-1)**(NAK)
         tdm = sig * oe.contract('ijm,ikqr,jlp,kln->mnpqr',v1,Da,Db,v2)
 
+    if spin_case == 'bab':
+        sig = (-1)**(2*(NAK)+1)
+        tdm = sig*  oe.contract('ijm,ikp,jlqr,kln->mnpqr',v1,Da,Db,v2)
+
+    if spin_case == 'aba':
+        sig = (-1)**(NAK-1)
+        tdm = sig * oe.contract('ijm,ikqr,jlp,kln->mnpqr',v1,Da,Db,v2)
+
     v2.shape = (ket_a_max*ket_b_max,nv2)
     v1.shape = (bra_a_max*bra_b_max,nv1)
    
@@ -1765,13 +1779,20 @@ def build_caa_os(no,bra_space,ket_space,basis,spin_case):
     ket_b = ci_string(no, ket_space[1])
   
 
-    assert(spin_case == 'bba' or spin_case == 'aab')
+    assert(spin_case == 'bba' or spin_case == 'aab' or spin_case == 'bab' or spin_case == 'aba')
+
     assert(ket_a.no == ket_b.no) 
     assert(bra_a.no == ket_a.no)
     if spin_case == "aab":
         assert(bra_a.ne == ket_a.ne) 
         assert(bra_b.ne == ket_b.ne-1) 
     elif spin_case == "bba":
+        assert(bra_a.ne == ket_a.ne-1) 
+        assert(bra_b.ne == ket_b.ne) 
+    elif spin_case == "aba":
+        assert(bra_a.ne == ket_a.ne) 
+        assert(bra_b.ne == ket_b.ne-1) 
+    elif spin_case == "bab":
         assert(bra_a.ne == ket_a.ne-1) 
         assert(bra_b.ne == ket_b.ne) 
    
@@ -1795,7 +1816,7 @@ def build_caa_os(no,bra_space,ket_space,basis,spin_case):
 
     NAK = ket_space[0]
     
-    if spin_case == 'aab':
+    if spin_case == 'aab' or spin_case == 'aba':
         #alpha term 
         Da = np.zeros((bra_a.max(),ket_a.max(),no,no))
 
@@ -1836,7 +1857,7 @@ def build_caa_os(no,bra_space,ket_space,basis,spin_case):
                 Db[L,K,q] += sign
             ket_b.incr()
 
-    if spin_case == 'bba':
+    if spin_case == 'bba' or spin_case == 'bab':
         #alpha term 
         Da = np.zeros((bra_a.max(),ket_a.max(),no))
 
@@ -1888,6 +1909,14 @@ def build_caa_os(no,bra_space,ket_space,basis,spin_case):
 
     if spin_case == 'aab':
         sig = (-1)**(NAK)
+        tdm = sig * oe.contract('ijm,ikqr,jls,kln->mnqrs',v1,Da,Db,v2)
+
+    if spin_case == 'bab':
+        sig = (-1)**(2*NAK-1)
+        tdm = sig*  oe.contract('ijm,iks,jlqr,kln->mnqrs',v1,Da,Db,v2)
+
+    if spin_case == 'aba':
+        sig = (-1)**(NAK-1)
         tdm = sig * oe.contract('ijm,ikqr,jls,kln->mnqrs',v1,Da,Db,v2)
 
     v2.shape = (ket_a_max*ket_b_max,nv2)
