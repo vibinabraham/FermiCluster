@@ -1160,6 +1160,9 @@ def build_aa_ss(no,bra_space,ket_space,basis,spin_case):
     spin case: a
     D(m,n,p,q) = v(I,J,m) <IJ|pq|I'J'> v(I'J'n)
                  v(I,J,m) <I|pq|I'><J|J'> v(I'J'n)
+    
+    no sign in 'a' or 'b'
+
     Input: 
         no = n_orbs
         bra_space = (n_alpha,n_beta) for bra
@@ -1241,6 +1244,124 @@ def build_aa_ss(no,bra_space,ket_space,basis,spin_case):
         tdm = np.einsum('ijs,jpqit->stpq',v1,tmp) 
 
     
+    v2.shape = (ket_a_max*ket_b_max,nv2)
+    v1.shape = (bra_a_max*bra_b_max,nv1)
+   
+    return tdm
+# }}}
+
+def build_aa_os(no,bra_space,ket_space,basis,spin_case):
+    """
+    Compute D(v1,v2,pq) = <v1|pq|v2> where p,q have different spins
+
+    if spin_case ab
+    D(v1,v2,pq) =          v(I,J,s) <IJ|pq|I'J'> v(I',J',t)
+                           v(I,J,s) <I|p|I'><J|q|J'> v(I',J',t) (-1)^N(I')
+    
+    if spin_case ba
+    D(v1,v2,pq) =          v(I,J,s) <IJ|p'q|I'J'> v(I',J',t)
+                          -v(I,J,s) <I|q|I'><J|p'|J'> v(I',J',t) (-1)^N(I')
+
+    where N(I') is Number of Alpha electrons in the ket_space
+        
+    Input: 
+        no = n_orbs
+        bra_space = (n_alpha,n_beta) for bra
+        ket_space = (n_alpha,n_beta) for ket
+        basis = dict of basis vectors
+        spin_case: 'ab' or 'ba'
+
+    """
+    # {{{ 
+    bra_a = ci_string(no, bra_space[0])
+    bra_b = ci_string(no, bra_space[1])
+    ket_a = ci_string(no, ket_space[0])
+    ket_b = ci_string(no, ket_space[1])
+  
+
+    assert(spin_case == 'ab' or spin_case == 'ba')
+    assert(ket_a.no == ket_b.no) 
+    assert(bra_a.no == ket_a.no)
+    if spin_case == "ab":
+        assert(bra_a.ne == ket_a.ne-1) 
+        assert(bra_b.ne == ket_b.ne-1) 
+    elif spin_case == "ba":
+        assert(bra_a.ne == ket_a.ne-1) 
+        assert(bra_b.ne == ket_b.ne-1) 
+   
+    # avoid python function call overhead
+    ket_a_max = ket_a.max()
+    ket_b_max = ket_b.max()
+    bra_a_max = bra_a.max()
+    bra_b_max = bra_b.max()
+    
+    range_no = range(no)
+  
+    _abs = abs
+   
+    v1 = basis[bra_space] 
+    v2 = basis[ket_space] 
+
+    assert(v1.shape[0] == len(bra_a)*len(bra_b))
+    assert(v2.shape[0] == len(ket_a)*len(ket_b))
+    assert(spin_case == "ba" or spin_case=="ab")
+    nv1 = v1.shape[1]
+    nv2 = v2.shape[1]
+
+    NAK = ket_space[0]
+    Da = np.zeros((bra_a.max(),ket_a.max(),no))
+    Db = np.zeros((bra_b.max(),ket_b.max(),no))
+    
+    #alpha term 
+    ket_a.reset()
+    bra_a.reset()
+    for K in range(ket_a.max()): 
+        for p in range_no:
+            bra_a.dcopy(ket_a)
+            if spin_case == 'ab':
+                bra_a.a(p)
+            else:
+                bra_a.a(p)
+
+            if bra_a.sign() == 0:
+                continue
+            L = bra_a.linear_index()
+            sign = bra_a.sign()
+            Da[L,K,p] += sign
+        ket_a.incr()
+
+
+    #beta term 
+    ket_b.reset()
+    bra_b.reset()
+    for K in range(ket_b.max()): 
+        for q in range_no:
+            bra_b.dcopy(ket_b)
+            if spin_case == 'ab':
+                bra_b.a(q)
+            else:
+                bra_b.a(q)
+            if bra_b.sign() == 0:
+                continue
+            L = bra_b.linear_index()
+            sign = bra_b.sign()
+            Db[L,K,q] += sign
+
+        ket_b.incr()
+  
+    v2.shape = (ket_a_max,ket_b_max,nv2)
+    v1.shape = (bra_a_max,bra_b_max,nv1)
+   
+
+    # v(IJs) Da(IKp) Db(JLq) v(KLt)   
+    #                               = v(IJs) Da(IKp) Dbv(JKqt)
+    #                               = vDa(JsKp) Dbv(JqKt)
+    #                               = D(stpq)
+    if spin_case == 'ab':
+        tdm = (-1)**NAK * oe.contract('ijs,ikp,jlq,klt->stpq',v1,Da,Db,v2)
+    if spin_case == 'ba':
+        tdm = (-1)**(NAK+1) * oe.contract('ijs,ikp,jlq,klt->stqp',v1,Da,Db,v2)
+
     v2.shape = (ket_a_max*ket_b_max,nv2)
     v1.shape = (bra_a_max*bra_b_max,nv1)
    
