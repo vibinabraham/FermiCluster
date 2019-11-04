@@ -36,11 +36,32 @@ myhf = scf.RHF(mol).run()
 print(myhf.mo_energy)
 #exit()
 n_orb = myhf.mo_coeff.shape[1]
-h = myhf.mo_coeff.T.dot(myhf.get_hcore()).dot(myhf.mo_coeff)
-g = ao2mo.kernel(mol,myhf.mo_coeff,aosym='s4',compact=False).reshape(4*((n_orb),))
 #g.shape = (n_orb,n_orb,n_orb,n_orb)
-print(g.shape)
 enu = myhf.energy_nuc()
+S = mol.intor('int1e_ovlp_sph')
+
+local = 'lowdin'
+local = 'p'
+
+if local == 'lowdin':
+    print("Using lowdin orthogonalized orbitals")
+    #forming S^-1/2 to transform to A and B block.
+    sal, svec = np.linalg.eigh(S)
+    idx = sal.argsort()[::-1]
+    sal = sal[idx]
+    svec = svec[:, idx]
+    sal = sal**-0.5
+    sal = np.diagflat(sal)
+    X = svec @ sal @ svec.T
+    C = cp.deepcopy(X)
+
+    h = C.T.dot(myhf.get_hcore()).dot(C)
+    g = ao2mo.kernel(mol,C,aosym='s4',compact=False).reshape(4*((n_orb),))
+
+else:
+    h = myhf.mo_coeff.T.dot(myhf.get_hcore()).dot(myhf.mo_coeff)
+    g = ao2mo.kernel(mol,myhf.mo_coeff,aosym='s4',compact=False).reshape(4*((n_orb),))
+print(g.shape)
 
 do_fci = 1
 do_hci = 1
@@ -65,6 +86,7 @@ if do_hci:
     print("HCI %10.8f"%(ehci+enu))
 
 blocks = [[0,1,2,3],[4,5,6,7]]
+#blocks = [[0,1],[2,3],[4,5],[6,7]]
 n_blocks = len(blocks)
 clusters = []
 
@@ -72,8 +94,8 @@ for ci,c in enumerate(blocks):
     clusters.append(Cluster(ci,c))
 
 ci_vector = ClusteredState(clusters)
-#ci_vector.init(((3,3),(0,0)))
 ci_vector.init(((2,2),(0,0)))
+#ci_vector.init(((1,1),(1,1),(0,0),(0,0)))
 
 print(" Clusters:")
 [print(ci) for ci in clusters]
