@@ -1739,11 +1739,11 @@ def build_cca_os(no,bra_space,ket_space,basis,spin_case):
 
     if spin_case == 'bab':
         sig = (-1)**(2*(NAK)+1)
-        tdm = sig*  oe.contract('ijm,ikp,jlqr,kln->mnpqr',v1,Da,Db,v2)
+        tdm = sig*  oe.contract('ijm,ikq,jlpr,kln->mnpqr',v1,Da,Db,v2)
 
     if spin_case == 'aba':
         sig = (-1)**(NAK-1)
-        tdm = sig * oe.contract('ijm,ikqr,jlp,kln->mnpqr',v1,Da,Db,v2)
+        tdm = sig * oe.contract('ijm,ikpr,jlq,kln->mnpqr',v1,Da,Db,v2)
 
     v2.shape = (ket_a_max*ket_b_max,nv2)
     v1.shape = (bra_a_max*bra_b_max,nv1)
@@ -1916,11 +1916,11 @@ def build_caa_os(no,bra_space,ket_space,basis,spin_case):
 
     if spin_case == 'bab':
         sig = (-1)**(2*NAK-1)
-        tdm = sig*  oe.contract('ijm,iks,jlqr,kln->mnqrs',v1,Da,Db,v2)
+        tdm = sig*  oe.contract('ijm,ikr,jlqs,kln->mnqrs',v1,Da,Db,v2)
 
     if spin_case == 'aba':
         sig = (-1)**(NAK-1)
-        tdm = sig * oe.contract('ijm,ikqr,jls,kln->mnqrs',v1,Da,Db,v2)
+        tdm = sig * oe.contract('ijm,ikqs,jlr,kln->mnqrs',v1,Da,Db,v2)
 
     v2.shape = (ket_a_max*ket_b_max,nv2)
     v1.shape = (bra_a_max*bra_b_max,nv1)
