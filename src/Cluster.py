@@ -94,8 +94,8 @@ class Cluster(object):
                 ci.init(H,na,nb,max_roots)
                 print(ci)
                 ci.run()
-                self.basis[(na,nb)] = np.eye(ci.results_v.shape[0])
-                #self.basis[(na,nb)] = ci.results_v
+                #self.basis[(na,nb)] = np.eye(ci.results_v.shape[0])
+                self.basis[(na,nb)] = ci.results_v
             
     def rotate_basis(self,U):
         """
