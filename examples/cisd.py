@@ -18,9 +18,12 @@ ttt = time.time()
 
 np.set_printoptions(suppress=True, precision=3, linewidth=1500)
 
-n_orb = 6 
-U = 1.
+n_orb = 6
+U = 0.2
 beta = 1.0
+#n_cluster_states = 9
+cs_ratio = 0.9
+nel = n_orb//2
 
 h, g = get_hubbard_params(n_orb,beta,U,pbc=True)
 np.random.seed(2)
@@ -48,10 +51,10 @@ if do_fci:
     e, ci = cisolver.kernel(h, g, h.shape[1], mol.nelectron, ecore=0)
     print(" FCI:        %12.8f"%e)
 
-blocks = [[0,1,2,3,4],[5,6,7,8,9]]
 blocks = [[0],[1],[2],[3],[4],[5],[6],[7],[8],[9]]
 blocks = [[0],[1],[2],[3],[4],[5]]
 blocks = [[0,1,2],[3,4,5]]
+blocks = [range(nel),range(nel,2*nel)]
 n_blocks = len(blocks)
 clusters = []
 
@@ -66,10 +69,10 @@ ci_vector = ClusteredState(clusters)
 #ci_vector.init(((1,1),(1,1),(1,1),(1,1),(1,1),(0,0),(0,0),(0,0),(0,0),(0,0)))
 #ci_vector.init(((1,1),(1,1),(1,1),(0,0),(0,0),(0,0)))
 #ci_vector.init(((2,1),(1,2)))
-ci_vector.init(((3,3),(0,0)))
-ci_vector.init(((2,2),(1,1)))
-ci_vector.init(((3,2),(0,1)))
-ci_vector.init(((2,3),(1,0)))
+ci_vector.init(((nel,nel),(0,0)))
+ci_vector.init(((nel-1,nel-1),(1,1)))
+ci_vector.init(((nel,nel-2),(0,2)))
+ci_vector.init(((nel-2,nel),(2,0)))
 
 
 print(" Clusters:")
@@ -90,7 +93,7 @@ for ci_idx, ci in enumerate(clusters):
     print()
     print()
     print(" Form basis by diagonalize local Hamiltonian for cluster: ",ci_idx)
-    ci.form_eigbasis_from_local_operator(opi,max_roots=1000)
+    ci.form_eigbasis_from_local_operator(opi,ratio=cs_ratio)
 
 
 #clustered_ham.add_ops_to_clusters()
@@ -108,4 +111,14 @@ ci_vector_ref = ci_vector.copy()
 e_last = 0
 #ci_vector.print_configs()
 ci_vector, pt_vector, e0, e2 = bc_cipsi(ci_vector_ref.copy(), clustered_ham, thresh_cipsi=1e-14, thresh_ci_clip=1e-14, max_iter=1)
-#ci_vector.print_configs()
+print(ci_vector.get_vector())
+ci_vector.print_configs()
+civec = ci_vector.get_vector()
+occ = nel
+vir = n_orb - occ
+ci_ab = civec[1:nel*nel*nel*nel+1].reshape(occ*occ,vir*vir)
+print(ci_ab)
+U,s,Vt = np.linalg.svd(ci_ab)
+print(s)
+
+
