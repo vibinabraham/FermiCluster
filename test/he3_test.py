@@ -18,6 +18,7 @@ from tools import *
 from bc_cipsi import *
 import pyscf
 ttt = time.time()
+pyscf.lib.num_threads(1) #with degenerate states and multiple processors there can be issues
 
 def test_1():
     n_cluster_states = 1000

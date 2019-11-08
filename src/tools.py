@@ -254,6 +254,10 @@ def update_hamiltonian_diagonal(clustered_ham,ci_vector,Hd_vector):
                     Hd_vector.add_fockspace(fockspace)
                     Hd_vector[fockspace][config] = 0 
                 terms = clustered_ham.terms[delta_fock]
+                
+                # add diagonal energies
+                for ci in clusters:
+                    Hd[idx] += ci.energies[fockspace[ci.idx]][config[ci.idx]]
                 for term in terms:
                     #Hd[idx] += term.matrix_element(fockspace,config,fockspace,config)
                     Hd[idx] += term.diag_matrix_element(fockspace,config)
@@ -264,10 +268,48 @@ def update_hamiltonian_diagonal(clustered_ham,ci_vector,Hd_vector):
 # }}}
 
 
+def precompute_cluster_basis_energies(clustered_ham):
+    """
+    For each cluster grab the local operator from clustered_ham, and store the expectation values 
+    for each cluster state
+    """
+    # {{{
+    for ci in clustered_ham.clusters:
+        for fspace in ci.basis:
+            dim = ci.basis[fspace].shape[1]
+            ci.energies[fspace] = np.zeros((dim))
+        opi = clustered_ham.extract_local_operator(ci.idx)
+        for t in opi.terms:
+            assert(len(t.ops)==1)
+            if len(t.ops[0]) == 2:
+                for fspace_del in ci.ops[t.ops[0]]:
+                    assert(fspace_del[0] == fspace_del[1])
+                    D = ci.ops[t.ops[0]][fspace_del]
+                    
+                    # e(I) += D(I,I,pq) H(pq) 
+                    e = np.einsum('iipq,pq->i',D,t.ints)
+                    try:
+                        ci.energies[fspace_del[0]] += e
+                    except KeyError:
+                        ci.energies[fspace_del[0]] = e
+            elif len(t.ops[0]) == 4:
+                for fspace_del in ci.ops[t.ops[0]]:
+                    assert(fspace_del[0] == fspace_del[1])
+                    D = ci.ops[t.ops[0]][fspace_del]
+                    
+                    # e(I) += D(I,I,pqrs) H(pqrs) 
+                    e = np.einsum('iipqrs,pqrs->i',D,t.ints)
+                    try:
+                        ci.energies[fspace_del[0]] += e
+                    except KeyError:
+                        ci.energies[fspace_del[0]] = e
+# }}}
+
 def build_1rdm(ci_vector):
     """
     Build 1rdm C_{I,J,K}<IJK|p'q|LMN> C_{L,M,N}
     """
+    # {{{
     dm_aa = np.zeros((ci_vector.n_orb,ci_vector.n_orb))
     dm_bb = np.zeros((ci_vector.n_orb,ci_vector.n_orb))
 
@@ -308,12 +350,14 @@ def build_1rdm(ci_vector):
                 shift_r += len(configs_r) 
         shift_l += len(configs_l)
     return H
+# }}}
 
 
 def build_brdm(ci_vector, ci_idx):
     """
     Build block reduced density matrix for cluster ci_idx
     """
+    # {{{
     ci = ci_vector.clusters[ci_idx]
     rdms = OrderedDict()
     for fspace, configs in ci_vector.items():
@@ -340,4 +384,5 @@ def build_brdm(ci_vector, ci_idx):
             rdms[fspace[ci_idx]] = rdm 
 
     return rdms
+# }}}
 

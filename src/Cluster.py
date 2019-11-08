@@ -50,6 +50,8 @@ class Cluster(object):
         self.basis = {}                     # organized as basis = { (na,nb):v(IJ,s), (na',nb'):v(IJ,s), ...} 
                                             #       where IJ is alpha,beta string indices
         self.ops    = {}
+        
+        self.energies = {}                  # Diagonal of local operators
 
     def __len__(self):
         return len(self.orb_list) 

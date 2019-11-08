@@ -2,7 +2,7 @@ import numpy as np
 import scipy
 import itertools
 import copy as cp
-from collections import OrderedDict
+from collections import OrderedDict,abc
 from helpers import *
 
 class ClusteredState(OrderedDict):
@@ -48,6 +48,51 @@ class ClusteredState(OrderedDict):
     def __setitem__(self,fock_config,c):
         self.data[fock_config]=c
         #self._len += len(c)
+
+
+    def __iter__(self):
+        self._curr_fock_idx = 0
+        self._curr_conf_idx = 0
+        self._curr_idx = -1 
+        self._max_iter = len(self)
+        self._fock_iter = iter(self.data)
+        self._curr_fock = next(self._fock_iter) 
+        self._conf_iter = iter(self.data[self._curr_fock])
+        return self
+
+#    def __next__(self):
+#        if self._curr_idx < self._max_iter-1:
+#            self._curr_idx += 1
+#            #next(self._conf_iter)
+#            try:
+#                curr_conf = next(self._conf_iter)
+#                return self._curr_fock, curr_conf 
+#            except StopIteration:
+#                self._curr_fock = next(self._curr_fock)
+#                self._conf_iter = iter(self._fock_iter)
+#                return self._curr_fock, next(self._conf_iter)
+#        else:
+#            raise StopIteration
+
+    def __next__(self):
+       
+        try:
+            curr_conf = next(self._conf_iter)
+            return self._curr_fock, curr_conf, self.data[self._curr_fock][curr_conf]
+        except StopIteration:
+            try:
+                self._curr_fock = next(self._fock_iter)
+                self._conf_iter = iter(self.data[self._curr_fock])
+                # Check to make sure that there are no empty fock_spaces
+                # as that would require a recursive check
+                # If this assert fails, either make this function recursive
+                # or simply run "self.prune_empty_fock_spaces()"
+                assert(len(self.data[self._curr_fock])>0)
+                curr_conf = next(self._conf_iter)
+                return self._curr_fock, curr_conf, self.data[self._curr_fock][curr_conf]
+            except StopIteration:
+                raise StopIteration
+
     def __len__(self):
         l = 0
         for b,c in self.data.items():
@@ -83,7 +128,7 @@ class ClusteredState(OrderedDict):
         return 
     def clip(self,thresh):
         """
-        delete values smaller than thresh
+        delete values smaller than thresh, and return the list of kept indices
         """
         idx_to_keep = []
         idx = 0
@@ -95,11 +140,17 @@ class ClusteredState(OrderedDict):
                     idx_to_keep.append(idx)
                 idx += 1
 
-        # clean out empty fockspaces
+        self.prune_empty_fock_spaces()
+        return idx_to_keep
+    
+    def prune_empty_fock_spaces(self):
+        """
+        remove fock_spaces that don't have any configurations 
+        """
         for fockspace,configs in list(self.items()):
             if len(configs) == 0:
                 del self.data[fockspace]
-        return idx_to_keep
+        return 
 
     def zero(self):
         for fock,configs in self.data.items():
@@ -209,10 +260,18 @@ class ClusteredState(OrderedDict):
         Compute norm of state
         """
         norm = 0
-        for fockspace,configs in self.items():
-            for config,coeff in configs.items():
-                norm += coeff*coeff
+        for fockspace,config,coeff in self:
+            norm += coeff*coeff
         return norm
+
+    def normalize(self):
+        """
+        Normalize state
+        """
+        norm = self.norm()
+        for fockspace,config,coeff in self:
+            self[fockspace][config] = coeff/np.sqrt(norm)
+        return
 
     def print(self):
         """ Pretty print """
