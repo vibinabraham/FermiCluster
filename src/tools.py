@@ -254,6 +254,10 @@ def update_hamiltonian_diagonal(clustered_ham,ci_vector,Hd_vector):
                     Hd_vector.add_fockspace(fockspace)
                     Hd_vector[fockspace][config] = 0 
                 terms = clustered_ham.terms[delta_fock]
+
+                ## add diagonal energies
+                #for ci in clusters:
+                #    Hd[idx] += ci.energies[fockspace[ci.idx]][config[ci.idx]]
                 
                 for term in terms:
                     #Hd[idx] += term.matrix_element(fockspace,config,fockspace,config)

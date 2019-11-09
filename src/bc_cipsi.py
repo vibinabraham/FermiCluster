@@ -98,8 +98,8 @@ def bc_cipsi(ci_vector, clustered_ham, thresh_cipsi=1e-4, thresh_ci_clip=1e-5, t
         H = build_full_hamiltonian(clustered_ham, ci_vector)
 
         print(" Diagonalize Hamiltonian Matrix:",flush=True)
-        if H.shape[0] > 100:
-            vguess = ci_vector.get_vector()
+        vguess = ci_vector.get_vector()
+        if H.shape[0] > 100 and abs(np.sum(vguess)) >0:
             e,v = scipy.sparse.linalg.eigsh(H,n_roots,v0=vguess,which='SA')
         else:
             e,v = np.linalg.eigh(H)
