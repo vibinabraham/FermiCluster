@@ -19,10 +19,10 @@ ttt = time.time()
 np.set_printoptions(suppress=True, precision=3, linewidth=1500)
 
 n_orb = 6
-U = 0.2
+U = 1.0
 beta = 1.0
 #n_cluster_states = 9
-cs_ratio = 0.9
+cs_ratio = 1
 nel = n_orb//2
 
 h, g = get_hubbard_params(n_orb,beta,U,pbc=True)
@@ -110,7 +110,8 @@ thresh_conv = 1e-8
 ci_vector_ref = ci_vector.copy()
 e_last = 0
 #ci_vector.print_configs()
-ci_vector, pt_vector, e0, e2 = bc_cipsi(ci_vector_ref.copy(), clustered_ham, thresh_cipsi=1e-14, thresh_ci_clip=1e-14, max_iter=1)
+ci_vector, pt_vector, e0, e2 = bc_cipsi(ci_vector_ref.copy(), clustered_ham, thresh_cipsi=1e-14, thresh_ci_clip=0, max_iter=1)
+
 print(ci_vector.get_vector())
 ci_vector.print_configs()
 civec = ci_vector.get_vector()
@@ -121,4 +122,6 @@ print(ci_ab)
 U,s,Vt = np.linalg.svd(ci_ab)
 print(s)
 
-
+q,r =  np.linalg.qr(ci_ab,mode='complete')
+print(q)
+print(r)

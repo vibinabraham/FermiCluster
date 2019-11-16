@@ -70,3 +70,38 @@ def run_hubbard_scf(h_local,g_local,closed_shell_nel,do_scf=True):
 
     return Escf,orb,h,g,C
 # }}}
+
+def get_hubbard_1d(n_site, beta1, beta2, U, pbc=True):
+# {{{
+    print(n_site//2)
+    assert(n_site%2==0)
+    #gets the interactions for linear hubbard
+    print(" ---------------------------------------------------------")
+    print("                       Hubbard model")
+    print(" ---------------------------------------------------------")
+    print(" nsite :%6d"%n_site)
+    print(" beta1 :%10.6f"%beta1)
+    print(" beta2 :%10.6f"%beta2)
+    print(" U     :%10.6f"%U)
+
+    t = np.zeros((n_site,n_site))
+
+    for i in range(0,n_site-1):
+        if i%2==0:
+            t[i,i+1] = -beta1 
+            t[i+1,i] = -beta1
+        else:
+            t[i,i+1] = -beta2 
+            t[i+1,i] = -beta2
+    if pbc:
+        t[n_site-1,0] = -beta2 
+        t[0,n_site-1] = -beta2
+
+    h_local = cp.deepcopy(t)
+
+    g_local = np.zeros((n_site,n_site,n_site,n_site))
+    for i in range(0,n_site):
+        g_local[i,i,i,i] = U
+            
+    return h_local,g_local
+    # }}}

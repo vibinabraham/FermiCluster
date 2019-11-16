@@ -149,6 +149,15 @@ print("\npyscf cisd")
 from pyscf import ci
 myci = ci.CISD(myhf).run()
 
+from pyscf import mp
+mp2 = mp.MP2(myhf).run()
+
+
 print("\n")
 print("    BC-CISD:        %12.8f "%(e0+enu))
 print(" PYSCF CISD:        %12.8f "%myci.e_tot)
+print("   BC-CI(D):        %12.8f "%(e2+enu))
+print(" PYSCF MP2 :        %12.8f "%mp2.e_tot)
+print("        HCI:        %12.8f   Dim:%6d"%(ehci+enu,hci_dim))
+print("        FCI:        %12.8f   Dim:%6d"%(efci+enu,fci_dim))
+
