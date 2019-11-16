@@ -428,7 +428,7 @@ class ClusteredOperator:
                 except:
                     self.terms[delta_b] = [term_b]
 
-        print(self.print_terms_header())
+        #print(self.print_terms_header())
         for ti,t in self.terms.items():
             for tt in t:
                 print(tt)
