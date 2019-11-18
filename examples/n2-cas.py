@@ -196,7 +196,7 @@ for c in clusters:
 #ci_vector.expand_to_full_space()
 #ci_vector.expand_each_fock_space()
 
-ci_vector, pt_vector, e0, e2 = bc_cipsi_tucker(ci_vector.copy(),clustered_ham,)
+ci_vector, pt_vector, e0, e2 = bc_cipsi_tucker(ci_vector.copy(),clustered_ham)
 bcci_dim = len(ci_vector)
 
 print("  radius:        %12.8f " % r0)

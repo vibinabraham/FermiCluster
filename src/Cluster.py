@@ -8,6 +8,7 @@ from ci_string import *
 from Hamiltonian import *
 from davidson import *
 from helpers import *
+from myfci import *
 
 class Cluster(object):
 
@@ -98,7 +99,19 @@ class Cluster(object):
                 ci.run()
                 #self.basis[(na,nb)] = np.eye(ci.results_v.shape[0])
                 self.basis[(na,nb)] = ci.results_v
-                print(ci.results_v)
+                #print(ci.results_v)
+
+
+                if 0: #basis deteminant ordering not same yet, so cant use pyscf 
+                    from pyscf import gto, scf, ao2mo, fci, cc
+                    np.set_printoptions(suppress=True, precision=3, linewidth=1500)
+                    cisolver = fci.direct_spin1.FCI()
+                    e, civ = cisolver.kernel(h, v, h.shape[1], (na,nb), ecore=0,nroots=max_roots)
+                    print(e)
+                    civ = np.array(civ)
+                    civ = civ.reshape(dim,dim)
+                    self.basis[(na,nb)] = civ
+                    #self.basis[(na,nb)] = np.eye(civ.shape[0])
 
                 if 0:
                     ci.init(H,na,nb,dim)

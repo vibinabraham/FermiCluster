@@ -323,48 +323,48 @@ class ci_solver:
         range_ket_a_no = list(range(ket_a.no))
         range_ket_b_no = list(range(ket_b.no))
    
-        ket_b.reset()
-        for Kb in range(ket_b_max): 
+        ket_a.reset()
+        for Ka in range(ket_a_max): 
             
-            ket_a.reset()
-            for Ka in range(ket_a_max): 
+            ket_b.reset()
+            for Kb in range(ket_b_max): 
     
-                K = Ka + Kb * ket_a_max
+                K = Kb + Ka * ket_b_max
                 
                 #  <pq|rs> p'q'sr  --> (pr|qs) (a,b)
-                for r in range_ket_a_no:
-                    for p in range_ket_a_no:
-                        La = ket_a._ca_lookup[Ka][p+r*ket_a.no]
-                        if La == 0:
+                for r in range_ket_b_no:
+                    for p in range_ket_b_no:
+                        Lb = ket_b._ca_lookup[Kb][p+r*ket_b.no]
+                        if Lb == 0:
                             continue
-                        sign_a = 1
-                        if La < 0:
-                            sign_a = -1
-                            La = -La
-                        La = La - 1
+                        sign_b = 1
+                        if Lb < 0:
+                            sign_b = -1
+                            Lb = -Lb
+                        Lb = Lb - 1
 
                         
-                        for s in range_ket_b_no:
-                            for q in range_ket_b_no:
-                                Lb = ket_b._ca_lookup[Kb][q+s*ket_b.no]
-                                if Lb == 0:
+                        for s in range_ket_a_no:
+                            for q in range_ket_a_no:
+                                La = ket_a._ca_lookup[Ka][q+s*ket_a.no]
+                                if La == 0:
                                     continue
-                                sign_b = 1
-                                if Lb < 0:
-                                    sign_b = -1
-                                    Lb = -Lb 
-                                Lb = Lb - 1
+                                sign_a = 1
+                                if La < 0:
+                                    sign_a = -1
+                                    La = -La 
+                                La = La - 1
                                
-                                L = La + Lb * bra_a_max 
+                                L = Lb + La * bra_b_max 
         
                                 
                                 Iprqs = self.H.V[p,r,q,s]
 
                                 H[K,L] += Iprqs * sign_a * sign_b 
-                ket_a.incr()
+                ket_b.incr()
                 #   end Ka 
 
-            ket_b.incr()
+            ket_a.incr()
             #   end Kb 
 # }}}
 
@@ -408,8 +408,8 @@ class ci_solver:
         #   
         #   Add spin diagonal components
         #print(" Add spin diagonals")
-        Hci += np.kron(np.eye(ket_b.max()), self.Hdiag_s[0])
-        Hci += np.kron(self.Hdiag_s[1],np.eye(ket_a.max()))
+        Hci += np.kron(np.eye(ket_a.max()), self.Hdiag_s[1])
+        Hci += np.kron(self.Hdiag_s[0],np.eye(ket_b.max()))
 
         #print(" Do alpha/beta terms")
         self.compute_ab_terms_direct(Hci)
@@ -447,7 +447,7 @@ class ci_solver:
             self.results_v.append(C[:,s])
 
         """
-        return
+        return 
         #print(" E(nuc) + E(core) = %16.10f" %(self.H.e_nuc+self.H.e_core))
 # }}}
     
