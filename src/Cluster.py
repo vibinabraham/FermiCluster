@@ -8,7 +8,6 @@ from ci_string import *
 from Hamiltonian import *
 from davidson import *
 from helpers import *
-from myfci import *
 
 class Cluster(object):
 
