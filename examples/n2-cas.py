@@ -185,7 +185,8 @@ for ci_idx, ci in enumerate(clusters):
     print()
     print()
     print(" Form basis by diagonalize local Hamiltonian for cluster: ", ci_idx)
-    ci.form_eigbasis_from_local_operator(opi, max_roots=n_cluster_states)
+    #ci.form_eigbasis_from_local_operator(opi, max_roots=n_cluster_states)
+    ci.form_eigbasis_from_ints(h1e_cas,h2e_cas,max_roots=1000)
 
 #clustered_ham.add_ops_to_clusters()
 print(" Build these local operators")
