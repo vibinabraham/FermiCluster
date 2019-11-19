@@ -15,7 +15,7 @@ from tools import *
 
 def bc_cipsi_tucker(ci_vector, clustered_ham, 
         thresh_cipsi=1e-4, thresh_ci_clip=1e-5, thresh_cipsi_conv=1e-8, max_cipsi_iter=30, 
-        thresh_tucker_conv = 1e-6, max_tucker_iter=20, tucker_state_clip=None):
+        thresh_tucker_conv = 1e-6, max_tucker_iter=20, tucker_state_clip=None,hshift=1e-8):
     """
     Run iterations of BR-CIPSI to make the tucker decomposition self-consistent
     """
@@ -50,11 +50,24 @@ def bc_cipsi_tucker(ci_vector, clustered_ham,
             norm = 0
             rotations = {}
             for fspace,rdm in rdms.items():
+                
                 print(" Diagonalize RDM for Cluster %2i in Fock space:"%ci.idx, fspace,flush=True)
                 n,U = np.linalg.eigh(rdm)
                 idx = n.argsort()[::-1]
                 n = n[idx]
                 U = U[:,idx]
+
+                if hshift != None:
+                    print(fspace)
+                    Hci = ci.Hci[fspace]
+                    print(Hci)
+                    print(rdm)
+                    n,U = np.linalg.eigh(rdm + hshift*Hci)
+                    n = np.diag(U.T @ rdm @ U)
+                    idx = n.argsort()[::-1]
+                    n = n[idx]
+                    U = U[:,idx]
+                
                 norm += sum(n)
                 for ni_idx,ni in enumerate(n):
                     if abs(ni) > 1e-12:

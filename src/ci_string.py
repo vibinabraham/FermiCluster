@@ -387,12 +387,13 @@ class ci_solver:
         ket_b.fill_ca_lookup()
 
         if self.algorithm == "direct":
-            self.run_direct()
+            Hci = self.run_direct()
         elif self.algorithm == "davidson":
             self.run_davidson()
         else:
             print(" Wrong option for algorithm")
             exit(-1)
+        return Hci
        
 
     def run_direct(self):
@@ -447,7 +448,7 @@ class ci_solver:
             self.results_v.append(C[:,s])
 
         """
-        return 
+        return Hci
         #print(" E(nuc) + E(core) = %16.10f" %(self.H.e_nuc+self.H.e_core))
 # }}}
     

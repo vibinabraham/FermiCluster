@@ -199,11 +199,10 @@ if do_hci:
     print("HCI %10.8f" % (ehci + enu))
 
 
-"""
 #blocks = [[0,1,2,3],[4,5,6,7]]
 #blocks = [[0,1],[2,3],[4,5,6],[7,8,9],range(10,14),range(14,18),range(18,22),range(22,25),range(25,28)]
 ##blocks = [[0,1],[2,3],[4,5,6],[7,8,9]]
-blocks = [[0,1,2,3],[4,5,6],[7,8],[9,10,11]]
+blocks = [[0,1,2,3],[4,5,6],[7,8],[9,10],[11]]
 n_blocks = len(blocks)
 clusters = []
 
@@ -216,7 +215,7 @@ ci_vector = ClusteredState(clusters)
 
 #ci_vector.init(((2,2),(3,2),(2,3)))
 #ci_vector.init(((2,2),(2,3),(3,2)))
-ci_vector.init(((3, 3), (2, 2), (1, 1), (0, 0)))
+ci_vector.init(((3, 3), (2, 2), (1, 1), (0, 0), (0, 0)))
 #ci_vector.init(((2,2),(2,2),(1,1),(2,2)))
 #ci_vector.init(((2,2),(2,2),(3,1),(2,0)))
 #ci_vector.init(((2,2),(2,2),(1,3),(0,2)))
@@ -253,14 +252,13 @@ for c in clusters:
 #ci_vector.expand_each_fock_space()
 
 #ci_vector, pt_vector, e0, e2 = bc_cipsi_tucker(ci_vector.copy(),clustered_ham,)
-ci_vector, pt_vector, e0, e2 = bc_cipsi(ci_vector.copy(),clustered_ham,ecore=ecore)
+ci_vector, pt_vector, e0, e2 = bc_cipsi(ci_vector.copy(),clustered_ham)
 bcci_dim = len(ci_vector)
 
-"""
 print(ecore)
 print("    E Nu:        %12.8f " % enu)
-print("    BCCI:        %12.8f Dim:%6d" % (e0 , bcci_dim))
-print("    BCCI(2):     %12.8f Dim:%6d" % (e2 , bcci_dim))
+print("    BCCI:        %12.8f Dim:%6d" % (e0+ecore , bcci_dim))
+print("    BCCI(2):     %12.8f Dim:%6d" % (e2+ecore , bcci_dim))
 print("     HCI:        %12.8f Dim:%6d" % (ehci , hci_dim))
 print("     FCI:        %12.8f Dim:%6d" % (efci , fci_dim))
 print("CAS(6,6):        %12.8f Dim:%6d" % (ecas , casdim))

@@ -52,6 +52,7 @@ class Cluster(object):
         self.ops    = {}
         
         self.energies = {}                  # Diagonal of local operators
+        self.Hci = {}
 
     def __len__(self):
         return len(self.orb_list) 
@@ -95,9 +96,10 @@ class Cluster(object):
                 ci.algorithm = "direct"
                 ci.init(H,na,nb,max_roots)
                 print(ci)
-                ci.run()
+                Hci = ci.run()
                 #self.basis[(na,nb)] = np.eye(ci.results_v.shape[0])
                 self.basis[(na,nb)] = ci.results_v
+                self.Hci[(na,nb)] = Hci
                 #print(ci.results_v)
 
 
@@ -127,6 +129,7 @@ class Cluster(object):
         """
         for fspace,mat in U.items():
             self.basis[fspace] = self.basis[fspace] @ mat
+            self.Hci[fspace] = self.basis[fspace].T @ self.Hci[fspace] @ self.basis[fspace]
         #print(" Build all operators:")
         #self.build_op_matrices()
         for op,fspace_deltas in self.ops.items():

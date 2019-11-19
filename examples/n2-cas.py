@@ -196,7 +196,7 @@ for c in clusters:
 #ci_vector.expand_to_full_space()
 #ci_vector.expand_each_fock_space()
 
-ci_vector, pt_vector, e0, e2 = bc_cipsi_tucker(ci_vector.copy(),clustered_ham)
+ci_vector, pt_vector, e0, e2 = bc_cipsi_tucker(ci_vector.copy(),clustered_ham,hshift=1e-8, max_tucker_iter=8,thresh_cipsi=1e-5)
 bcci_dim = len(ci_vector)
 
 print("  radius:        %12.8f " % r0)
@@ -205,4 +205,4 @@ print("    BCCI:        %12.8f Dim:%6d" % (e0 + ecore, bcci_dim))
 print("    BCCI(2):     %12.8f Dim:%6d" % (e2 + ecore, bcci_dim))
 print("     HCI:        %12.8f Dim:%6d" % (ehci , hci_dim))
 print("     FCI:        %12.8f Dim:%6d" % (efci , fci_dim))
-print("CAS(6,6):        %12.8f Dim:%6d" % (ecas , casdim))
+print(" CAS(6,6):       %12.8f Dim:%6d" % (ecas , casdim))
