@@ -46,20 +46,20 @@ def matvec1(h,v,term_thresh=1e-12):
             
             for term in h.terms[terms]:
                 #print(" term: ", term)
+                state_sign = 1
+                for oi,o in enumerate(term.ops):
+                    if o == '':
+                        continue
+                    if len(o) == 1 or len(o) == 3:
+                        for cj in range(oi):
+                            state_sign *= (-1)**(fock_r[cj][0]+fock_r[cj][1])
+                    
                 for conf_ri, conf_r in enumerate(v[fock_r]):
                     #print("  ", conf_r)
                     
                     #if abs(v[fock_r][conf_r]) < 5e-2:
                     #    continue
                     # get state sign 
-                    state_sign = 1
-                    for oi,o in enumerate(term.ops):
-                        if o == '':
-                            continue
-                        if len(o) == 1 or len(o) == 3:
-                            for cj in range(oi):
-                                state_sign *= (-1)**(fock_r[cj][0]+fock_r[cj][1])
-                    
                     #print('state_sign ', state_sign)
                     opii = -1
                     mats = []
