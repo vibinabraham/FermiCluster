@@ -122,9 +122,9 @@ def test_1():
     print("BCCI:        %12.8f Dim:%6d"%(e0,bcci_dim))
     print(" HCI:        %12.8f Dim:%6d"%(ehci,hci_dim))
     print(" FCI:        %12.8f Dim:%6d"%(efci,fci_dim))
-    assert(abs(e0 --12.31898286) < 1e-7)
-    assert(abs(e2 --12.31898946) < 1e-7)
-    assert(abs(bcci_dim - 76)<1e-15)
+    assert(abs(e0 --12.31898309) < 1e-7)
+    assert(abs(e2 --12.31898968) < 1e-7)
+    assert(abs(bcci_dim - 78)<1e-15)
     assert(abs(efci --12.31898984) < 1e-7)
     
 if __name__== "__main__":

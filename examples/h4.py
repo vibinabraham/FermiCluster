@@ -127,15 +127,12 @@ for c in clusters:
 #ci_vector.expand_to_full_space()
 #ci_vector.expand_each_fock_space()
 
-e_prev = 0
 thresh_conv = 1e-8
-ci_vector_ref = ci_vector.copy()
-e_last = 0
-for brdm_iter in range(1):
-    ci_vector, pt_vector, e0, e2 = bc_cipsi(ci_vector_ref.copy(), clustered_ham, thresh_cipsi=1e-7, thresh_ci_clip=1e-7,max_iter=20)
-    print(" CIPSI: E0 = %12.8f E2 = %12.8f CI_DIM: %i" %(e0, e2, len(ci_vector)))
-    print(e2+enu)
-    bcci_dim = len(ci_vector)
+#ci_vector, pt_vector, e0, e2 = bc_cipsi_tucker(ci_vector.copy(),clustered_ham, thresh_cipsi=1e-5, thresh_ci_clip=1e-5,hshift=1e-8, max_tucker_iter=8)
+ci_vector, pt_vector, e0, e2 = bc_cipsi_tucker(ci_vector.copy(),clustered_ham, thresh_cipsi=1e-6, thresh_ci_clip=1e-6,hshift=1e-8, max_tucker_iter=8)
+print(" CIPSI: E0 = %12.8f E2 = %12.8f CI_DIM: %i" %(e0, e2, len(ci_vector)))
+print(e2+enu)
+bcci_dim = len(ci_vector)
 
 print("BCCI:        %12.8f Dim:%6d"%(e0,bcci_dim))
 print(" HCI:        %12.8f Dim:%6d"%(ehci,hci_dim))

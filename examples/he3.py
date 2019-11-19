@@ -138,6 +138,6 @@ for brdm_iter in range(1):
     print(e2+enu)
     bcci_dim = len(ci_vector)
 
-print("BCCI:        %12.8f Dim:%6d"%(e0,bcci_dim))
-print(" HCI:        %12.8f Dim:%6d"%(ehci,hci_dim))
-print(" FCI:        %12.8f Dim:%6d"%(efci,fci_dim))
+print("BCCI:        %12.9f Dim:%6d"%(e0,bcci_dim))
+print(" HCI:        %12.9f Dim:%6d"%(ehci,hci_dim))
+print(" FCI:        %12.9f Dim:%6d"%(efci,fci_dim))

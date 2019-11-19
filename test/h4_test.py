@@ -1,6 +1,4 @@
 import sys, os
-sys.path.append('../')
-sys.path.append('../src/')
 import numpy as np
 import scipy
 import itertools
@@ -21,7 +19,10 @@ ttt = time.time()
 pyscf.lib.num_threads(1) #with degenerate states and multiple processors there can be issues
 
 def test_1():
+    ttt = time.time()
+
     n_cluster_states = 1000
+
     from pyscf import gto, scf, mcscf, ao2mo
     mol = gto.Mole()
     mol.atom = '''
@@ -40,11 +41,32 @@ def test_1():
     print(myhf.mo_energy)
     #exit()
     n_orb = myhf.mo_coeff.shape[1]
-    h = myhf.mo_coeff.T.dot(myhf.get_hcore()).dot(myhf.mo_coeff)
-    g = ao2mo.kernel(mol,myhf.mo_coeff,aosym='s4',compact=False).reshape(4*((n_orb),))
     #g.shape = (n_orb,n_orb,n_orb,n_orb)
-    print(g.shape)
     enu = myhf.energy_nuc()
+    S = mol.intor('int1e_ovlp_sph')
+
+    local = 'lowdin'
+    local = 'p'
+
+    if local == 'lowdin':
+        print("Using lowdin orthogonalized orbitals")
+        #forming S^-1/2 to transform to A and B block.
+        sal, svec = np.linalg.eigh(S)
+        idx = sal.argsort()[::-1]
+        sal = sal[idx]
+        svec = svec[:, idx]
+        sal = sal**-0.5
+        sal = np.diagflat(sal)
+        X = svec @ sal @ svec.T
+        C = cp.deepcopy(X)
+
+        h = C.T.dot(myhf.get_hcore()).dot(C)
+        g = ao2mo.kernel(mol,C,aosym='s4',compact=False).reshape(4*((n_orb),))
+
+    else:
+        h = myhf.mo_coeff.T.dot(myhf.get_hcore()).dot(myhf.mo_coeff)
+        g = ao2mo.kernel(mol,myhf.mo_coeff,aosym='s4',compact=False).reshape(4*((n_orb),))
+    print(g.shape)
 
     do_fci = 1
     do_hci = 1
@@ -69,6 +91,7 @@ def test_1():
         print("HCI %10.8f"%(ehci+enu))
 
     blocks = [[0,1,2,3],[4,5,6,7]]
+    #blocks = [[0,1],[2,3],[4,5],[6,7]]
     n_blocks = len(blocks)
     clusters = []
 
@@ -76,8 +99,8 @@ def test_1():
         clusters.append(Cluster(ci,c))
 
     ci_vector = ClusteredState(clusters)
-    #ci_vector.init(((3,3),(0,0)))
     ci_vector.init(((2,2),(0,0)))
+    #ci_vector.init(((1,1),(1,1),(0,0),(0,0)))
 
     print(" Clusters:")
     [print(ci) for ci in clusters]
@@ -109,21 +132,19 @@ def test_1():
     #ci_vector.expand_to_full_space()
     #ci_vector.expand_each_fock_space()
 
-    e_prev = 0
     thresh_conv = 1e-8
-    ci_vector_ref = ci_vector.copy()
-    e_last = 0
-    for brdm_iter in range(1):
-        ci_vector, pt_vector, e0, e2 = bc_cipsi(ci_vector_ref.copy(), clustered_ham, thresh_cipsi=1e-7, thresh_ci_clip=1e-7,max_iter=20)
-        print(" CIPSI: E0 = %12.8f E2 = %12.8f CI_DIM: %i" %(e0, e2, len(ci_vector)))
-        print(e2+enu)
-        bcci_dim = len(ci_vector)
+    #ci_vector, pt_vector, e0, e2 = bc_cipsi_tucker(ci_vector.copy(),clustered_ham, thresh_cipsi=1e-5, thresh_ci_clip=1e-5,hshift=1e-8, max_tucker_iter=8)
+    ci_vector, pt_vector, e0, e2 = bc_cipsi_tucker(ci_vector.copy(),clustered_ham, thresh_cipsi=1e-6, thresh_ci_clip=1e-6,hshift=1e-8, max_tucker_iter=8)
+    print(" CIPSI: E0 = %12.8f E2 = %12.8f CI_DIM: %i" %(e0, e2, len(ci_vector)))
+    print(e2+enu)
+    bcci_dim = len(ci_vector)
 
     print("BCCI:        %12.8f Dim:%6d"%(e0,bcci_dim))
     print(" HCI:        %12.8f Dim:%6d"%(ehci,hci_dim))
     print(" FCI:        %12.8f Dim:%6d"%(efci,fci_dim))
-    assert(abs(e0 --3.08153878) < 1e-7)
-    assert(abs(bcci_dim - 307)<1e-15)
+    assert(abs(e0 --3.08152531) < 1e-7)
+    assert(abs(e2 --3.08154325) < 1e-7)
+    assert(abs(bcci_dim - 48)<1e-15)
     assert(abs(efci --3.08154574) < 1e-7)
     
 if __name__== "__main__":
