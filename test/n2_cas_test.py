@@ -1,3 +1,6 @@
+import sys, os
+sys.path.append('../')
+sys.path.append('../src/')
 import numpy as np
 import scipy
 import itertools
@@ -16,10 +19,10 @@ from bc_cipsi import *
 import pyscf
 ttt = time.time()
 
-pyscf.lib.num_threads(1)  #with degenerate states and multiple processors there can be issues
-np.set_printoptions(suppress=True, precision=3, linewidth=1500)
 
 def test_1():
+    pyscf.lib.num_threads(1)  #with degenerate states and multiple processors there can be issues
+    np.set_printoptions(suppress=True, precision=3, linewidth=1500)
     n_cluster_states = 1000
 
     from pyscf import gto, scf, mcscf, ao2mo
@@ -212,3 +215,7 @@ def test_1():
     assert(abs(e2 + ecore --108.85574547)< 1e-7)
     assert(abs(bcci_dim - 63)<1e-15)
     assert(abs(efci   --108.85574521)< 1e-7)
+
+
+if __name__== "__main__":
+    test_1() 
