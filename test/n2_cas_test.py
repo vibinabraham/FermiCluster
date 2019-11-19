@@ -201,7 +201,8 @@ def test_1():
     #ci_vector.expand_each_fock_space()
 
     #ci_vector, pt_vector, e0, e2 = bc_cipsi_tucker(ci_vector.copy(),clustered_ham)
-    ci_vector, pt_vector, e0, e2 = bc_cipsi_tucker(ci_vector.copy(),clustered_ham,hshift=1e-8, max_tucker_iter=8,thresh_cipsi=1e-5)
+    ci_vector, pt_vector, e0, e2 = bc_cipsi_tucker(ci_vector.copy(),clustered_ham,hshift=1e-8, max_tucker_iter=20, thresh_cipsi=1e-5, thresh_ci_clip=1e-6)
+    #ci_vector, pt_vector, e0, e2 = bc_cipsi(ci_vector.copy(),clustered_ham, thresh_cipsi=1e-5, thresh_ci_clip=1e-5)
     bcci_dim = len(ci_vector)
 
     print("  radius:        %12.8f " % r0)
@@ -213,7 +214,7 @@ def test_1():
     print("CAS(6,6):        %12.8f Dim:%6d" % (ecas , casdim))
     assert(abs(e0 + ecore --108.85558051)< 1e-7)
     assert(abs(e2 + ecore --108.85574547)< 1e-7)
-    assert(abs(bcci_dim - 63)<1e-15)
+    assert(abs(bcci_dim - 67)<1e-15)
     assert(abs(efci   --108.85574521)< 1e-7)
 
 

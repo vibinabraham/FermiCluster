@@ -134,7 +134,8 @@ def test_1():
 
     thresh_conv = 1e-8
     #ci_vector, pt_vector, e0, e2 = bc_cipsi_tucker(ci_vector.copy(),clustered_ham, thresh_cipsi=1e-5, thresh_ci_clip=1e-5,hshift=1e-8, max_tucker_iter=8)
-    ci_vector, pt_vector, e0, e2 = bc_cipsi_tucker(ci_vector.copy(),clustered_ham, thresh_cipsi=1e-6, thresh_ci_clip=1e-6,hshift=1e-8, max_tucker_iter=8)
+    ci_vector, pt_vector, e0, e2 = bc_cipsi_tucker(ci_vector.copy(),clustered_ham, thresh_cipsi=1e-6, thresh_ci_clip=1e-7,hshift=1e-8, max_tucker_iter=20)
+    #ci_vector, pt_vector, e0, e2 = bc_cipsi(ci_vector.copy(),clustered_ham, thresh_cipsi=1e-6, thresh_ci_clip=1e-6)
     print(" CIPSI: E0 = %12.8f E2 = %12.8f CI_DIM: %i" %(e0, e2, len(ci_vector)))
     print(e2+enu)
     bcci_dim = len(ci_vector)
@@ -144,7 +145,7 @@ def test_1():
     print(" FCI:        %12.8f Dim:%6d"%(efci,fci_dim))
     assert(abs(e0 --3.08152531) < 1e-7)
     assert(abs(e2 --3.08154325) < 1e-7)
-    assert(abs(bcci_dim - 48)<1e-15)
+    assert(abs(bcci_dim - 49)<1e-15)
     assert(abs(efci --3.08154574) < 1e-7)
     
 if __name__== "__main__":
