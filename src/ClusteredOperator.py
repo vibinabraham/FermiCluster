@@ -200,14 +200,14 @@ class ClusteredTerm:
         mats = []
         # state sign is always 1 here, since an even number of creation/annihilation operators can only 
         # contribute to diagonal
-        #state_sign = 1
-        #n_active = 0
-        #for oi,o in enumerate(self.ops):
-        #    if o == '':
-        #        continue
-        #    n_active+=1
-        #if n_active <= 1:
-        #    return 0
+        state_sign = 1
+        n_active = 0
+        for oi,o in enumerate(self.ops):
+            if o == '':
+                continue
+            n_active+=1
+        if n_active <= 1:
+            return 0
 
         for oi,o in enumerate(self.ops):
             if o == '':

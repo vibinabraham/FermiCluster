@@ -256,18 +256,54 @@ def update_hamiltonian_diagonal(clustered_ham,ci_vector,Hd_vector):
                 terms = clustered_ham.terms[delta_fock]
 
                 ## add diagonal energies
-                #for ci in clusters:
-                #    Hd[idx] += ci.energies[fockspace[ci.idx]][config[ci.idx]]
+                tmp = 0
+                for ci in clusters:
+                    tmp += ci.energies[fockspace[ci.idx]][config[ci.idx]]
                 
                 for term in terms:
                     #Hd[idx] += term.matrix_element(fockspace,config,fockspace,config)
-                    Hd[idx] += term.diag_matrix_element(fockspace,config)
+                    tmp += term.diag_matrix_element(fockspace,config)
+                Hd[idx] = tmp
+                #print(" nick: %12.8f"%(Hd[idx]-test1))
                 Hd_vector[fockspace][config] = Hd[idx] 
             idx += 1
     return Hd
 
 # }}}
 
+#def precompute_cluster_basis_energies(clustered_ham):
+#    """
+#    For each cluster grab the local operator from clustered_ham, and store the expectation values
+#    for each cluster state
+#    """
+#    # {{{
+#    clusters = clustered_ham.clusters
+#
+#
+#    delta_fock= tuple([(0,0) for ci in range(len(clusters))])
+#    terms = clustered_ham.terms[delta_fock]
+#    for ci in clustered_ham.clusters:
+#        ci.energies = {}
+#        for fspace in ci.basis:
+#            dim = ci.basis[fspace].shape[1]
+#            ci.energies[fspace] = np.zeros((dim))
+#
+#    config_ref = [0]*len(clusters)
+#    for ci in clusters:
+#        for fspace in ci.basis:
+#            fspace_curr = cp.deepcopy(list(delta_fock))
+#            fspace_curr[ci.idx] = fspace
+#            print(fspace_curr)
+#            for config in range(ci.basis[fspace].shape[1]):
+#                config_curr = cp.deepcopy(config_ref)
+#                config_curr[ci.idx] = config
+#                e = 0
+#                for term in terms:
+#                    active = term.get_active_clusters()
+#                    if len(active) == 1 and active[0] == ci.idx:
+#                        e += term.matrix_element(fspace_curr,config_curr,fspace_curr,config_curr)
+#                    ci.energies[fspace_curr[0]] = e
+## }}}
 
 def precompute_cluster_basis_energies(clustered_ham):
     """
