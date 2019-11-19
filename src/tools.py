@@ -69,7 +69,8 @@ def matvec1(h,v,term_thresh=1e-12):
                             continue
                         opii += 1
                         #print(opi,term.active)
-                        ci = clusters[term.active[opii]]
+                        ci = clusters[opi]
+                        #ci = clusters[term.active[opii]]
                         try:
                             oi = ci.ops[op][(fock_l[ci.idx],fock_r[ci.idx])][:,conf_r[ci.idx],:]
                             mats.append(oi)
