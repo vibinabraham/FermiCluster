@@ -70,7 +70,48 @@ class Cluster(object):
         else:
             self.ops[op] = {}
     
+    def form_eigbasis_from_ints(self,hin,vin,max_roots=1000):
+        """
+        grab integrals acting locally and form eigenbasis by FCI
+        """
+# {{{
+        h = np.zeros([self.n_orb]*2)
+        v = np.zeros([self.n_orb]*4)
+      
+        for pidx,p in enumerate(self.orb_list):
+            for qidx,q in enumerate(self.orb_list):
+                h[pidx,qidx] = hin[p,q]
+        
+        for pidx,p in enumerate(self.orb_list):
+            for qidx,q in enumerate(self.orb_list):
+                for ridx,r in enumerate(self.orb_list):
+                    for sidx,s in enumerate(self.orb_list):
+                        v[pidx,qidx,ridx,sidx] = vin[p,q,r,s]
+
+        H = Hamiltonian()
+        H.S = np.eye(h.shape[0])
+        H.C = H.S
+        H.t = h
+        H.V = v
+        self.basis = {}
+        print(" Do CI for each particle number block")
+        for na in range(self.n_orb+1):
+            for nb in range(self.n_orb+1):
+                ci = ci_solver()
+                ci.algorithm = "direct"
+                ci.init(H,na,nb,max_roots)
+                print(ci)
+                Hci = ci.run()
+                #self.basis[(na,nb)] = np.eye(ci.results_v.shape[0])
+                self.basis[(na,nb)] = ci.results_v
+                self.Hci[(na,nb)] = Hci
+    # }}}
+    
     def form_eigbasis_from_local_operator(self,local_op,max_roots=1000,ratio = 1):
+        """
+        grab integrals acting locally and form eigenbasis by FCI
+        """
+# {{{
         h = np.zeros([self.n_orb]*2)
         v = np.zeros([self.n_orb]*4)
         for t in local_op.terms:
@@ -119,7 +160,7 @@ class Cluster(object):
                     print(ci.results_v[:,-max_roots:] )
                     ci.run()
                     self.basis[(na,nb)] = ci.results_v[:,-max_roots:]
-                    
+                    # }}}
                     
             
     def rotate_basis(self,U):

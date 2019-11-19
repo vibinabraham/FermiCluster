@@ -286,12 +286,13 @@ if __name__ == "__main__":
     print(" Build cluster basis")
     for ci_idx, ci in enumerate(clusters):
         assert(ci_idx == ci.idx)
-        print(" Extract local operator for cluster",ci.idx)
-        opi = clustered_ham.extract_local_operator(ci_idx)
+        #print(" Extract local operator for cluster",ci.idx)
+        #opi = clustered_ham.extract_local_operator(ci_idx)
         print()
         print()
         print(" Form basis by diagonalize local Hamiltonian for cluster: ",ci_idx)
-        ci.form_eigbasis_from_local_operator(opi,max_roots=1000)
+        #ci.form_eigbasis_from_local_operator(opi,max_roots=1000)
+        ci.form_eigbasis_from_ints(h,g,max_roots=1000)
     
     
     #clustered_ham.add_ops_to_clusters()
