@@ -13,10 +13,10 @@ ttt = time.time()
 np.set_printoptions(suppress=True, precision=3, linewidth=1500)
 
 ###     PYSCF INPUT
+r0 = 1.9 
 molecule = '''
 N      0.00       0.00       0.00
-N      0.00       0.00       2.00
-'''
+N      0.00       0.00       {}'''.format(r0)
 charge = 0
 spin  = 0
 basis_set = 'ccpvdz'
