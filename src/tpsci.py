@@ -23,6 +23,7 @@ def run_tpsci(h, g, blocks, init_fspace,
                     thresh_tucker_conv= 1e-6, 
                     max_tucker_iter=20, 
                     tucker_state_clip=None,
+                    cs_guess = None,
                     hshift=1e-8):
     """
     Tensor Product Selected Configuration Interaction (TPSCI)
@@ -135,9 +136,9 @@ def run_tpsci(h, g, blocks, init_fspace,
         ci_vector, pt_vector, e0, e2 = bc_cipsi(ci_vector.copy(), clustered_ham, 
                 thresh_cipsi=thresh_cipsi, thresh_ci_clip=thresh_ci_clip, thresh_conv=thresh_cipsi_conv, max_iter=max_cipsi_iter)
         print("")
-        print(" BCSCI:          %12.8f      Dim:%6d" % (e0+ecore, len(ci_vector)))
-        print(" BCSCI(2):       %12.8f      Dim:%6d" % (e2+ecore,len(pt_vector)))
-        print("--------         TPSCI converged        --------")
+        print(" TPSCI:          %12.8f      Dim:%6d" % (e0+ecore, len(ci_vector)))
+        print(" TPSCI(2):       %12.8f      Dim:%6d" % (e2+ecore,len(pt_vector)))
+        print("--------         TPSCI no tucker converged        --------")
         print("\n\n")
 
         

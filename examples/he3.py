@@ -12,26 +12,40 @@ import pyscf
 ttt = time.time()
 np.set_printoptions(suppress=True, precision=3, linewidth=1500)
 
-
+###     PYSCF INPUT
 molecule = '''
-He      0.00       0.00       0.00
-He      0.00       0.00       1.50
-He      0.00       0.00       3.00
-He      0.00       0.00       4.50
-He      0.00       0.00       6.00
+H      0.00       0.00       0.00
+H      2.00       0.00       2.00
+H      0.00       2.20       2.00
+H      2.10       2.00       0.00
 '''
 charge = 0
 spin  = 0
-basis = '3-21g'
+basis_set = '3-21g'
 
+###     TPSCI BASIS INPUT
+orb_basis = 'lowdin'
+cas = False
+#cas_nstart = 2
+#cas_nstop = 10
+#cas_nel = 10
 
-h,g,ecore = init_pyscf(molecule,charge,spin,basis,local='lowdin')
-blocks = [[0,1],[2,3],[4,5],[6,7],[8,9]]
-init_fspace = ((1,1),(1,1),(1,1),(1,1),(1,1))
-#init_fspace = ((1,1),(1,1))
+###     TPSCI CLUSTER INPUT
+blocks = [[0,1],[2,3],[4,5]]
+init_fspace = ((1, 1), (1, 1), (1, 1))
 nelec = tuple([sum(x) for x in zip(*init_fspace)])
+if cas == True:
+    assert(cas_nel == nelec)
+    nelec = cas_nel
 
-print(h)
+
+#Integrals from pyscf
+h,g,ecore = init_pyscf(molecule,charge,spin,basis_set,orb_basis)
+
+#cluster using hcore
+idx = e1_order(h,cut_off = 1e-4)
+h,g = reorder_integrals(idx,h,g)
+
 
 do_fci = 1
 do_hci = 1
@@ -40,10 +54,10 @@ do_tci = 1
 if do_fci:
     efci, fci_dim = run_fci_pyscf(h,g,nelec,ecore=ecore)
 if do_hci:
-    ehci, hci_dim = run_hci_pyscf(h,g,nelec,ecore=ecore,select_cutoff=3e-2,ci_cutoff=1e-2)
+    ehci, hci_dim = run_hci_pyscf(h,g,nelec,ecore=ecore,select_cutoff=2e-3,ci_cutoff=2e-3)
 if do_tci:
     ci_vector, pt_vector, etci, etci2 = run_tpsci(h,g,blocks,init_fspace,ecore=ecore,
-        thresh_ci_clip=1e-3,thresh_cipsi=1e-4,max_tucker_iter=4)
+        thresh_ci_clip=1e-4,thresh_cipsi=1e-7,max_tucker_iter=0)
     ci_vector.print_configs()
     tci_dim = len(ci_vector)
 
