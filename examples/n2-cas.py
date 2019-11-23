@@ -15,7 +15,7 @@ np.set_printoptions(suppress=True, precision=3, linewidth=1500)
 ###     PYSCF INPUT
 molecule = '''
 N      0.00       0.00       0.00
-N      0.00       0.00       0.90
+N      0.00       0.00       2.00
 '''
 charge = 0
 spin  = 0
@@ -53,11 +53,12 @@ if do_hci:
     ehci, hci_dim = run_hci_pyscf(h,g,cas_nel,ecore=ecore,select_cutoff=1e-4,ci_cutoff=1e-4)
 if do_tci:
     ci_vector, pt_vector, etci, etci2 = run_tpsci(h,g,blocks,init_fspace,ecore=ecore,
-        thresh_ci_clip=1e-5,thresh_cipsi=1e-7,max_tucker_iter=20)
+        thresh_ci_clip=1e-5,thresh_cipsi=1e-5,max_tucker_iter=0)
     ci_vector.print_configs()
     tci_dim = len(ci_vector)
 
 
-print(" TCI:        %12.9f Dim:%6d"%(etci,tci_dim))
-print(" HCI:        %12.9f Dim:%6d"%(ehci,hci_dim))
-print(" FCI:        %12.9f Dim:%6d"%(efci,fci_dim))
+print(" TPSCI:           %12.9f Dim:%6d"%(etci,tci_dim))
+print(" TPSCI(2):        %12.9f Dim:%6d"%(etci2,tci_dim))
+print(" HCI:             %12.9f Dim:%6d"%(ehci,hci_dim))
+print(" FCI:             %12.9f Dim:%6d"%(efci,fci_dim))
