@@ -41,7 +41,7 @@ enu = myhf.energy_nuc()
 S = mol.intor('int1e_ovlp_sph')
 
 local = 'lowdin'
-local = 'p'
+#local = 'p'
 
 if local == 'lowdin':
     print("Using lowdin orthogonalized orbitals")
@@ -117,6 +117,7 @@ for ci_idx, ci in enumerate(clusters):
     print(" Form basis by diagonalize local Hamiltonian for cluster: ",ci_idx)
     ci.form_eigbasis_from_local_operator(opi,max_roots=n_cluster_states)
 
+exit()
 
 #clustered_ham.add_ops_to_clusters()
 print(" Build these local operators")
