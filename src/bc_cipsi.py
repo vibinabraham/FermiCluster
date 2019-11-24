@@ -20,6 +20,8 @@ def bc_cipsi_tucker(ci_vector, clustered_ham,
     Run iterations of TP-CIPSI to make the tucker decomposition self-consistent
     """
 # {{{
+
+    t_conv = False
     if tucker_state_clip == None:
         tucker_state_clip = thresh_cipsi/10.0
     e_prev = 0
@@ -33,6 +35,7 @@ def bc_cipsi_tucker(ci_vector, clustered_ham,
       
         if abs(e_prev-e2) < thresh_tucker_conv:
             print(" Converged BRDMs")
+            t_conv = True
             break
         e_prev = e2
         pt_vector.add(ci_vector)
@@ -80,7 +83,7 @@ def bc_cipsi_tucker(ci_vector, clustered_ham,
         if abs(delta_e) < 1e-8:
             print(" Converged BRDM iterations")
             break
-    return ci_vector, pt_vector, e0, e2
+    return ci_vector, pt_vector, e0, e2, t_conv
 # }}}
 
 

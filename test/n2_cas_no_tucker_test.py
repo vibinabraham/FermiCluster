@@ -1,6 +1,4 @@
 import sys, os
-sys.path.append('../')
-sys.path.append('../src/')
 import numpy as np
 import scipy
 import itertools
@@ -22,7 +20,7 @@ def test_1():
 
     from pyscf import gto, scf, mcscf, ao2mo
 
-    r0 = 1.5
+    r0 = 2.0
 
     molecule= '''
     N       0.00       0.00       0.00
@@ -30,7 +28,7 @@ def test_1():
 
     charge = 0
     spin  = 0
-    basis_set = '6-31g'
+    basis_set = 'ccpvdz'
 
     ###     TPSCI BASIS INPUT
     orb_basis = 'boys'
@@ -64,7 +62,7 @@ def test_1():
         ehci, hci_dim = run_hci_pyscf(h,g,cas_nel,ecore=ecore,select_cutoff=1e-4,ci_cutoff=1e-4)
     if do_tci:
         ci_vector, pt_vector, etci, etci2 = run_tpsci(h,g,blocks,init_fspace,ecore=ecore,
-            thresh_ci_clip=1e-6,thresh_cipsi=1e-5,max_tucker_iter=20,hshift=1e-8)
+            thresh_ci_clip=1e-5,thresh_cipsi=1e-5,max_tucker_iter=0,hshift=1e-8)
         ci_vector.print_configs()
         tci_dim = len(ci_vector)
 
@@ -72,10 +70,10 @@ def test_1():
     print(" TCI:        %12.9f Dim:%6d"%(etci,tci_dim))
     print(" HCI:        %12.9f Dim:%6d"%(ehci,hci_dim))
     print(" FCI:        %12.9f Dim:%6d"%(efci,fci_dim))
-    assert(abs(etci --108.85558051)< 1e-7)
-    assert(abs(etci2 --108.85574547)< 1e-7)
-    #assert(abs(tci_dim - 67)<1e-15)
-    assert(abs(efci   --108.85574521)< 1e-7)
+    assert(abs(etci --108.756551406)< 1e-7)
+    assert(abs(etci2 --108.756912357)< 1e-7)
+    assert(abs(tci_dim - 106)<1e-15)
+    assert(abs(efci   --108.756976573)< 1e-7)
 
 
 if __name__== "__main__":
