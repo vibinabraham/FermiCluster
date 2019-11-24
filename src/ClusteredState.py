@@ -142,7 +142,18 @@ class ClusteredState(OrderedDict):
 
         self.prune_empty_fock_spaces()
         return idx_to_keep
-    
+   
+    def add_single_excitonic_states(self):
+        for fspace in self.data.keys():
+            config = [0]*len(self.clusters)
+            for ci in self.clusters:
+                fock_i = fspace[ci.idx]
+                new_config = cp.deepcopy(config)
+                for cii in range(ci.basis[fock_i].shape[1]):
+                    new_config[ci.idx] = cii
+                    self[fspace][tuple(new_config)] = 0 
+
+
     def prune_empty_fock_spaces(self):
         """
         remove fock_spaces that don't have any configurations 
