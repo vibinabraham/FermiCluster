@@ -131,6 +131,27 @@ def init_pyscf(molecule,charge,spin,basis_set,orb_basis='scf',cas=False,cas_nsta
         C = np.column_stack((cl_c, cl_a, cl_v))
         print(cl_a)
 
+    elif orb_basis == 'ibmo':
+        mo_occ = mf.mo_coeff[:,mf.mo_occ>0]
+        mo_vir = mf.mo_coeff[:,mf.mo_occ==0]
+        iao_occ = lo.iao.iao(mol, mo_occ)
+        iao_vir = lo.iao.iao(mol, mo_vir)
+
+        # Orthogonalize IAO
+        iao_occ = lo.vec_lowdin(iao_occ, mf.get_ovlp())
+        iao_vir = lo.vec_lowdin(iao_vir, mf.get_ovlp())
+
+        #
+        # Method 1, using Knizia's alogrithm to localize IAO orbitals
+        #
+        '''
+        Generate IBOS from orthogonal IAOs
+        '''
+        ibo_occ = lo.ibo.ibo(mol, mo_occ, iao_occ)
+        ibo_vir = lo.ibo.ibo(mol, mo_vir, iao_vir)
+
+        C = np.column_stack((ibo_occ,ibo_vir))
+
     molden.from_mo(mol, 'h8.molden', C)
     if cas == True:
         mycas = mcscf.CASSCF(mf, cas_norb, cas_nel)
@@ -182,7 +203,7 @@ def e1_order(h,cut_off):
         scipy.sparse.csr_matrix(hnew))
     print(idx)
     idx = idx 
-    hnew = h[:, idx]
+    hnew = hnew[:, idx]
     hnew = hnew[idx, :]
     print(hnew)
     return idx
