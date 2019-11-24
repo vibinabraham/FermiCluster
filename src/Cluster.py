@@ -8,6 +8,7 @@ from ci_string import *
 from Hamiltonian import *
 from davidson import *
 from helpers import *
+from myfci import *
 
 class Cluster(object):
 
@@ -142,6 +143,10 @@ class Cluster(object):
                 self.basis[(na,nb)] = ci.results_v
                 self.Hci[(na,nb)] = Hci
                 #print(ci.results_v)
+                S2 = form_S2(self.n_orb,na,nb)
+
+                eva,evec = np.linalg.eigh(Hci + 0.003 * S2)
+                self.basis[(na,nb)] = evec
 
 
                 if 0: #basis deteminant ordering not same yet, so cant use pyscf 

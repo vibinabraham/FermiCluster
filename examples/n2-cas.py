@@ -13,7 +13,7 @@ ttt = time.time()
 np.set_printoptions(suppress=True, precision=3, linewidth=1500)
 
 ###     PYSCF INPUT
-r0 = 1.9 
+r0 = 2.2 
 molecule = '''
 N      0.00       0.00       0.00
 N      0.00       0.00       {}'''.format(r0)
@@ -29,8 +29,8 @@ cas_nstop = 10
 cas_nel = 10
 
 ###     TPSCI CLUSTER INPUT
-blocks = [[0,1,2,3],[4,5],[6,7]]
-init_fspace = ((3, 3), (1, 1), (1, 1))
+blocks = [[0,1,2,3],[4,5,6,7]]
+init_fspace = ((3, 3), (2, 2))
 
 
 
@@ -53,7 +53,7 @@ if do_hci:
     ehci, hci_dim = run_hci_pyscf(h,g,cas_nel,ecore=ecore,select_cutoff=1e-4,ci_cutoff=1e-4)
 if do_tci:
     ci_vector, pt_vector, etci, etci2 = run_tpsci(h,g,blocks,init_fspace,ecore=ecore,
-        thresh_ci_clip=1e-5,thresh_cipsi=1e-5,max_tucker_iter=0)
+        thresh_ci_clip=1e-5,thresh_cipsi=1e-5,max_tucker_iter=0,max_cipsi_iter=20)
     ci_vector.print_configs()
     tci_dim = len(ci_vector)
 

@@ -306,6 +306,8 @@ if __name__ == "__main__":
     
     #ci_vector.expand_to_full_space()
     #ci_vector.expand_each_fock_space()
+    ci_vector.add_single_excitonic_states()
+    ci_vector.print_configs()
 
 
     ci_vector, pt_vector, e0, e2 = bc_cipsi_tucker(ci_vector.copy(), clustered_ham, thresh_cipsi=1e-5,

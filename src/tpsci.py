@@ -132,6 +132,9 @@ def run_tpsci(h, g, blocks, init_fspace,
 
     #ci_vector.expand_to_full_space()
     #ci_vector.expand_each_fock_space()
+    #ci_vector.add_single_excitonic_states()
+    #ci_vector.print_configs()
+
     if max_tucker_iter ==0:
         ci_vector, pt_vector, e0, e2 = bc_cipsi(ci_vector.copy(), clustered_ham, 
                 thresh_cipsi=thresh_cipsi, thresh_ci_clip=thresh_ci_clip, thresh_conv=thresh_cipsi_conv, max_iter=max_cipsi_iter)
