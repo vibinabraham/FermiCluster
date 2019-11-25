@@ -35,9 +35,11 @@ def run_hci_pyscf( h, g, nelec, ecore=0, select_cutoff=5e-4, ci_cutoff=5e-4):
     return ehci,hci_dim
 # }}}
 
-def init_pyscf(molecule,charge,spin,basis_set,orb_basis='scf',cas=False,cas_nstart=None,cas_nstop=None,cas_nel=None):
+def init_pyscf(molecule,charge,spin,basis_set,orb_basis='scf',cas=False,cas_nstart=None,cas_nstop=None,cas_nel=None,loc_nstart=None,loc_nstop=None):
 # {{{
+    import pyscf
     from pyscf import gto, scf, ao2mo, molden, lo
+    pyscf.lib.num_threads(1)  #with degenerate states and multiple processors there can be issues
     #PYSCF inputs
     print(" ---------------------------------------------------------")
     print("                      Using Pyscf:")
@@ -125,6 +127,7 @@ def init_pyscf(molecule,charge,spin,basis_set,orb_basis='scf',cas=False,cas_nsta
         #end
 
     elif orb_basis == 'boys':
+        pyscf.lib.num_threads(1)  #with degenerate states and multiple processors there can be issues
         cl_c = mf.mo_coeff[:, :cas_nstart]
         cl_a = lo.Boys(mol, mf.mo_coeff[:, cas_nstart:cas_nstop]).kernel(verbose=4)
         cl_v = mf.mo_coeff[:, cas_nstop:]
@@ -132,10 +135,15 @@ def init_pyscf(molecule,charge,spin,basis_set,orb_basis='scf',cas=False,cas_nsta
         print(cl_a)
 
     elif orb_basis == 'ibmo':
+        loc_vstop =  loc_nstop - n_a
+        print(loc_vstop)
+
         mo_occ = mf.mo_coeff[:,mf.mo_occ>0]
         mo_vir = mf.mo_coeff[:,mf.mo_occ==0]
-        iao_occ = lo.iao.iao(mol, mo_occ)
-        iao_vir = lo.iao.iao(mol, mo_vir)
+        c_core = mo_occ[:,:loc_nstart]
+        iao_occ = lo.iao.iao(mol, mo_occ[:,loc_nstart:])
+        iao_vir = lo.iao.iao(mol, mo_vir[:,:loc_vstop])
+        c_out  = mo_vir[:,loc_vstop:]
 
         # Orthogonalize IAO
         iao_occ = lo.vec_lowdin(iao_occ, mf.get_ovlp())
@@ -147,12 +155,21 @@ def init_pyscf(molecule,charge,spin,basis_set,orb_basis='scf',cas=False,cas_nsta
         '''
         Generate IBOS from orthogonal IAOs
         '''
-        ibo_occ = lo.ibo.ibo(mol, mo_occ, iao_occ)
-        ibo_vir = lo.ibo.ibo(mol, mo_vir, iao_vir)
+        ibo_occ = lo.ibo.ibo(mol, mo_occ[:,loc_nstart:], iao_occ)
+        ibo_vir = lo.ibo.ibo(mol, mo_vir[:,:loc_vstop], iao_vir)
 
-        C = np.column_stack((ibo_occ,ibo_vir))
+        C = np.column_stack((c_core,ibo_occ,ibo_vir,c_out))
 
+
+    print(orb_basis)
+    print(C.T @ mf.get_hcore() @ C)
+    print(C.T @ mf.get_fock() @ C)
+    print(C.T @ mf.get_ovlp() @ C)
+    J,K = mf.get_jk() 
+    print(C.T @ J @ C)
+    print(C.T @ K @ C)
     molden.from_mo(mol, 'h8.molden', C)
+
     if cas == True:
         mycas = mcscf.CASSCF(mf, cas_norb, cas_nel)
         h1e_cas, ecore = mycas.get_h1eff(mo_coeff = C)  #core core orbs to form ecore and eff
