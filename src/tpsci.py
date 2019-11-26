@@ -24,7 +24,8 @@ def run_tpsci(h, g, blocks, init_fspace,
                     max_tucker_iter=20, 
                     tucker_state_clip=None,
                     cs_guess = None,
-                    hshift=1e-8):
+                    hshift=1e-8,
+                    s2_shift=False):
     """
     Tensor Product Selected Configuration Interaction (TPSCI)
 
@@ -54,6 +55,8 @@ def run_tpsci(h, g, blocks, init_fspace,
         Clip the tucker state, improve the tucker iterations_
     hshift : float
         For the tucker iterations, shift the BRDM rotation by hshift* H for the cluster in the fock space
+    s2_shift: boolean
+        use S2 when forming local eigenvectors of clusters
 
 
     Examples
@@ -121,7 +124,7 @@ def run_tpsci(h, g, blocks, init_fspace,
         print()
         print()
         print(" Form basis by diagonalize local Hamiltonian for cluster: ",ci_idx)
-        ci.form_eigbasis_from_local_operator(opi,max_roots=1000)
+        ci.form_eigbasis_from_local_operator(opi,max_roots=1000,s2_shift=s2_shift)
 
 
     #clustered_ham.add_ops_to_clusters()

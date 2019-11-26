@@ -108,7 +108,7 @@ class Cluster(object):
                 self.Hci[(na,nb)] = Hci
     # }}}
     
-    def form_eigbasis_from_local_operator(self,local_op,max_roots=1000,ratio = 1):
+    def form_eigbasis_from_local_operator(self,local_op,max_roots=1000,ratio = 1,s2_shift=False):
         """
         grab integrals acting locally and form eigenbasis by FCI
         """
@@ -143,10 +143,11 @@ class Cluster(object):
                 self.basis[(na,nb)] = ci.results_v
                 self.Hci[(na,nb)] = Hci
                 #print(ci.results_v)
-                S2 = form_S2(self.n_orb,na,nb)
+                if s2_shift == True:
+                    S2 = form_S2(self.n_orb,na,nb)
 
-                eva,evec = np.linalg.eigh(Hci + 0.003 * S2)
-                self.basis[(na,nb)] = evec
+                    eva,evec = np.linalg.eigh(Hci + 0.003 * S2)
+                    self.basis[(na,nb)] = evec
 
 
                 if 0: #basis deteminant ordering not same yet, so cant use pyscf 

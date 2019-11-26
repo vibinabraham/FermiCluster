@@ -7,13 +7,13 @@ import copy as cp
 import sys
 
 
-def run_fci_pyscf( h, g, nelec, ecore=0):
+def run_fci_pyscf( h, g, nelec, ecore=0,nroots=1):
 # {{{
     # FCI
     from pyscf import fci
     #efci, ci = fci.direct_spin1.kernel(h, g, h.shape[0], nelec,ecore=ecore, verbose=5) #DO NOT USE 
     cisolver = fci.direct_spin1.FCI()
-    efci, ci = cisolver.kernel(h, g, h.shape[1], nelec, ecore=ecore,verbose=4)
+    efci, ci = cisolver.kernel(h, g, h.shape[1], nelec, ecore=ecore,verbose=4,nroots =nroots)
     fci_dim = ci.shape[0]*ci.shape[1]
     print(" FCI:        %12.8f Dim:%6d"%(efci,fci_dim))
     print("FCI %10.8f"%(efci))
@@ -50,10 +50,13 @@ def init_pyscf(molecule,charge,spin,basis_set,orb_basis='scf',cas=False,cas_nsta
     mol.atom = molecule
 
     mol.max_memory = 1000 # MB
+    mol.symmetry = True
     mol.charge = charge
     mol.spin = spin
     mol.basis = basis_set
     mol.build()
+    print("symmertry")
+    print(mol.topgroup)
 
 
     #SCF 
@@ -163,12 +166,19 @@ def init_pyscf(molecule,charge,spin,basis_set,orb_basis='scf',cas=False,cas_nsta
 
     print(orb_basis)
     print(C.T @ mf.get_hcore() @ C)
-    print(C.T @ mf.get_fock() @ C)
-    print(C.T @ mf.get_ovlp() @ C)
-    J,K = mf.get_jk() 
-    print(C.T @ J @ C)
-    print(C.T @ K @ C)
+    #print(C.T @ mf.get_fock() @ C)
+    #print(C.T @ mf.get_ovlp() @ C)
+    #J,K = mf.get_jk() 
+    #print(C.T @ J @ C)
+    #print(C.T @ K @ C)
+
+    #cluster using hcore
+    #idx = e1_order(C.T  @ mf.get_hcore() @ C,cut_off = 1e-1)
+    #h,g = reorder_integrals(idx,h,g)
+
+    #C = C[:,idx]
     molden.from_mo(mol, 'h8.molden', C)
+    print(mf.mo_energy)
 
     if cas == True:
         mycas = mcscf.CASSCF(mf, cas_norb, cas_nel)
@@ -222,6 +232,7 @@ def e1_order(h,cut_off):
     idx = idx 
     hnew = hnew[:, idx]
     hnew = hnew[idx, :]
+    print("New order")
     print(hnew)
     return idx
 # }}}

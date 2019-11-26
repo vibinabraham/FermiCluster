@@ -105,3 +105,38 @@ def get_hubbard_1d(n_site, beta1, beta2, U, pbc=True):
             
     return h_local,g_local
     # }}}
+
+def make_2d_lattice(dim_a,dim_b,beta1,beta2,U):
+# {{{
+    n_site = dim_a * dim_b
+    t = np.zeros((n_site,n_site))
+    for a in range(0,dim_a):
+        for b in range(0,dim_b):
+            ind = a *dim_b + b
+            if a%2 == 0:
+                ind2 = (a+1) * dim_b + b
+                t[ind, ind2] = beta1 
+                t[ind2, ind] = beta1 
+            else:
+                ind2 = (a+1) * dim_b + b
+                #print(ind,ind2)
+                try:
+                    t[ind, ind2] = -beta2 
+                    t[ind2, ind] = -beta2 
+                except:
+                    pass
+            if b%2 == 0:
+                ind2 = (a) * dim_b + b+1
+                t[ind, ind2] = beta1 
+                t[ind2, ind] = beta1 
+            elif b%2 ==1 and b%dim_b !=dim_b-1:
+                ind2 = (a) * dim_b + b+1
+                #print(ind,ind2)
+                t[ind, ind2] = -beta2 
+                t[ind2, ind] = -beta2 
+
+    g_local = np.zeros((n_site,n_site,n_site,n_site))
+    for i in range(0,n_site):
+        g_local[i,i,i,i] = U
+    return t,g_local
+# }}}
