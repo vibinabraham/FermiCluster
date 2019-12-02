@@ -13,10 +13,18 @@ def run_fci_pyscf( h, g, nelec, ecore=0,nroots=1):
     from pyscf import fci
     #efci, ci = fci.direct_spin1.kernel(h, g, h.shape[0], nelec,ecore=ecore, verbose=5) #DO NOT USE 
     cisolver = fci.direct_spin1.FCI()
-    efci, ci = cisolver.kernel(h, g, h.shape[1], nelec, ecore=ecore,verbose=4,nroots =nroots)
+    efci, ci = cisolver.kernel(h, g, h.shape[1], nelec, ecore=ecore,nroots =nroots,verbose=100)
     fci_dim = ci.shape[0]*ci.shape[1]
+    d1 = cisolver.make_rdm1(ci, h.shape[1], nelec)
+    print(d1)
     print(" FCI:        %12.8f Dim:%6d"%(efci,fci_dim))
     print("FCI %10.8f"%(efci))
+    print(ci[0,0])
+    #for i in range(ci.shape[0]):
+    #    for j in range(ci.shape[0]):
+    #        print("%20.14f"%(ci[i,j]*ci[i,j]))
+    #exit()
+            
     return efci,fci_dim
 # }}}
 
@@ -59,10 +67,20 @@ def init_pyscf(molecule,charge,spin,basis_set,orb_basis='scf',cas=False,cas_nsta
     print(mol.topgroup)
 
 
+
     #SCF 
+
+    #mf = scf.RHF(mol).run(init_guess='atom')
     mf = scf.RHF(mol).run()
     #C = mf.mo_coeff #MO coeffs
     enu = mf.energy_nuc()
+
+    from pyscf import symm
+    mo = symm.symmetrize_orb(mol, mf.mo_coeff)
+    osym = symm.label_orb_symm(mol, mol.irrep_name, mol.symm_orb, mo)
+    #symm.addons.symmetrize_space(mol, mo, s=None, check=True, tol=1e-07)
+    for i in range(len(osym)):
+        print("%4d %8s %16.8f"%(i+1,osym[i],mf.mo_energy[i]))
 
     #orbitals and lectrons
     n_orb = mol.nao_nr()
@@ -179,17 +197,20 @@ def init_pyscf(molecule,charge,spin,basis_set,orb_basis='scf',cas=False,cas_nsta
     #C = C[:,idx]
     molden.from_mo(mol, 'h8.molden', C)
     print(mf.mo_energy)
+    print(C)
 
     if cas == True:
         mycas = mcscf.CASSCF(mf, cas_norb, cas_nel)
         h1e_cas, ecore = mycas.get_h1eff(mo_coeff = C)  #core core orbs to form ecore and eff
         h2e_cas = ao2mo.kernel(mol, C[:,cas_nstart:cas_nstop], aosym='s4',compact=False).reshape(4 * ((cas_norb), )) 
         print(h1e_cas)
+        #return h1e_cas,h2e_cas,ecore,C,mol,mf
         return h1e_cas,h2e_cas,ecore
     elif cas==False:
         h = C.T.dot(mf.get_hcore()).dot(C)
         g = ao2mo.kernel(mol,C,aosym='s4',compact=False).reshape(4*((n_orb),))
         print(h)
+        #return h, g, enu, C,mol,mf
         return h, g, enu
 # }}}
 

@@ -16,12 +16,12 @@ import subprocess
 label = subprocess.check_output(["git","rev-parse", "HEAD"]).strip()
 print(label)
 
-for ri in range(0,44):
+for ri in range(0,36):
     ###     PYSCF INPUT
     r0 = 0.9 + 0.05 * ri 
     molecule = '''
-    N      0.00       0.00       0.00
-    N      0.00       0.00       {}'''.format(r0)
+    C      0.00       0.00       0.00
+    O      0.00       0.00       {}'''.format(r0)
     charge = 0
     spin  = 0
     basis_set = 'sto-3g'
@@ -43,6 +43,8 @@ for ri in range(0,44):
     h,g,ecore = init_pyscf(molecule,charge,spin,basis_set,
                             orb_basis,cas,cas_nstart,cas_nstop, cas_nel)
 
+
+
     do_fci = 1
     do_hci = 1
     do_tci = 1
@@ -51,14 +53,12 @@ for ri in range(0,44):
         efci, fci_dim = run_fci_pyscf(h,g,cas_nel,ecore=ecore)
     if do_hci:
         ehci, hci_dim = run_hci_pyscf(h,g,cas_nel,ecore=ecore,select_cutoff=1e-3,ci_cutoff=1e-3)
-
     #cluster using hcore
     idx = e1_order(h,cut_off = 1e-4)
     h,g = reorder_integrals(idx,h,g)
-
     if do_tci:
         ci_vector, pt_vector, etci, etci2 = run_tpsci(h,g,blocks,init_fspace,ecore=ecore,
-            thresh_ci_clip=1e-3,thresh_cipsi=1e-6,max_tucker_iter=0,max_cipsi_iter=20)
+            thresh_ci_clip=1e-3,thresh_cipsi=1e-6,max_tucker_iter=20,max_cipsi_iter=20)
         ci_vector.print_configs()
         tci_dim = len(ci_vector)
 

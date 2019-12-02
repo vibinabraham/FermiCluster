@@ -140,3 +140,45 @@ def make_2d_lattice(dim_a,dim_b,beta1,beta2,U):
         g_local[i,i,i,i] = U
     return t,g_local
 # }}}
+
+def make_stack_lattice(dim_a,dim_b,beta1,beta2,U,pbc=True):
+# {{{
+    """
+    make a lattice with strong intra in 1d and weak in 2nd dimension
+    for 4 x 3 
+    it makes a cube in strong interaction and stacks them on top of each other
+
+    dima = 3 
+    dimb = 4 pbc in dim b 
+    this will be 12 site stacked cube
+    """
+    n_site = dim_a * dim_b
+    t = np.zeros((n_site,n_site))
+    for a in range(0,dim_a):
+        for b in range(0,dim_b):
+            ind = a *dim_b + b
+            ind2 = (a+1) * dim_b + b
+            try:
+                t[ind, ind2] = beta2
+                t[ind2, ind] = beta2 
+            except:
+                pass
+
+            if b%dim_b != dim_b -1:
+                ind2 = (a) * dim_b + b+1
+                try:
+                    t[ind, ind2] =  beta1 
+                    t[ind2, ind] =  beta1 
+                except:
+                    pass
+            else:
+                if pbc == True:
+                    ind2 = (a-1) * dim_b + b+ 1
+                    t[ind, ind2] =  beta1 
+                    t[ind2, ind] =  beta1 
+
+    g_local = np.zeros((n_site,n_site,n_site,n_site))
+    for i in range(0,n_site):
+        g_local[i,i,i,i] = U
+    return t,g_local
+# }}}

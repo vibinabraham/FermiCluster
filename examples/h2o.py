@@ -13,9 +13,9 @@ ttt = time.time()
 np.set_printoptions(suppress=True, precision=4, linewidth=1500)
 pyscf.lib.num_threads(1)  #with degenerate states and multiple processors there can be issues
 
-for ri in range(30):
-    r0 = 0.85 + ri * 0.05 
+for ri in range(0,47):
     ###     PYSCF INPUT
+    r0 = 0.70 + 0.05 * ri
     molecule = '''
     O
     H   1   {} 
@@ -38,12 +38,12 @@ for ri in range(30):
     blocks = [[0,1],[2,3],[4,5],[6,7]]
     blocks = [[0,1,2],[3,4],[5,6]]
     blocks = [[0,1],[2,4],[3,5],[6,7],[8,9]]
-    blocks = [[0,1],[2,3],[4,5]]
+    blocks = [[0,1,2],[3,4],[5]]
 
     init_fspace = ((1, 1), (1, 1),(1, 1), (1, 1))
     init_fspace = ((2, 2), (2, 2))
     init_fspace = ((2, 2), (1, 1),(1,1))
-    init_fspace = ((1, 1), (1, 1),(2,2))
+    init_fspace = ((2, 2), (1, 1),(1,1))
 
 
     #if orb_basis == 'scf':
@@ -59,12 +59,6 @@ for ri in range(30):
     # Integrals from pyscf
     h,g,ecore = init_pyscf(molecule,charge,spin,basis_set,orb_basis,cas_nstart=cas_nstart,cas_nstop=cas_nstop,cas_nel=cas_nel,cas=True,loc_nstart=loc_start,loc_nstop = loc_stop)
 
-    #cluster using hcore
-    idx = e1_order(h,cut_off = 0.70)
-    h,g = reorder_integrals(idx,h,g)
-    print(h)
-    print("new index")
-    print(idx)
 
     do_fci = 1
     do_hci = 1
@@ -74,9 +68,13 @@ for ri in range(30):
         efci, fci_dim = run_fci_pyscf(h,g,nelec,ecore=ecore)
     if do_hci:
         ehci, hci_dim = run_hci_pyscf(h,g,nelec,ecore=ecore,select_cutoff=1e-3,ci_cutoff=1e-3)
+
+    #cluster using hcore
+    idx = e1_order(h,cut_off = 1e-4)
+    h,g = reorder_integrals(idx,h,g)
     if do_tci:
         ci_vector, pt_vector, etci, etci2 = run_tpsci(h,g,blocks,init_fspace,ecore=ecore,
-            thresh_ci_clip=1e-3,thresh_cipsi=1e-6,max_tucker_iter=5)
+            thresh_ci_clip=1e-3,thresh_cipsi=1e-6,max_tucker_iter=20,max_cipsi_iter=20)
         ci_vector.print_configs()
         tci_dim = len(ci_vector)
 
