@@ -13,7 +13,7 @@ ttt = time.time()
 np.set_printoptions(suppress=True, precision=4, linewidth=1500)
 pyscf.lib.num_threads(1)  #with degenerate states and multiple processors there can be issues
 
-for ri in range(0,47):
+for ri in range(0,37):
     ###     PYSCF INPUT
     r0 = 0.70 + 0.05 * ri
     molecule = '''
@@ -26,7 +26,7 @@ for ri in range(0,47):
     basis_set = 'sto-3g'
 
     ###     TPSCI BASIS INPUT
-    orb_basis = 'scf'
+    orb_basis = 'ibmo'
     cas = True
     cas_nstart = 1
     cas_nstop =  7
@@ -60,9 +60,9 @@ for ri in range(0,47):
     h,g,ecore = init_pyscf(molecule,charge,spin,basis_set,orb_basis,cas_nstart=cas_nstart,cas_nstop=cas_nstop,cas_nel=cas_nel,cas=True,loc_nstart=loc_start,loc_nstop = loc_stop)
 
 
-    do_fci = 1
-    do_hci = 1
-    do_tci = 1
+    do_fci = 0
+    do_hci = 0
+    do_tci = 0
 
     if do_fci:
         efci, fci_dim = run_fci_pyscf(h,g,nelec,ecore=ecore)
@@ -70,14 +70,18 @@ for ri in range(0,47):
         ehci, hci_dim = run_hci_pyscf(h,g,nelec,ecore=ecore,select_cutoff=1e-3,ci_cutoff=1e-3)
 
     #cluster using hcore
-    idx = e1_order(h,cut_off = 1e-4)
+    idx = e1_order(h,cut_off = 4e-1)
     h,g = reorder_integrals(idx,h,g)
     if do_tci:
         ci_vector, pt_vector, etci, etci2 = run_tpsci(h,g,blocks,init_fspace,ecore=ecore,
-            thresh_ci_clip=1e-3,thresh_cipsi=1e-6,max_tucker_iter=20,max_cipsi_iter=20)
+            thresh_ci_clip=1e-3,thresh_cipsi=1e-6,max_tucker_iter=0,max_cipsi_iter=20)
         ci_vector.print_configs()
         tci_dim = len(ci_vector)
 
+    for i in range(0,h.shape[0]):
+        for j in range(0,h.shape[0]):
+            print("%8.4f"%h[i,j],end='')
+        print()
 
-    print("  rad      FCI          Dim          HCI       Dim          TPSCI      Dim       TPSCI(2)")
-    print(" %4.2f  %12.9f   %6d     %12.9f  %6d %12.9f %6d %12.9f"%(r0,efci,fci_dim,ehci,hci_dim,etci,tci_dim,etci2))
+    #print("  rad      FCI          Dim          HCI       Dim          TPSCI      Dim       TPSCI(2)")
+    #print(" %4.2f  %12.9f   %6d     %12.9f  %6d %12.9f %6d %12.9f"%(r0,efci,fci_dim,ehci,hci_dim,etci,tci_dim,etci2))
