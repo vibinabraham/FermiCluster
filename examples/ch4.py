@@ -43,7 +43,12 @@ if cas == True:
 
 
 #Integrals from pyscf
-h,g,ecore = init_pyscf(molecule,charge,spin,basis_set,orb_basis,cas_nstart=1,cas_nstop=9,cas_nel=8,cas=True)
+pmol = PyscfHelper()
+pmol.init(molecule,charge,spin,basis_set,orb_basis,cas_nstart=1,cas_nstop=9,cas_nel=8,cas=True)
+
+h = pmol.h
+g = pmol.g
+ecore = pmol.ecore
 
 #cluster using hcore
 idx = e1_order(h,cut_off = 1e-1)

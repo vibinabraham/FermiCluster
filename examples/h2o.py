@@ -35,20 +35,10 @@ for ri in range(0,37):
     cas_nel = 8
 
     ###     TPSCI CLUSTER INPUT
-    blocks = [[0,1],[2,3],[4,5],[6,7]]
-    blocks = [[0,1,2],[3,4],[5,6]]
-    blocks = [[0,1],[2,4],[3,5],[6,7],[8,9]]
     blocks = [[0,1,2],[3,4],[5]]
 
-    init_fspace = ((1, 1), (1, 1),(1, 1), (1, 1))
-    init_fspace = ((2, 2), (2, 2))
-    init_fspace = ((2, 2), (1, 1),(1,1))
     init_fspace = ((2, 2), (1, 1),(1,1))
 
-
-    #if orb_basis == 'scf':
-    #    blocks = [[0,1],[2,3,4,5]]
-    #    init_fspace = ((1, 1), (3, 3))
 
     nelec = tuple([sum(x) for x in zip(*init_fspace)])
     if cas == True:
@@ -57,8 +47,15 @@ for ri in range(0,37):
 
 
     # Integrals from pyscf
-    h,g,ecore = init_pyscf(molecule,charge,spin,basis_set,orb_basis,cas_nstart=cas_nstart,cas_nstop=cas_nstop,cas_nel=cas_nel,cas=True,loc_nstart=loc_start,loc_nstop = loc_stop)
+    #Integrals from pyscf
+    pmol = PyscfHelper()
+    pmol.init(molecule,charge,spin,basis_set,orb_basis,
+                    cas_nstart=cas_nstart,cas_nstop=cas_nstop,cas_nel=cas_nel,cas=True,
+                    loc_nstart=loc_start,loc_nstop = loc_stop)
 
+    h = pmol.h
+    g = pmol.g
+    ecore = pmol.ecore
 
     do_fci = 0
     do_hci = 0

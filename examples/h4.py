@@ -40,11 +40,12 @@ if cas == True:
 
 
 #Integrals from pyscf
-h,g,ecore = init_pyscf(molecule,charge,spin,basis_set,orb_basis)
+pmol = PyscfHelper()
+pmol.init(molecule,charge,spin,basis_set,orb_basis)
 
-#cluster using hcore
-idx = e1_order(h,cut_off = 1e-2)
-h,g = reorder_integrals(idx,h,g)
+h = pmol.h
+g = pmol.g
+ecore = pmol.ecore
 
 do_fci = 1
 do_hci = 1
@@ -54,6 +55,11 @@ if do_fci:
     efci, fci_dim = run_fci_pyscf(h,g,nelec,ecore=ecore)
 if do_hci:
     ehci, hci_dim = run_hci_pyscf(h,g,nelec,ecore=ecore,select_cutoff=2e-3,ci_cutoff=2e-3)
+
+#cluster using hcore
+idx = e1_order(h,cut_off = 1e-2)
+h,g = reorder_integrals(idx,h,g)
+
 if do_tci:
     ci_vector, pt_vector, etci, etci2 = run_tpsci(h,g,blocks,init_fspace,ecore=ecore,
         thresh_ci_clip=1e-4,thresh_cipsi=1e-7,max_tucker_iter=0)

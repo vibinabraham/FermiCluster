@@ -37,13 +37,14 @@ for ri in range(0,36):
     blocks = [[0,1,2,3],[4,5,6,7]]
     init_fspace = ((3, 3), (2, 2))
 
-
-
     #Integrals from pyscf
-    h,g,ecore = init_pyscf(molecule,charge,spin,basis_set,
-                            orb_basis,cas,cas_nstart,cas_nstop, cas_nel)
+    pmol = PyscfHelper()
+    pmol.init(molecule,charge,spin,basis_set,orb_basis,
+                cas,cas_nstart,cas_nstop,cas_nel)
 
-
+    h = pmol.h
+    g = pmol.g
+    ecore = pmol.ecore
 
     do_fci = 1
     do_hci = 1
