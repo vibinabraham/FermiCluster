@@ -21,7 +21,7 @@ print(label)
 numpy_memory = 2
 
 ###     PYSCF INPUT
-r0 = 1.5
+r0 = 1.0977
 molecule = '''
 N      0.00       0.00       0.00
 N      0.00       0.00       {}'''.format(r0)
@@ -49,7 +49,6 @@ pmol.init(molecule,charge,spin,basis_set,orb_basis,cas,cas_nstart,cas_nstop,cas_
 
 do_tci = 1
 
-print("pmol has h")
 print(pmol.h.shape)
 
 idx = ordering(pmol,cas,cas_nstart,cas_nstop,loc_nstart,loc_nstop,ordering='hcore')
