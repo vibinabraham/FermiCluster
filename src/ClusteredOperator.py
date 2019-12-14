@@ -593,10 +593,10 @@ class ClusteredOperator:
                         term_ba = ClusteredTerm(delta_ba, ops_ba, vijkl, self.clusters)
                         term_bb = ClusteredTerm(delta_bb, ops_bb, vijkl, self.clusters)
                        
-                        term_aa.active = list(set([ci.idx,cj.idx,ck.idx,cl.idx]))
-                        term_ab.active = list(set([ci.idx,cj.idx,ck.idx,cl.idx]))
-                        term_ba.active = list(set([ci.idx,cj.idx,ck.idx,cl.idx]))
-                        term_bb.active = list(set([ci.idx,cj.idx,ck.idx,cl.idx]))
+                        term_aa.active = sorted(list(set([ci.idx,cj.idx,ck.idx,cl.idx])))
+                        term_ab.active = sorted(list(set([ci.idx,cj.idx,ck.idx,cl.idx])))
+                        term_ba.active = sorted(list(set([ci.idx,cj.idx,ck.idx,cl.idx])))
+                        term_bb.active = sorted(list(set([ci.idx,cj.idx,ck.idx,cl.idx])))
                         
                         
                        
