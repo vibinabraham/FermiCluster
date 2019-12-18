@@ -157,19 +157,19 @@ def run_tpsci(h, g, blocks, init_fspace,
         print("")
         print(" TPSCI:          %12.8f      Dim:%6d" % (e0+ecore, len(ci_vector)))
         print(" TPSCI(2):       %12.8f      Dim:%6d" % (e2+ecore,len(pt_vector)))
+        ci_vector_ref = ci_vector.copy()
+        ci_vector_ref.clip(.5)
+        print("coefficient of dominant determinant")
+        ci_vector_ref.print_configs()
+        ci_vector_ref.normalize()  #normalize to get energy
+        edps = build_hamiltonian_diagonal(clustered_ham,ci_vector_ref)
+        print("new DPS %16.8f"%(edps+ecore))
         if t_conv == True:
             print("--------         TPSCI converged        --------")
             print("\n\n")
         elif t_conv == False:
             print("--------         TPSCI did not converged        --------")
             print("\n\n")
-        ci_vector_ref = ci_vector.copy()
-        ci_vector_ref.clip(.5)
-        ci_vector_ref.print_configs()
-        ci_vector_ref.normalize()
-        ci_vector_ref.print_configs()
-        edps = build_hamiltonian_diagonal(clustered_ham,ci_vector_ref)
-        print("new DPS %16.8f"%(edps+ecore))
 
     return ci_vector, pt_vector, e0+ecore, e2+ecore 
 # }}}

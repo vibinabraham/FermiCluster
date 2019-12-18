@@ -22,6 +22,9 @@ class PyscfHelper(object):
         #self.na     = 0
         #self.nb     = 0
         self.ecore  = 0
+        self.C      = None
+        self.J      = None
+        self.K      = None
 
     def init(self,molecule,charge,spin,basis_set,orb_basis='scf',cas=False,cas_nstart=None,cas_nstop=None,cas_nel=None,loc_nstart=None,loc_nstop=None):
     # {{{
@@ -181,6 +184,10 @@ class PyscfHelper(object):
             self.ecore = ecore
             self.mf = mf
             self.mol = mol
+            self.C = cp.deepcopy(C[:,cas_nstart:cas_nstop])
+            J,K = mf.get_jk()
+            self.J = self.C.T @ J @ self.C
+            self.K = self.C.T @ J @ self.C
 
         elif cas==False:
             h = C.T.dot(mf.get_hcore()).dot(C)
@@ -192,6 +199,10 @@ class PyscfHelper(object):
             self.ecore = enu
             self.mf = mf
             self.mol = mol
+            self.C = C
+            J,K = mf.get_jk()
+            self.J = self.C.T @ J @ self.C
+            self.K = self.C.T @ J @ self.C
     # }}}
 
 def run_fci_pyscf( h, g, nelec, ecore=0,nroots=1):
