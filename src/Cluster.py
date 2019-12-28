@@ -167,6 +167,42 @@ class Cluster(object):
                     ci.run()
                     self.basis[(na,nb)] = ci.results_v[:,-max_roots:]
                     # }}}
+
+    def form_eigbasis_from_local_operator_nanb(self,local_op,n_max,max_roots=1000,ratio = 1):
+        """
+        grab integrals acting locally and form eigenbasis by FCI
+        """
+# {{{
+        h = np.zeros([self.n_orb]*2)
+        v = np.zeros([self.n_orb]*4)
+        for t in local_op.terms:
+            if t.ops[0] == "Aa":
+                h += t.ints 
+            if t.ops[0] == "AAaa":
+                v = 2*t.ints 
+
+        H = Hamiltonian()
+        H.S = np.eye(h.shape[0])
+        H.C = H.S
+        H.t = h
+        H.V = v
+        self.basis = {}
+        print(" Do CI for each particle number block")
+        for na in range(n_max+1):
+            for nb in range(n_max+1):
+                if na+nb < n_max:
+                    dim = calc_nchk(self.n_orb, na)*calc_nchk(self.n_orb, nb)
+                    #max_roots = int(((ratio * dim) //1) +1 )
+
+                    ci = ci_solver()
+                    ci.algorithm = "direct"
+                    ci.init(H,na,nb,max_roots)
+                    print(ci)
+                    Hci = ci.run()
+                    #self.basis[(na,nb)] = np.eye(ci.results_v.shape[0])
+                    self.basis[(na,nb)] = ci.results_v
+                    self.Hci[(na,nb)] = Hci
+# }}}
                     
             
     def rotate_basis(self,U):
@@ -230,8 +266,11 @@ class Cluster(object):
         #  a, A 
         for na in range(1,self.n_orb+1):
             for nb in range(0,self.n_orb+1):
-                self.ops['a'][(na-1,nb),(na,nb)] = build_annihilation(self.n_orb, (na-1,nb),(na,nb),self.basis)
-                self.ops['A'][(na,nb),(na-1,nb)] = cp.deepcopy(np.swapaxes(self.ops['a'][(na-1,nb),(na,nb)],0,1))
+                try:
+                    self.ops['a'][(na-1,nb),(na,nb)] = build_annihilation(self.n_orb, (na-1,nb),(na,nb),self.basis)
+                    self.ops['A'][(na,nb),(na-1,nb)] = cp.deepcopy(np.swapaxes(self.ops['a'][(na-1,nb),(na,nb)],0,1))
+                except KeyError:
+                    continue
                 # note:
                 #   I did a deepcopy instead of reference. This increases memory requirements and 
                 #   basis transformation costs, but simplifies later manipulations. Later I need to 
@@ -240,8 +279,11 @@ class Cluster(object):
         #  b, B 
         for na in range(0,self.n_orb+1):
             for nb in range(1,self.n_orb+1):
-                self.ops['b'][(na,nb-1),(na,nb)] = build_annihilation(self.n_orb, (na,nb-1),(na,nb),self.basis)
-                self.ops['B'][(na,nb),(na,nb-1)] = cp.deepcopy(np.swapaxes(self.ops['b'][(na,nb-1),(na,nb)],0,1))
+                try:
+                    self.ops['b'][(na,nb-1),(na,nb)] = build_annihilation(self.n_orb, (na,nb-1),(na,nb),self.basis)
+                    self.ops['B'][(na,nb),(na,nb-1)] = cp.deepcopy(np.swapaxes(self.ops['b'][(na,nb-1),(na,nb)],0,1))
+                except KeyError:
+                    continue
                 # note:
                 #   I did a deepcopy instead of reference. This increases memory requirements and 
                 #   basis transformation costs, but simplifies later manipulations. Later I need to 
@@ -250,122 +292,182 @@ class Cluster(object):
         #  Aa
         for na in range(1,self.n_orb+1):
             for nb in range(0,self.n_orb+1):
-                self.ops['Aa'][(na,nb),(na,nb)] = build_ca_ss(self.n_orb, (na,nb),(na,nb),self.basis,'a')
+                try:
+                    self.ops['Aa'][(na,nb),(na,nb)] = build_ca_ss(self.n_orb, (na,nb),(na,nb),self.basis,'a')
+                except KeyError:
+                    continue
         #  Bb
         for na in range(0,self.n_orb+1):
             for nb in range(1,self.n_orb+1):
-                self.ops['Bb'][(na,nb),(na,nb)] = build_ca_ss(self.n_orb, (na,nb),(na,nb),self.basis,'b')
+                try:
+                    self.ops['Bb'][(na,nb),(na,nb)] = build_ca_ss(self.n_orb, (na,nb),(na,nb),self.basis,'b')
+                except KeyError:
+                    continue
                
 
 
         #  Ab,Ba
         for na in range(1,self.n_orb+1):
             for nb in range(1,self.n_orb+1):
-                self.ops['Ab'][(na,nb-1),(na-1,nb)] = build_ca_os(self.n_orb, (na,nb-1),(na-1,nb),self.basis,'ab')
-                self.ops['Ba'][(na-1,nb),(na,nb-1)] = build_ca_os(self.n_orb, (na-1,nb),(na,nb-1),self.basis,'ba')
+                try:
+                    self.ops['Ab'][(na,nb-1),(na-1,nb)] = build_ca_os(self.n_orb, (na,nb-1),(na-1,nb),self.basis,'ab')
+                    self.ops['Ba'][(na-1,nb),(na,nb-1)] = build_ca_os(self.n_orb, (na-1,nb),(na,nb-1),self.basis,'ba')
+                except KeyError:
+                    continue
         
                
         #  AAaa,BBbb
         for na in range(0,self.n_orb+1):
             for nb in range(0,self.n_orb+1):
-                self.ops['AAaa'][(na,nb),(na,nb)] = build_ccaa_ss(self.n_orb, (na,nb),(na,nb),self.basis,'a')
-                self.ops['BBbb'][(na,nb),(na,nb)] = build_ccaa_ss(self.n_orb, (na,nb),(na,nb),self.basis,'b')
+                try:
+                    self.ops['AAaa'][(na,nb),(na,nb)] = build_ccaa_ss(self.n_orb, (na,nb),(na,nb),self.basis,'a')
+                    self.ops['BBbb'][(na,nb),(na,nb)] = build_ccaa_ss(self.n_orb, (na,nb),(na,nb),self.basis,'b')
+                except KeyError:
+                    continue
 
 
         #  ABba
         #  BAab
         for na in range(1,self.n_orb+1):
             for nb in range(1,self.n_orb+1):
-                self.ops['ABba'][(na,nb),(na,nb)] = build_ccaa_os(self.n_orb, (na,nb),(na,nb),self.basis,'abba')
-                self.ops['BAab'][(na,nb),(na,nb)] = build_ccaa_os(self.n_orb, (na,nb),(na,nb),self.basis,'baab')
+                try:
+                    self.ops['ABba'][(na,nb),(na,nb)] = build_ccaa_os(self.n_orb, (na,nb),(na,nb),self.basis,'abba')
+                    self.ops['BAab'][(na,nb),(na,nb)] = build_ccaa_os(self.n_orb, (na,nb),(na,nb),self.basis,'baab')
+                except KeyError:
+                    continue
 
         
         #  AA
         for na in range(2,self.n_orb+1):
             for nb in range(0,self.n_orb+1):
-                self.ops['aa'][(na-2,nb),(na,nb)] = build_aa_ss(self.n_orb, (na-2,nb),(na,nb),self.basis,'a')
+                try:
+                    self.ops['aa'][(na-2,nb),(na,nb)] = build_aa_ss(self.n_orb, (na-2,nb),(na,nb),self.basis,'a')
 
-                temp = cp.deepcopy(np.swapaxes(self.ops['aa'][(na-2,nb),(na,nb)],0,1))
-                self.ops['AA'][(na,nb),(na-2,nb)] = cp.deepcopy(np.swapaxes(temp,2,3))
-
+                    temp = cp.deepcopy(np.swapaxes(self.ops['aa'][(na-2,nb),(na,nb)],0,1))
+                    self.ops['AA'][(na,nb),(na-2,nb)] = cp.deepcopy(np.swapaxes(temp,2,3))
+                except KeyError:
+                    continue
         # BB
         for na in range(0,self.n_orb+1):
             for nb in range(2,self.n_orb+1):
-                self.ops['bb'][(na,nb-2),(na,nb)] = build_aa_ss(self.n_orb, (na,nb-2),(na,nb),self.basis,'b')
+                try:
+                    self.ops['bb'][(na,nb-2),(na,nb)] = build_aa_ss(self.n_orb, (na,nb-2),(na,nb),self.basis,'b')
 
-                temp = cp.deepcopy(np.swapaxes(self.ops['bb'][(na,nb-2),(na,nb)],0,1))
-                self.ops['BB'][(na,nb),(na,nb-2)] = cp.deepcopy(np.swapaxes(temp,2,3))
+                    temp = cp.deepcopy(np.swapaxes(self.ops['bb'][(na,nb-2),(na,nb)],0,1))
+                    self.ops['BB'][(na,nb),(na,nb-2)] = cp.deepcopy(np.swapaxes(temp,2,3))
+                except KeyError:
+                    continue
+
 
         # Ab
         for na in range(1,self.n_orb+1):
             for nb in range(1,self.n_orb+1):
-                self.ops['ab'][(na-1,nb-1),(na,nb)] = build_aa_os(self.n_orb, (na-1,nb-1),(na,nb),self.basis,'ab')
-                self.ops['ba'][(na-1,nb-1),(na,nb)] = build_aa_os(self.n_orb, (na-1,nb-1),(na,nb),self.basis,'ba')
+                try:
+                    self.ops['ab'][(na-1,nb-1),(na,nb)] = build_aa_os(self.n_orb, (na-1,nb-1),(na,nb),self.basis,'ab')
+                    self.ops['ba'][(na-1,nb-1),(na,nb)] = build_aa_os(self.n_orb, (na-1,nb-1),(na,nb),self.basis,'ba')
 
-                temp = cp.deepcopy(np.swapaxes(self.ops['ba'][(na-1,nb-1),(na,nb)],0,1))
-                self.ops['AB'][(na,nb),(na-1,nb-1)] = cp.deepcopy(np.swapaxes(temp,2,3))
+                    temp = cp.deepcopy(np.swapaxes(self.ops['ba'][(na-1,nb-1),(na,nb)],0,1))
+                    self.ops['AB'][(na,nb),(na-1,nb-1)] = cp.deepcopy(np.swapaxes(temp,2,3))
 
-                temp = cp.deepcopy(np.swapaxes(self.ops['ab'][(na-1,nb-1),(na,nb)],0,1))
-                self.ops['BA'][(na,nb),(na-1,nb-1)] = cp.deepcopy(np.swapaxes(temp,2,3))
+                    temp = cp.deepcopy(np.swapaxes(self.ops['ab'][(na-1,nb-1),(na,nb)],0,1))
+                    self.ops['BA'][(na,nb),(na-1,nb-1)] = cp.deepcopy(np.swapaxes(temp,2,3))
+                except KeyError:
+                    continue
         
                
         #  AAa #   have to fix the swapaxes
         for na in range(2,self.n_orb+1):
             for nb in range(0,self.n_orb+1):
-                self.ops['AAa'][(na,nb),(na-1,nb)] = build_cca_ss(self.n_orb, (na,nb),(na-1,nb),self.basis,'a')
+                try:
+                    self.ops['AAa'][(na,nb),(na-1,nb)] = build_cca_ss(self.n_orb, (na,nb),(na-1,nb),self.basis,'a')
+                except KeyError:
+                    continue
 
         #  BBb
         for na in range(0,self.n_orb+1):
             for nb in range(2,self.n_orb+1):
-                self.ops['BBb'][(na,nb),(na,nb-1)] = build_cca_ss(self.n_orb, (na,nb),(na,nb-1),self.basis,'b')
+                try:
+                    self.ops['BBb'][(na,nb),(na,nb-1)] = build_cca_ss(self.n_orb, (na,nb),(na,nb-1),self.basis,'b')
+                except KeyError:
+                    continue
 
         #  ABb
         for na in range(1,self.n_orb+1):
             for nb in range(1,self.n_orb+1):
-                self.ops['ABb'][(na,nb),(na-1,nb)] = build_cca_os(self.n_orb, (na,nb),(na-1,nb),self.basis,'abb')
+                try:
+                    self.ops['ABb'][(na,nb),(na-1,nb)] = build_cca_os(self.n_orb, (na,nb),(na-1,nb),self.basis,'abb')
+                except KeyError:
+                    continue
         #  BAa
         for na in range(1,self.n_orb+1):
             for nb in range(1,self.n_orb+1):
-                self.ops['BAa'][(na,nb),(na,nb-1)] = build_cca_os(self.n_orb, (na,nb),(na,nb-1),self.basis,'baa')
+                try:
+                    self.ops['BAa'][(na,nb),(na,nb-1)] = build_cca_os(self.n_orb, (na,nb),(na,nb-1),self.basis,'baa')
+                except KeyError:
+                    continue
 
         #  ABa
         for na in range(1,self.n_orb+1):
             for nb in range(1,self.n_orb+1):
-                self.ops['ABa'][(na,nb),(na,nb-1)] = build_cca_os(self.n_orb, (na,nb),(na,nb-1),self.basis,'aba')
+                try:
+                    self.ops['ABa'][(na,nb),(na,nb-1)] = build_cca_os(self.n_orb, (na,nb),(na,nb-1),self.basis,'aba')
+                except KeyError:
+                    continue
         #  BAb
         for na in range(1,self.n_orb+1):
             for nb in range(1,self.n_orb+1):
-                self.ops['BAb'][(na,nb),(na-1,nb)] = build_cca_os(self.n_orb, (na,nb),(na-1,nb),self.basis,'bab')
+                try:
+                    self.ops['BAb'][(na,nb),(na-1,nb)] = build_cca_os(self.n_orb, (na,nb),(na-1,nb),self.basis,'bab')
+                except KeyError:
+                    continue
 
         #  Aaa
         for na in range(2,self.n_orb+1):
             for nb in range(0,self.n_orb+1):
-                self.ops['Aaa'][(na-1,nb),(na,nb)] = build_caa_ss(self.n_orb, (na-1,nb),(na,nb),self.basis,'a')
+                try:
+                    self.ops['Aaa'][(na-1,nb),(na,nb)] = build_caa_ss(self.n_orb, (na-1,nb),(na,nb),self.basis,'a')
+                except KeyError:
+                    continue
         
         #  Bbb
         for na in range(0,self.n_orb+1):
             for nb in range(2,self.n_orb+1):
-                self.ops['Bbb'][(na,nb-1),(na,nb)] = build_caa_ss(self.n_orb, (na,nb-1),(na,nb),self.basis,'b')
+                try:
+                    self.ops['Bbb'][(na,nb-1),(na,nb)] = build_caa_ss(self.n_orb, (na,nb-1),(na,nb),self.basis,'b')
+                except KeyError:
+                    continue
         
         #  Aab
         for na in range(1,self.n_orb+1):
             for nb in range(1,self.n_orb+1):
-                self.ops['Aab'][(na,nb-1),(na,nb)] = build_caa_os(self.n_orb, (na,nb-1),(na,nb),self.basis,'aab')
+                try:
+                    self.ops['Aab'][(na,nb-1),(na,nb)] = build_caa_os(self.n_orb, (na,nb-1),(na,nb),self.basis,'aab')
+                except KeyError:
+                    continue
 
         #  Bba
         for na in range(1,self.n_orb+1):
             for nb in range(1,self.n_orb+1):
-                self.ops['Bba'][(na-1,nb),(na,nb)] = build_caa_os(self.n_orb, (na-1,nb),(na,nb),self.basis,'bba')
+                try:
+                    self.ops['Bba'][(na-1,nb),(na,nb)] = build_caa_os(self.n_orb, (na-1,nb),(na,nb),self.basis,'bba')
+                except KeyError:
+                    continue
 
         #  Aba
         for na in range(1,self.n_orb+1):
             for nb in range(1,self.n_orb+1):
-                self.ops['Aba'][(na,nb-1),(na,nb)] = build_caa_os(self.n_orb, (na,nb-1),(na,nb),self.basis,'aba')
+                try:
+                    self.ops['Aba'][(na,nb-1),(na,nb)] = build_caa_os(self.n_orb, (na,nb-1),(na,nb),self.basis,'aba')
+                except KeyError:
+                    continue
 
         #  Bab
         for na in range(1,self.n_orb+1):
             for nb in range(1,self.n_orb+1):
-                self.ops['Bab'][(na-1,nb),(na,nb)] = build_caa_os(self.n_orb, (na-1,nb),(na,nb),self.basis,'bab')
+                try:
+                    self.ops['Bab'][(na-1,nb),(na,nb)] = build_caa_os(self.n_orb, (na-1,nb),(na,nb),self.basis,'bab')
+                except KeyError:
+                    continue
         
 
 #        #  Ab
