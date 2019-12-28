@@ -56,13 +56,14 @@ class PyscfHelper(object):
         mf = scf.RHF(mol).run()
         #C = mf.mo_coeff #MO coeffs
         enu = mf.energy_nuc()
-
-        from pyscf import symm
-        mo = symm.symmetrize_orb(mol, mf.mo_coeff)
-        osym = symm.label_orb_symm(mol, mol.irrep_name, mol.symm_orb, mo)
-        #symm.addons.symmetrize_space(mol, mo, s=None, check=True, tol=1e-07)
-        for i in range(len(osym)):
-            print("%4d %8s %16.8f"%(i+1,osym[i],mf.mo_energy[i]))
+        
+        if mol.symmetry == True:
+            from pyscf import symm
+            mo = symm.symmetrize_orb(mol, mf.mo_coeff)
+            osym = symm.label_orb_symm(mol, mol.irrep_name, mol.symm_orb, mo)
+            #symm.addons.symmetrize_space(mol, mo, s=None, check=True, tol=1e-07)
+            for i in range(len(osym)):
+                print("%4d %8s %16.8f"%(i+1,osym[i],mf.mo_energy[i]))
 
         #orbitals and lectrons
         n_orb = mol.nao_nr()
@@ -188,6 +189,15 @@ class PyscfHelper(object):
             J,K = mf.get_jk()
             self.J = self.C.T @ J @ self.C
             self.K = self.C.T @ J @ self.C
+            if 0:
+                h = C.T.dot(mf.get_hcore()).dot(C)
+                g = ao2mo.kernel(mol,C,aosym='s4',compact=False).reshape(4*((n_orb),))
+                const,heff = get_eff_for_casci(cas_nstart,cas_nstop,h,g)
+                print(heff)
+                print("const",const)
+                print("ecore",ecore)
+                self.h = heff
+                self.g = g
 
         elif cas==False:
             h = C.T.dot(mf.get_hcore()).dot(C)
@@ -316,4 +326,53 @@ def ordering(pmol,cas,cas_nstart,cas_nstop,loc_nstart,loc_nstop,ordering='hcore'
     print(idx)
     return idx
     # }}}
+
+def mulliken_ordering(mol,norb,C):
+# {{{
+    """
+    pyscf mulliken
+    """
+    S = mol.intor('int1e_ovlp_sph')
+    mulliken = np.zeros((mol.natm,norb))
+    for i in range(0,norb):
+        Cocc = C[:,i].reshape(C.shape[0],1)
+        temp = Cocc @ Cocc.T @ S   
+        for m,lb in enumerate(mol.ao_labels()):
+            mulliken[int(lb[0]),i] += temp[m,m]
+    print(mulliken)
+    return mulliken
+# }}}
+
+def block_order_mulliken(n_blocks,n_orb,mulliken,atom_block): 
+# {{{
+    blocks = [[] for i in range(n_blocks)]
+    for i in range(0,n_orb):
+        atom = mulliken[:,i].argmax(axis=0)
+
+        for ind,bl in enumerate(atom_block):
+            if atom in bl:
+                #print(ind)
+                blocks[ind].append(i)
+        print(blocks)
+    return blocks
+# }}}
+
+def get_eff_for_casci(n_start,n_stop,h,g):
+# {{{
+    const = 0
+    for i in range(0,n_start):
+        const += 2 * h[i,i]
+        for j in range(0,n_start):
+            const += 2 * g[i,i,j,j] -  g[i,j,i,j]
+
+    eff = np.zeros((n_stop - n_start,n_stop - n_start))
+
+    for l in range(n_start,n_stop):
+        L = l - n_start
+        for m in range(n_start,n_stop):
+            M = m - n_start
+            for j in range(0,n_start):
+                eff[L,M] += 2 * g[l,m,j,j] -  g[l,j,j,m]
+    return const, eff
+# }}}
 

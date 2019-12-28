@@ -20,8 +20,8 @@ for ri in range(0,25):
     ###     PYSCF INPUT
     r0 = 0.8  + 0.05 * ri
     molecule = '''
-    C      0.00       0.00       0.00
-    O      0.00       0.00       {}'''.format(r0)
+    N      0.00       0.00       0.00
+    N      0.00       0.00       {}'''.format(r0)
     charge = 0
     spin  = 0
     basis_set = 'sto-3g'
@@ -37,13 +37,31 @@ for ri in range(0,25):
     blocks = [[0,1,2,3],[4,5,6,7]]
     init_fspace = ((3, 3), (2, 2))
 
-    blocks = [[0,1],[2,3],[4,5],[6,7]]
-    init_fspace = ((1, 1), (2, 2),(1, 1), (1, 1))
-
     #Integrals from pyscf
     pmol = PyscfHelper()
     pmol.init(molecule,charge,spin,basis_set,orb_basis,
                 cas,cas_nstart,cas_nstop,cas_nel)
+
+    C = pmol.C
+    from pyscf import symm
+    mo = symm.symmetrize_orb(pmol.mol, C)
+    osym = symm.label_orb_symm(pmol.mol, pmol.mol.irrep_name, pmol.mol.symm_orb, mo)
+    #symm.addons.symmetrize_space(mol, mo, s=None, check=True, tol=1e-07)
+    c0 = []
+    cx = []
+    cy = []
+    for i in range(len(osym)):
+        print("%4d %8s "%(i,osym[i]))
+        if 'x' in osym[i]:
+            cx.append(i)
+        elif 'y' in osym[i]:
+            cy.append(i)
+        else:
+            c0.append(i)
+
+    blocks = [c0,cx,cy]
+    print(blocks)
+    init_fspace = ((3, 3),(1, 1), (1, 1))
 
     h = pmol.h
     g = pmol.g
@@ -57,16 +75,7 @@ for ri in range(0,25):
         efci, fci_dim = run_fci_pyscf(h,g,cas_nel,ecore=ecore)
     if do_hci:
         ehci, hci_dim = run_hci_pyscf(h,g,cas_nel,ecore=ecore,select_cutoff=1e-3,ci_cutoff=1e-3)
-    #cluster using hcore
-    C = pmol.C
-    D = C @ C.T
     #idx = e1_order(D[cas_nstart:,cas_nstart:],cut_off = 1e-4)
-    idx = e1_order(h,cut_off = 1e-4)
-    idx = e1_order(pmol.K,cut_off = 1e-4)
-    idx = e1_order(pmol.J,cut_off = 1e-4)
-    h,g = reorder_integrals(idx,h,g)
-    C = C[:,idx]
-    #print(C)
     print("hcore")
     print(h)
     if do_tci:
@@ -75,12 +84,7 @@ for ri in range(0,25):
         ci_vector.print_configs()
         tci_dim = len(ci_vector)
 
-    from pyscf import symm
-    mo = symm.symmetrize_orb(pmol.mol, C)
-    osym = symm.label_orb_symm(pmol.mol, pmol.mol.irrep_name, pmol.mol.symm_orb, mo)
-    #symm.addons.symmetrize_space(mol, mo, s=None, check=True, tol=1e-07)
-    for i in range(len(osym)):
-        print("%4d %8s "%(i+1,osym[i]))
+
 
 
     #print("  rad      FCI          Dim          HCI       Dim          TPSCI      Dim       TPSCI(2)")
