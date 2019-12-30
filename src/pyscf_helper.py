@@ -220,23 +220,21 @@ def run_fci_pyscf( h, g, nelec, ecore=0,nroots=1):
     # FCI
     from pyscf import fci
     #efci, ci = fci.direct_spin1.kernel(h, g, h.shape[0], nelec,ecore=ecore, verbose=5) #DO NOT USE 
-    cisolver = fci.direct_spin1.FCI()
+    cisolver = fci.direct_spin0.FCI()
     efci, ci = cisolver.kernel(h, g, h.shape[1], nelec, ecore=ecore,nroots =nroots,verbose=100)
     fci_dim = ci.shape[0]*ci.shape[1]
-    d1 = cisolver.make_rdm1(ci, h.shape[1], nelec)
-    print(d1)
+    #d1 = cisolver.make_rdm1(ci, h.shape[1], nelec)
+    #print(d1)
     print(" FCI:        %12.8f Dim:%6d"%(efci,fci_dim))
-    print("FCI %10.8f"%(efci))
-    print(ci[0,0])
-    #for i in range(ci.shape[0]):
-    #    for j in range(ci.shape[0]):
-    #        print("%20.14f"%(ci[i,j]*ci[i,j]))
+    #for i in range(0,nroots):
+    #    print("FCI %10.8f"%(efci[i]))
     #exit()
+    #fci_dim =1
             
     return efci,fci_dim
 # }}}
 
-def run_hci_pyscf( h, g, nelec, ecore=0, select_cutoff=5e-4, ci_cutoff=5e-4):
+def run_hci_pyscf( h, g, nelec, ecore=0, select_cutoff=5e-4, ci_cutoff=5e-4,nroots=1):
 # {{{
     #heat bath ci
     from pyscf import mcscf
@@ -244,10 +242,13 @@ def run_hci_pyscf( h, g, nelec, ecore=0, select_cutoff=5e-4, ci_cutoff=5e-4):
     cisolver = hci.SCI()
     cisolver.select_cutoff = select_cutoff
     cisolver.ci_coeff_cutoff = ci_cutoff
-    ehci, civec = cisolver.kernel(h, g, h.shape[1], nelec, ecore=ecore,verbose=4)
+    ehci, civec = cisolver.kernel(h, g, h.shape[1], nelec, ecore=ecore,verbose=4,nroots=nroots)
     hci_dim = civec[0].shape[0]
     print(" HCI:        %12.8f Dim:%6d"%(ehci,hci_dim))
     print("HCI %10.8f"%(ehci))
+    #for i in range(0,nroots):
+    #    print("HCI %10.8f"%(ehci[i]))
+    #hci_dim = 1
     return ehci,hci_dim
 # }}}
 

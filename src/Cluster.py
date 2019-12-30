@@ -146,7 +146,7 @@ class Cluster(object):
                 if s2_shift == True:
                     S2 = form_S2(self.n_orb,na,nb)
 
-                    eva,evec = np.linalg.eigh(Hci + 0.003 * S2)
+                    eva,evec = np.linalg.eigh(Hci + 0.3 * S2)
                     self.basis[(na,nb)] = evec
 
 

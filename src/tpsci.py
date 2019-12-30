@@ -25,6 +25,7 @@ def run_tpsci(h, g, blocks, init_fspace,
                     tucker_state_clip=None,
                     cs_guess = None,
                     hshift=1e-8,
+                    asci_clip=0,
                     s2_shift=False):
     """
     Tensor Product Selected Configuration Interaction (TPSCI)
@@ -90,6 +91,7 @@ def run_tpsci(h, g, blocks, init_fspace,
                 max_cipsi_iter=max_cipsi_iter, 
                 thresh_tucker_conv= thresh_tucker_conv,
                 max_tucker_iter=max_tucker_iter, 
+                asci_clip=asci_clip, 
                 tucker_state_clip=tucker_state_clip).items():
         if v == None:
             v = 'None'
@@ -142,7 +144,7 @@ def run_tpsci(h, g, blocks, init_fspace,
 
     if max_tucker_iter ==0:
         ci_vector, pt_vector, e0, e2 = bc_cipsi(ci_vector.copy(), clustered_ham, 
-                thresh_cipsi=thresh_cipsi, thresh_ci_clip=thresh_ci_clip, thresh_conv=thresh_cipsi_conv, max_iter=max_cipsi_iter)
+                thresh_cipsi=thresh_cipsi, thresh_ci_clip=thresh_ci_clip, thresh_conv=thresh_cipsi_conv, max_iter=max_cipsi_iter,asci_clip=asci_clip)
         print("")
         print(" TPSCI:          %12.8f      Dim:%6d" % (e0+ecore, len(ci_vector)))
         print(" TPSCI(2):       %12.8f      Dim:%6d" % (e2+ecore,len(pt_vector)))
@@ -153,7 +155,7 @@ def run_tpsci(h, g, blocks, init_fspace,
     else:
         ci_vector, pt_vector, e0, e2, t_conv = bc_cipsi_tucker(ci_vector.copy(), clustered_ham, 
             thresh_cipsi, thresh_ci_clip, thresh_cipsi_conv, max_cipsi_iter, 
-            thresh_tucker_conv, max_tucker_iter, tucker_state_clip, hshift)
+            thresh_tucker_conv, max_tucker_iter, tucker_state_clip, hshift,asci_clip=asci_clip)
         print("")
         print(" TPSCI:          %12.8f      Dim:%6d" % (e0+ecore, len(ci_vector)))
         print(" TPSCI(2):       %12.8f      Dim:%6d" % (e2+ecore,len(pt_vector)))
