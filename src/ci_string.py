@@ -180,6 +180,12 @@ class ci_string:
         incr_comb(self._config, self.no)
         return   
 
+    def set_to_index(self,idx):
+        if self.linear_index() > idx:
+            self.reset()
+        while(self.linear_index() < idx):
+            self.incr()
+
     #
     #   Access Data
     #

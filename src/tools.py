@@ -119,7 +119,7 @@ def build_full_hamiltonian(clustered_ham,ci_vector,iprint=0):
 # {{{
     clusters = ci_vector.clusters
     H = np.zeros((len(ci_vector),len(ci_vector)))
-    
+ 
     shift_l = 0 
     for fock_li, fock_l in enumerate(ci_vector.data):
         configs_l = ci_vector[fock_l]

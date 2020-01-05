@@ -137,6 +137,7 @@ class ClusteredTerm:
         state_sign = 1
         #print(self.ints.shape)
         for oi,o in enumerate(self.ops):
+            ci = self.clusters[oi]
             #print(self.clusters[oi].ops[o][(fock_bra[oi],fock_ket[oi])][:,:,0])
             #print("dens:")
             #print(self.clusters[oi].ops[o][(fock_bra[oi],fock_ket[oi])][bra[oi],ket[oi],:])
@@ -152,15 +153,16 @@ class ClusteredTerm:
             #print(o) 
             #print(self.clusters[oi].ops[o].keys())
             try:
-                do = self.clusters[oi].ops[o]
+                do = ci.get_ops()[o]
                 #do = self.clusters[oi].ops[o][(fock_bra[oi],fock_ket[oi])][bra[oi],ket[oi]] #D(I,J,:,:...)
             except:
                 print(" Couldn't find:", self)
                 exit()
                 return 0
             try:
-                d = do[(fock_bra[oi],fock_ket[oi])][bra[oi],ket[oi]] #D(I,J,:,:...)
-            except:
+                d = ci.get_op_mel(o,fock_bra[oi],fock_ket[oi],bra[oi],ket[oi]) #D(I,J,:,:...)
+                #d = do[(fock_bra[oi],fock_ket[oi])][bra[oi],ket[oi]] #D(I,J,:,:...)
+            except KeyError:
                 #print(" Couldn't find:", self)
                 return 0
             mats.append(d)

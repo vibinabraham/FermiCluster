@@ -4,6 +4,7 @@ import itertools
 import copy as cp
 from collections import OrderedDict,abc
 from helpers import *
+from DetCluster import *
 
 class ClusteredState(OrderedDict):
     """
@@ -147,6 +148,8 @@ class ClusteredState(OrderedDict):
         for fspace in self.data.keys():
             config = [0]*len(self.clusters)
             for ci in self.clusters:
+                if type(ci) == DetCluster:
+                    continue
                 fock_i = fspace[ci.idx]
                 new_config = cp.deepcopy(config)
                 for cii in range(ci.basis[fock_i].shape[1]):

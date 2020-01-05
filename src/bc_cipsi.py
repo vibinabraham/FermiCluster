@@ -123,6 +123,8 @@ def bc_cipsi(ci_vector, clustered_ham, thresh_cipsi=1e-4, thresh_ci_clip=1e-5, t
 
         old_dim = len(ci_vector)
 
+        print("pause here")
+        exit()
         if thresh_ci_clip > 0:
             print(" Clip CI Vector: thresh = ", thresh_ci_clip)
             print(" Old CI Dim: ", len(ci_vector))
@@ -317,7 +319,7 @@ if __name__ == "__main__":
     ci_vector.print_configs()
 
 
-    ci_vector, pt_vector, e0, e2 = bc_cipsi_tucker(ci_vector.copy(), clustered_ham, thresh_cipsi=1e-5,
+    ci_vector, pt_vector, e0, e2, t_conv = bc_cipsi_tucker(ci_vector.copy(), clustered_ham, thresh_cipsi=1e-5,
             thresh_ci_clip=1e-4, max_tucker_iter = 20)
 
     
