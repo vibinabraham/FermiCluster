@@ -225,6 +225,58 @@ def bc_cipsi(ci_vector, clustered_ham, thresh_cipsi=1e-4, thresh_ci_clip=1e-5, t
         e_prev = e0
         if len(ci_vector) <= old_dim and abs(delta_e) < thresh_conv:
             print(" Converged")
+            if asci_clip > 0:
+                print("Compute Final PT vector and correction with full variational space")
+                pt_vector = matvec1(clustered_ham, ci_vector)
+                pt_vector.prune_empty_fock_spaces()
+
+                var = pt_vector.norm() - e0*e0
+                print(" Variance: %12.8f" % var,flush=True)
+
+
+                print(" Remove CI space from pt_vector vector")
+                for fockspace,configs in pt_vector.items():
+                    if fockspace in ci_vector.fblocks():
+                        for config,coeff in list(configs.items()):
+                            if config in ci_vector[fockspace]:
+                                del pt_vector[fockspace][config]
+
+
+                for fockspace,configs in ci_vector.items():
+                    if fockspace in pt_vector:
+                        for config,coeff in configs.items():
+                            assert(config not in pt_vector[fockspace])
+
+                print(" Norm of CI vector = %12.8f" %ci_vector.norm())
+                print(" Dimension of CI space: ", len(ci_vector))
+                print(" Dimension of PT space: ", len(pt_vector))
+                print(" Compute Denominator",flush=True)
+                #next_ci_vector = cp.deepcopy(ci_vector)
+                # compute diagonal for PT2
+
+                start = time.time()
+                pt_vector.prune_empty_fock_spaces()
+                    
+                #import cProfile
+                #pr = cProfile.Profile()
+                #pr.enable()
+                    
+                Hd = update_hamiltonian_diagonal(clustered_ham, pt_vector, Hd_vector)
+                #pr.disable()
+                #pr.print_stats(sort='time')
+                end = time.time()
+                print(" Time spent in demonimator: ", end - start)
+
+                denom = 1/(e0 - Hd)
+                pt_vector_v = pt_vector.get_vector()
+                pt_vector_v.shape = (pt_vector_v.shape[0])
+
+                e2 = np.multiply(denom,pt_vector_v)
+                pt_vector.set_vector(e2)
+                e2 = np.dot(pt_vector_v,e2)
+
+                print(" PT2 Energy Correction = %12.8f" %e2)
+                print(" PT2 Energy Total      = %12.8f" %(e0+e2))
             break
         print(" Next iteration CI space dimension", len(ci_vector))
     #    print(" Do CMF:")

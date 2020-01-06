@@ -220,7 +220,7 @@ def run_fci_pyscf( h, g, nelec, ecore=0,nroots=1):
     # FCI
     from pyscf import fci
     #efci, ci = fci.direct_spin1.kernel(h, g, h.shape[0], nelec,ecore=ecore, verbose=5) #DO NOT USE 
-    cisolver = fci.direct_spin0.FCI()
+    cisolver = fci.direct_spin1.FCI()
     efci, ci = cisolver.kernel(h, g, h.shape[1], nelec, ecore=ecore,nroots =nroots,verbose=100)
     fci_dim = ci.shape[0]*ci.shape[1]
     #d1 = cisolver.make_rdm1(ci, h.shape[1], nelec)
