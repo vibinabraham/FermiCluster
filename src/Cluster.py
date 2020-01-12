@@ -210,6 +210,7 @@ class Cluster(object):
         Rotate cluster's basis using U, which is an dictionary mapping fock spaces to unitary rotation matrices.
         rotate basis, and all associated operators
         """
+# {{{
         for fspace,mat in U.items():
             self.basis[fspace] = self.basis[fspace] @ mat
             self.Hci[fspace] = self.basis[fspace].T @ self.Hci[fspace] @ self.basis[fspace]
@@ -225,7 +226,20 @@ class Cluster(object):
                 if fspace_r in U:
                     Ur = U[fspace_r]
                     self.ops[op][fspace_delta] = np.einsum('rs,pr...->ps...',Ur,self.ops[op][fspace_delta])
+   # }}}
     
+    
+    def get_ops(self):
+        return self.ops
+
+    def get_op(self,opstr):
+        return self.ops[opstr]
+
+    
+    def get_op_mel(self,opstr,fI,fJ,I,J):
+        return self.ops[opstr][(fI,fJ)][I,J,:]
+
+
     def build_op_matrices(self):
         """
         build all operators needed

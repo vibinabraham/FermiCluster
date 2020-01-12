@@ -39,6 +39,10 @@ def test_1():
     ###     TPSCI CLUSTER INPUT
     blocks = [[0,1,2,3],[4,5,6,7]]
     init_fspace = ((2, 2), (0, 0))
+    
+    blocks = [[0,1,2,3],[4,5],[6,7]]
+    init_fspace = ((2, 2), (0, 0), (0, 0))
+    
     nelec = tuple([sum(x) for x in zip(*init_fspace)])
     if cas == True:
         assert(cas_nel == nelec)
@@ -68,7 +72,7 @@ def test_1():
         ehci, hci_dim = run_hci_pyscf(h,g,4,ecore=ecore)#,select_cutoff=2e-3,ci_cutoff=2e-3)
     if do_tci:
         ci_vector, pt_vector, etci, etci2 = run_tpsci(h,g,blocks,init_fspace,ecore=ecore,
-            thresh_ci_clip=1e-7,thresh_cipsi=1e-5,hshift=1e-8,max_tucker_iter=1)
+            thresh_ci_clip=1e-7,thresh_cipsi=1e-6,hshift=1e-8,max_tucker_iter=1)
         ci_vector.print_configs()
         tci_dim = len(ci_vector)
         rdm = tools.build_1rdm(ci_vector)

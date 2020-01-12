@@ -116,6 +116,16 @@ class ClusteredState(OrderedDict):
                 v[idx] = coeff
                 idx += 1
         return v
+    def get_fspace_vector(self,fspace):
+        """
+        return a ndarray for the coefficients associated with fockspace=fspace 
+        """
+        v = np.zeros((len(self[fspace]),1))
+        idx = 0
+        for config,coeff in self[fspace].items():
+            v[idx] = coeff
+            idx += 1
+        return v
     def set_vector(self,v):
         """
         input a ndarray vector for the state and update coeffs
@@ -240,6 +250,18 @@ class ClusteredState(OrderedDict):
         return
 # }}}
 
+    def randomize_vector(self,seed=None):
+        """
+        randomize coefficients in defined space 
+        """
+        # {{{
+        np.random.seed(seed)
+        for fockspace,config,coeff in self:
+            self[fockspace][config] = np.random.normal() - .5
+        self.normalize()
+        return
+    # }}}
+
     def add(self,other):
         """
         add clusteredstate vector coefficients to self
@@ -299,7 +321,7 @@ class ClusteredState(OrderedDict):
         for f in self.data:
             if len(self.data[f]) == 0:
                 continue
-            print(" Dim %4i fock_space: "%len(f),end='')
+            print(" Dim %4i fock_space: "%len(self.data[f]),end='')
             [print(" Cluster %-2i(%ia:%ib) "%(fii,fi[0],fi[1]),end='') for fii,fi in enumerate(f)] 
             print()
             for config, value in self.data[f].items():

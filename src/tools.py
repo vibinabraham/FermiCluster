@@ -4,6 +4,7 @@ import itertools
 import copy as cp
 from helpers import *
 import opt_einsum as oe
+import tools
 
 from ClusteredOperator import *
 from ClusteredState import *
@@ -350,39 +351,84 @@ def build_1rdm(ci_vector):
     # {{{
     dm_aa = np.zeros((ci_vector.n_orb,ci_vector.n_orb))
     dm_bb = np.zeros((ci_vector.n_orb,ci_vector.n_orb))
-
-    iprint = 1
     clusters = ci_vector.clusters
-    
+
+    # define orbital index shifts
+    tmp = 0
+    shifts = []
+    for ci in range(len(clusters)):
+        shifts.append(tmp)
+        tmp += clusters[ci].n_orb
+   
+    iprint = 1
+ 
+    # Diagonal terms
+    for fock in ci_vector.fblocks():
+        for ci in clusters:
+            #if ci.idx != 1:
+            #    continue
+            #Aa terms
+            if fock[ci.idx][0] > 0:
+                # c(ijk...) <ijk...|p'q|lmk...> c(lmk...)
+                # c(ijk...) <i|p'q|l> c(ljk...)
+                for config_l in ci_vector.fblock(fock):
+                    for config_r in ci_vector.fblock(fock):
+                        # make sure all state indices are the same aside for clusters i and j
+                        delta_conf = [config_l[i] == config_r[i] for i in range(len(clusters))] 
+                        delta_conf[ci.idx] = True
+                        diag = True
+                        for i in delta_conf:
+                            if i is False:
+                                diag = False
+                        
+                        if diag == False:
+                            continue
+                        pq = ci.get_op_mel('Aa', fock[ci.idx], fock[ci.idx], config_l[ci.idx], config_r[ci.idx])*ci_vector[fock][config_l] * ci_vector[fock][config_r]
+                        dm_aa[shifts[ci.idx]:shifts[ci.idx]+ci.n_orb, shifts[ci.idx]:shifts[ci.idx]+ci.n_orb] += pq
+ 
+    # Off-diagonal terms
     for fock_l in ci_vector.fblocks():
+        continue 
         print(fock_l)
         for ci in clusters:
             for cj in clusters:
-                if cj.idx >= ci.idx:
+                if cj.idx <= ci.idx:
                     continue
                 #A,a terms
-                if fock_l[ci.idx][0] < ci.n_orb and fock_l[cj.idx][0] > 0:
-                    fock_r = list(fock_l)
-                    fock_r[ci.idx] = tuple([fock_l[ci.idx][0]+1, fock_l[ci.idx][1]])
-                    fock_r[cj.idx] = tuple([fock_l[cj.idx][0]-1, fock_l[cj.idx][1]])
-                    fock_r = tuple(fock_r)
-                    print("A,a", fock_l, '-->', fock_r)
-                
-                #a,A terms
                 if fock_l[cj.idx][0] < ci.n_orb and fock_l[ci.idx][0] > 0:
                     fock_r = list(fock_l)
                     fock_r[ci.idx] = tuple([fock_l[ci.idx][0]-1, fock_l[ci.idx][1]])
                     fock_r[cj.idx] = tuple([fock_l[cj.idx][0]+1, fock_l[cj.idx][1]])
                     fock_r = tuple(fock_r)
-                    print("a,A", fock_l, '-->', fock_r)
-                
-                #B,b terms
-                if fock_l[ci.idx][1] < ci.n_orb and fock_l[cj.idx][1] > 0:
-                    fock_r = list(fock_l)
-                    fock_r[ci.idx] = tuple([fock_l[ci.idx][0], fock_l[ci.idx][1]+1])
-                    fock_r[cj.idx] = tuple([fock_l[cj.idx][0], fock_l[cj.idx][1]-1])
-                    fock_r = tuple(fock_r)
-                    print("B,b", fock_l, '-->', fock_r)
+                    print("A,a", fock_l, '-->', fock_r)
+                    # c(ijk...) <ijk...|p'q|lmk...> c(lmk...)
+                    # c(ijk...) <i|p'|l> <j|q|m> c(lmk...) (-1)^N(l)
+                    try:
+                        for config_l in ci_vector.fblock(fock_l):
+                            for config_r in ci_vector.fblock(fock_r):
+                                # make sure all state indices are the same aside for clusters i and j
+                                delta_conf = [abs(config_l[i]-config_r[i]) for i in range(len(clusters))] 
+                                delta_conf[ci.idx] = 0
+                                delta_conf[cj.idx] = 0
+                                if sum(delta_conf) > 0:
+                                    continue
+                                #print(" Here:", config_l, config_r, delta_conf)
+                                pmat = ci.get_op_mel('A', fock_l[ci.idx], fock_r[ci.idx], config_l[ci.idx], config_r[ci.idx])
+                                qmat = cj.get_op_mel('a', fock_l[cj.idx], fock_r[cj.idx], config_l[cj.idx], config_r[cj.idx])
+                                pq = np.einsum('p,q->pq',pmat,qmat) * ci_vector[fock_l][config_l] * ci_vector[fock_l][config_r]
+                                pq.shape = (ci.n_orb,cj.n_orb)
+                                # get state sign
+                                state_sign = 1
+                                for ck in range(ci.idx):
+                                    state_sign *= (-1)**(fock_l[ck][0]+fock_l[ck][1])
+                                for ck in range(cj.idx):
+                                    state_sign *= (-1)**(fock_l[ck][0]+fock_l[ck][1])
+                                pq *= state_sign
+                                dm_aa[shifts[ci.idx]:shifts[ci.idx]+ci.n_orb, shifts[cj.idx]:shifts[cj.idx]+cj.n_orb] += pq
+                                dm_aa[shifts[cj.idx]:shifts[cj.idx]+cj.n_orb, shifts[ci.idx]:shifts[ci.idx]+ci.n_orb] += pq.T
+                    except KeyError:
+                        pass 
+                    
                 
                 #B,b terms
                 if fock_l[cj.idx][1] < ci.n_orb and fock_l[ci.idx][1] > 0:
@@ -390,8 +436,13 @@ def build_1rdm(ci_vector):
                     fock_r[ci.idx] = tuple([fock_l[ci.idx][0], fock_l[ci.idx][1]-1])
                     fock_r[cj.idx] = tuple([fock_l[cj.idx][0], fock_l[cj.idx][1]+1])
                     fock_r = tuple(fock_r)
-                    print("b,B", fock_l, '-->', fock_r)
+                    print("B,b", fock_l, '-->', fock_r)
+                
 
+    print(ci_vector.norm())
+    print(np.linalg.eig(dm_aa))
+    print(np.trace(dm_aa))
+    print_mat(dm_aa)
     return
 
 # }}}
