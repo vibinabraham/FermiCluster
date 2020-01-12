@@ -351,43 +351,49 @@ def build_1rdm(ci_vector):
     dm_aa = np.zeros((ci_vector.n_orb,ci_vector.n_orb))
     dm_bb = np.zeros((ci_vector.n_orb,ci_vector.n_orb))
 
-
-    shift_l = 0 
-    for fock_li, fock_l in enumerate(ci_vector.data):
-        configs_l = ci_vector[fock_l]
-        if iprint > 0:
-            print(fock_l)
-       
-        for config_li, config_l in enumerate(configs_l):
-            idx_l = shift_l + config_li 
-            
-            shift_r = 0 
-            for fock_ri, fock_r in enumerate(ci_vector.data):
-                configs_r = ci_vector[fock_r]
-                delta_fock= tuple([(fock_l[ci][0]-fock_r[ci][0], fock_l[ci][1]-fock_r[ci][1]) for ci in range(len(clusters))])
-                if fock_ri<fock_li:
-                    shift_r += len(configs_r) 
+    iprint = 1
+    clusters = ci_vector.clusters
+    
+    for fock_l in ci_vector.fblocks():
+        print(fock_l)
+        for ci in clusters:
+            for cj in clusters:
+                if cj.idx >= ci.idx:
                     continue
-                try:
-                    terms = clustered_ham.terms[delta_fock]
-                except KeyError:
-                    shift_r += len(configs_r) 
-                    continue 
+                #A,a terms
+                if fock_l[ci.idx][0] < ci.n_orb and fock_l[cj.idx][0] > 0:
+                    fock_r = list(fock_l)
+                    fock_r[ci.idx] = tuple([fock_l[ci.idx][0]+1, fock_l[ci.idx][1]])
+                    fock_r[cj.idx] = tuple([fock_l[cj.idx][0]-1, fock_l[cj.idx][1]])
+                    fock_r = tuple(fock_r)
+                    print("A,a", fock_l, '-->', fock_r)
                 
-                for config_ri, config_r in enumerate(configs_r):        
-                    idx_r = shift_r + config_ri
-                    if idx_r<idx_l:
-                        continue
-                    
-                    for term in terms:
-                        me = term.matrix_element(fock_l,config_l,fock_r,config_r)
-                        H[idx_l,idx_r] += me
-                        if idx_r>idx_l:
-                            H[idx_r,idx_l] += me
-                        #print(" %4i %4i = %12.8f"%(idx_l,idx_r,me),"  :  ",config_l,config_r, " :: ", term)
-                shift_r += len(configs_r) 
-        shift_l += len(configs_l)
-    return H
+                #a,A terms
+                if fock_l[cj.idx][0] < ci.n_orb and fock_l[ci.idx][0] > 0:
+                    fock_r = list(fock_l)
+                    fock_r[ci.idx] = tuple([fock_l[ci.idx][0]-1, fock_l[ci.idx][1]])
+                    fock_r[cj.idx] = tuple([fock_l[cj.idx][0]+1, fock_l[cj.idx][1]])
+                    fock_r = tuple(fock_r)
+                    print("a,A", fock_l, '-->', fock_r)
+                
+                #B,b terms
+                if fock_l[ci.idx][1] < ci.n_orb and fock_l[cj.idx][1] > 0:
+                    fock_r = list(fock_l)
+                    fock_r[ci.idx] = tuple([fock_l[ci.idx][0], fock_l[ci.idx][1]+1])
+                    fock_r[cj.idx] = tuple([fock_l[cj.idx][0], fock_l[cj.idx][1]-1])
+                    fock_r = tuple(fock_r)
+                    print("B,b", fock_l, '-->', fock_r)
+                
+                #B,b terms
+                if fock_l[cj.idx][1] < ci.n_orb and fock_l[ci.idx][1] > 0:
+                    fock_r = list(fock_l)
+                    fock_r[ci.idx] = tuple([fock_l[ci.idx][0], fock_l[ci.idx][1]-1])
+                    fock_r[cj.idx] = tuple([fock_l[cj.idx][0], fock_l[cj.idx][1]+1])
+                    fock_r = tuple(fock_r)
+                    print("b,B", fock_l, '-->', fock_r)
+
+    return
+
 # }}}
 
 
