@@ -215,14 +215,16 @@ class PyscfHelper(object):
             self.K = self.C.T @ J @ self.C
     # }}}
 
-def run_fci_pyscf( h, g, nelec, ecore=0,nroots=1):
+def run_fci_pyscf( h, g, nelec, ecore=0,nroots=1, conv_tol=None, max_cycle=None):
 # {{{
     # FCI
     from pyscf import fci
     #efci, ci = fci.direct_spin1.kernel(h, g, h.shape[0], nelec,ecore=ecore, verbose=5) #DO NOT USE 
     cisolver = fci.direct_spin1.FCI()
-    cisolver.max_cycle = 1000
-    cisolver.conv_tol = 1e-12
+    if max_cycle != None:
+        cisolver.max_cycle = max_cycle 
+    if conv_tol != None:
+        cisolver.conv_tol = conv_tol 
     efci, ci = cisolver.kernel(h, g, h.shape[1], nelec, ecore=ecore,nroots =nroots,verbose=100)
     fci_dim = ci.shape[0]*ci.shape[1]
     d1 = cisolver.make_rdm1(ci, h.shape[1], nelec)
