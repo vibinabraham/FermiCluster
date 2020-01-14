@@ -221,10 +221,16 @@ def run_fci_pyscf( h, g, nelec, ecore=0,nroots=1):
     from pyscf import fci
     #efci, ci = fci.direct_spin1.kernel(h, g, h.shape[0], nelec,ecore=ecore, verbose=5) #DO NOT USE 
     cisolver = fci.direct_spin1.FCI()
+    cisolver.max_cycle = 1000
+    cisolver.conv_tol = 1e-12
     efci, ci = cisolver.kernel(h, g, h.shape[1], nelec, ecore=ecore,nroots =nroots,verbose=100)
     fci_dim = ci.shape[0]*ci.shape[1]
-    #d1 = cisolver.make_rdm1(ci, h.shape[1], nelec)
-    #print(d1)
+    d1 = cisolver.make_rdm1(ci, h.shape[1], nelec)
+    print(" PYSCF 1RDM: ")
+    occs = np.linalg.eig(d1)[0]
+    [print("%4i %12.8f"%(i,occs[i])) for i in range(len(occs))]
+    with np.printoptions(precision=6, suppress=True):
+        print(d1)
     print(" FCI:        %12.8f Dim:%6d"%(efci,fci_dim))
     #for i in range(0,nroots):
     #    print("FCI %10.8f"%(efci[i]))

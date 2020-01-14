@@ -275,6 +275,22 @@ class ClusteredState(OrderedDict):
                 else:
                     self.data[fockspace][config] = coeff
         return 
+
+    def dot(self,other):
+        """
+        Compute dot product of state with other
+
+        loop is over self, so use the dot function belonging to the shortest vector
+        """
+        dot = 0
+        for fockspace,config,coeff in self:
+        
+            try:
+                coeff2 = other[fockspace][config]
+            except KeyError:
+                pass
+            dot += coeff * coeff2
+        return dot
     
     def add_basis(self,other):
         """

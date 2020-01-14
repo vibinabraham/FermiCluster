@@ -349,9 +349,26 @@ def build_1rdm(ci_vector):
     Build 1rdm C_{I,J,K}<IJK|p'q|LMN> C_{L,M,N}
     """
     # {{{
-    dm_aa = np.zeros((ci_vector.n_orb,ci_vector.n_orb))
-    dm_bb = np.zeros((ci_vector.n_orb,ci_vector.n_orb))
+    n_orb = ci_vector.n_orb
+    dm_aa = np.zeros((n_orb,n_orb))
+    dm_bb = np.zeros((n_orb,n_orb))
     clusters = ci_vector.clusters
+    
+    dm_aa_slow = np.zeros((n_orb,n_orb))
+    for i in range(n_orb):
+        for j in range(n_orb):
+            op = ClusteredOperator(clusters)
+            h = np.zeros((n_orb,n_orb))
+            h[i,j] = 1
+            op.add_1b_terms(h)
+            Nv = matvec1(op, ci_vector)
+            Nv = ci_vector.dot(Nv)
+            dm_aa_slow[i,j] = Nv
+    print(" Here is the slow version:")
+    occs = np.linalg.eig(dm_aa_slow)[0]
+    [print("%4i %12.8f"%(i,occs[i])) for i in range(len(occs))]
+    with np.printoptions(precision=6, suppress=True):
+        print(dm_aa_slow)
 
     # define orbital index shifts
     tmp = 0
@@ -388,7 +405,7 @@ def build_1rdm(ci_vector):
  
     # Off-diagonal terms
     for fock_l in ci_vector.fblocks():
-        continue 
+        #continue 
         print(fock_l)
         for ci in clusters:
             for cj in clusters:
@@ -400,7 +417,7 @@ def build_1rdm(ci_vector):
                     fock_r[ci.idx] = tuple([fock_l[ci.idx][0]-1, fock_l[ci.idx][1]])
                     fock_r[cj.idx] = tuple([fock_l[cj.idx][0]+1, fock_l[cj.idx][1]])
                     fock_r = tuple(fock_r)
-                    print("A,a", fock_l, '-->', fock_r)
+                    #print("A,a", fock_l, '-->', fock_r)
                     # c(ijk...) <ijk...|p'q|lmk...> c(lmk...)
                     # c(ijk...) <i|p'|l> <j|q|m> c(lmk...) (-1)^N(l)
                     try:
@@ -415,15 +432,15 @@ def build_1rdm(ci_vector):
                                 #print(" Here:", config_l, config_r, delta_conf)
                                 pmat = ci.get_op_mel('A', fock_l[ci.idx], fock_r[ci.idx], config_l[ci.idx], config_r[ci.idx])
                                 qmat = cj.get_op_mel('a', fock_l[cj.idx], fock_r[cj.idx], config_l[cj.idx], config_r[cj.idx])
-                                pq = np.einsum('p,q->pq',pmat,qmat) * ci_vector[fock_l][config_l] * ci_vector[fock_l][config_r]
+                                pq = np.einsum('p,q->pq',pmat,qmat) * ci_vector[fock_l][config_l] * ci_vector[fock_r][config_r]
                                 pq.shape = (ci.n_orb,cj.n_orb)
                                 # get state sign
                                 state_sign = 1
-                                for ck in range(ci.idx):
+                                for ck in range(ci.idx-1):
                                     state_sign *= (-1)**(fock_l[ck][0]+fock_l[ck][1])
-                                for ck in range(cj.idx):
+                                for ck in range(cj.idx-1):
                                     state_sign *= (-1)**(fock_l[ck][0]+fock_l[ck][1])
-                                pq *= state_sign
+                                pq = pq * state_sign
                                 dm_aa[shifts[ci.idx]:shifts[ci.idx]+ci.n_orb, shifts[cj.idx]:shifts[cj.idx]+cj.n_orb] += pq
                                 dm_aa[shifts[cj.idx]:shifts[cj.idx]+cj.n_orb, shifts[ci.idx]:shifts[ci.idx]+ci.n_orb] += pq.T
                     except KeyError:
@@ -440,9 +457,11 @@ def build_1rdm(ci_vector):
                 
 
     print(ci_vector.norm())
-    print(np.linalg.eig(dm_aa))
+    occs = np.linalg.eig(2*dm_aa)[0]
+    [print("%4i %12.8f"%(i,occs[i])) for i in range(len(occs))]
     print(np.trace(dm_aa))
-    print_mat(dm_aa)
+    with np.printoptions(precision=6, suppress=True):
+        print(2*dm_aa)
     return
 
 # }}}

@@ -62,7 +62,7 @@ def test_1():
     #idx = e1_order(h,cut_off = 1e-2)
     #h,g = reorder_integrals(idx,h,g)
 
-    do_fci = 0
+    do_fci = 1
     do_hci = 0
     do_tci = 1
 
@@ -72,9 +72,39 @@ def test_1():
         ehci, hci_dim = run_hci_pyscf(h,g,4,ecore=ecore)#,select_cutoff=2e-3,ci_cutoff=2e-3)
     if do_tci:
         ci_vector, pt_vector, etci, etci2 = run_tpsci(h,g,blocks,init_fspace,ecore=ecore,
-            thresh_ci_clip=1e-7,thresh_cipsi=1e-6,hshift=1e-8,max_tucker_iter=1)
-        ci_vector.print_configs()
+                thresh_ci_clip=1e-7,thresh_cipsi=1e-3,hshift=1e-8,max_tucker_iter=3)
+        
+        # Do exact
+        if 1:
+            clusters = ci_vector.clusters
+            clustered_ham = ClusteredOperator(clusters)
+            print(" Add 1-body terms")
+            clustered_ham.add_1b_terms(h)
+            print(" Add 2-body terms")
+            clustered_ham.add_2b_terms(g)
+            
+            ci_vector.expand_to_full_space()
+            H = build_full_hamiltonian(clustered_ham, ci_vector)
+            
+            print(" Diagonalize Hamiltonian Matrix:",flush=True)
+            vguess = ci_vector.get_vector()
+            if H.shape[0] > 100 and abs(np.sum(vguess)) >0:
+                e,v = scipy.sparse.linalg.eigsh(H,n_roots,v0=vguess,which='SA')
+            else:
+                e,v = np.linalg.eigh(H)
+            idx = e.argsort()
+            e = e[idx]
+            v = v[:,idx]
+            v0 = v[:,0]
+            e0 = e[0]
+            print(" Ground state of CI:                 %12.8f  CI Dim: %4i "%(e[0].real,len(ci_vector)))
+            
+            ci_vector.zero()
+            ci_vector.set_vector(v0)
         tci_dim = len(ci_vector)
+        #ci_vector.add(pt_vector)
+        #ci_vector.normalize()
+
         rdm = tools.build_1rdm(ci_vector)
         print(rdm)
         exit()
