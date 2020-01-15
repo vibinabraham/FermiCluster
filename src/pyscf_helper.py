@@ -19,10 +19,12 @@ class PyscfHelper(object):
 
         self.h      = None
         self.g      = None
+        self.n_orb  = None
         #self.na     = 0
         #self.nb     = 0
         self.ecore  = 0
         self.C      = None
+        self.S      = None
         self.J      = None
         self.K      = None
 
@@ -56,6 +58,9 @@ class PyscfHelper(object):
         mf = scf.RHF(mol).run()
         #C = mf.mo_coeff #MO coeffs
         enu = mf.energy_nuc()
+       
+        print(mf.get_fock())
+        print(np.linalg.eig(mf.get_fock())[0])
         
         if mol.symmetry == True:
             from pyscf import symm
@@ -69,6 +74,7 @@ class PyscfHelper(object):
         n_orb = mol.nao_nr()
         n_b , n_a = mol.nelec 
         nel = n_a + n_b
+        self.n_orb = mol.nao_nr()
 
 
         if cas == True:

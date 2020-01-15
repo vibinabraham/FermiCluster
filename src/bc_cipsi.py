@@ -86,6 +86,70 @@ def bc_cipsi_tucker(ci_vector, clustered_ham,
     return ci_vector, pt_vector, e0, e2, t_conv
 # }}}
 
+#def bc_cipsi_1rdm(ci_vector, clustered_ham, h, g,
+#        thresh_cipsi=1e-4, thresh_ci_clip=1e-5, thresh_cipsi_conv=1e-8, max_cipsi_iter=30, 
+#        thresh_rdm_conv = 1e-6, max_rdm_iter=20,hshift=1e-8,asci_clip=0):
+#    """
+#    Run iterations of TP-CIPSI to make the spin-averaged 1rdm potential self-consistent
+#    """
+## {{{
+#
+#    t_conv = False
+#    e_prev = 0
+#    e_last = 0
+#    ci_vector_ref = ci_vector.copy()
+#    for rdm_iter in range(max_rdm_iter):
+#        ci_vector, pt_vector, e0, e2 = bc_cipsi(ci_vector_ref.copy(), clustered_ham, 
+#                thresh_cipsi=thresh_cipsi, thresh_ci_clip=thresh_ci_clip, thresh_conv=thresh_cipsi_conv, max_iter=max_cipsi_iter,asci_clip=asci_clip)
+#        
+#        print(" CIPSI: E0 = %12.8f E2 = %12.8f CI_DIM: %i" %(e0, e2, len(ci_vector)))
+#      
+#        if abs(e_prev-e2) < thresh_rdm_conv:
+#            print(" Converged 1RDM")
+#            t_conv = True
+#            break
+#        e_prev = e2
+#        pt_vector.add(ci_vector)
+#        print(" Reduce size of 1st order wavefunction")
+#        print(" Before:",len(pt_vector))
+#        pt_vector.normalize()
+#        print(" After:",len(pt_vector))
+#        print()
+#        print(" Compute 1RDM",flush=True)
+#        
+#        # form 1rdm from current state
+#        rdm_a, rdm_b = tools.build_1rdm(ci_vector)
+#
+#        print(" done.",flush=True)
+#            
+#        print(" Build cluster basis")
+#        for ci_idx, ci in enumerate(clustered_ham.clusters):
+#            assert(ci_idx == ci.idx)
+#            #print(" Extract local operator for cluster",ci.idx)
+#            #opi = clustered_ham.extract_local_operator(ci_idx)
+#            print()
+#            print()
+#            print(" Form basis by diagonalize local Hamiltonian for cluster: ",ci_idx)
+#            #ci.form_eigbasis_from_local_operator(opi,max_roots=1000)
+#            
+#            #ci.form_eigbasis_from_ints(h,g,max_roots=1000)
+#            ci.form_eigbasis_from_ints(h,g,max_roots=1000, rdm1_a=rdm_a, rdm1_b=rdm_b)
+#        
+#        
+#        #clustered_ham.add_ops_to_clusters()
+#        print(" Build these local operators")
+#        for c in clustered_ham.clusters:
+#            print(" Build mats for cluster ",c.idx)
+#            c.build_op_matrices()
+#
+#        delta_e = e0 - e_last
+#        e_last = e0
+#        if abs(delta_e) < 1e-8:
+#            print(" Converged 1RDM iterations")
+#            break
+#    return ci_vector, pt_vector, e0, e2, t_conv
+## }}}
+
 
 def bc_cipsi(ci_vector, clustered_ham, thresh_cipsi=1e-4, thresh_ci_clip=1e-5, thresh_conv=1e-8, max_iter=30, n_roots=1,asci_clip=0):
 
@@ -307,6 +371,12 @@ if __name__ == "__main__":
     
     if 1:
         Escf,orb,h,g,C = run_hubbard_scf(h,g,n_orb//2)
+        dm_a = np.zeros((n_orb,n_orb))
+        for i in range(n_orb//2):
+            dm_a[i,i] = 1.0 
+        print(" Density matrix: ")
+        print(dm_a)
+        dm_b = dm_a
     
     do_fci = 1
     if do_fci:
@@ -345,7 +415,7 @@ if __name__ == "__main__":
     print(" Add 2-body terms")
     clustered_ham.add_2b_terms(g)
     #clustered_ham.combine_common_terms(iprint=1)
-    
+   
     print(" Build cluster basis")
     for ci_idx, ci in enumerate(clusters):
         assert(ci_idx == ci.idx)
@@ -355,7 +425,10 @@ if __name__ == "__main__":
         print()
         print(" Form basis by diagonalize local Hamiltonian for cluster: ",ci_idx)
         #ci.form_eigbasis_from_local_operator(opi,max_roots=1000)
-        ci.form_eigbasis_from_ints(h,g,max_roots=1000)
+        
+        dm = dm_a + dm_b
+
+        ci.form_eigbasis_from_ints(h,g,max_roots=1000, rdm1=dm)
     
     
     #clustered_ham.add_ops_to_clusters()
@@ -364,13 +437,17 @@ if __name__ == "__main__":
         print(" Build mats for cluster ",c.idx)
         c.build_op_matrices()
     
+    # form 1rdm from reference state
+    rdm_a, rdm_b = tools.build_1rdm(ci_vector)
+
+    
     #ci_vector.expand_to_full_space()
     #ci_vector.expand_each_fock_space()
     ci_vector.add_single_excitonic_states()
     ci_vector.print_configs()
 
 
-    ci_vector, pt_vector, e0, e2 = bc_cipsi_tucker(ci_vector.copy(), clustered_ham, thresh_cipsi=1e-5,
+    ci_vector, pt_vector, e0, e2, t_conv = bc_cipsi_tucker(ci_vector.copy(), clustered_ham, thresh_cipsi=1e-5,
             thresh_ci_clip=1e-4, max_tucker_iter = 20)
 
     

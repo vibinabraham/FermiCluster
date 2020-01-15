@@ -9,6 +9,76 @@ import tools
 from ClusteredOperator import *
 from ClusteredState import *
 
+
+def cmf(clustered_ham, ci_vector, h, g, max_iter=20, thresh=1e-8, max_nroots=1000):
+    """ Do CMF for a tensor product state 
+       
+        This modifies the data in clustered_ham.clusters, both the basis, and the operators
+
+        h is the 1e integrals
+        g is the 2e integrals
+
+        thresh: how tightly to converge energy
+        max_nroots: what is the max number of cluster states to allow in each fock space of each cluster
+                    after the potential is optimized?
+    """
+  # {{{
+    rdm_a = None
+    rdm_b = None
+    converged = False
+    clusters = clustered_ham.clusters
+    e_last = 999
+    for cmf_iter in range(max_iter):
+        
+        print(" Build cluster basis and operators")
+        for ci_idx, ci in enumerate(clusters):
+            assert(ci_idx == ci.idx)
+            if cmf_iter > 0:
+                ci.form_eigbasis_from_ints(h,g,max_roots=1, rdm1_a=rdm_a, rdm1_b=rdm_b)
+            else: 
+                ci.form_eigbasis_from_ints(h,g,max_roots=1)
+        
+            print(" Build new operators for cluster ",ci.idx)
+            ci.build_op_matrices()
+      
+        print(" Compute CMF energy")
+        e_curr = build_full_hamiltonian(clustered_ham, ci_vector)[0,0]
+        print(" CMF Iter: %4i Energy: %12.8f" %(cmf_iter,e_curr))
+
+        print(" Converged?")
+        if abs(e_curr-e_last) < thresh:
+            print(" CMF Converged. ")
+             
+            # form 1rdm from reference state
+            rdm_a, rdm_b = tools.build_1rdm(ci_vector)
+            converged = True
+            break
+        elif abs(e_curr-e_last) >= thresh and cmf_iter == max_iter-1:
+            print(" Max CMF iterations reached. Just continue anyway")
+        elif abs(e_curr-e_last) >= thresh and cmf_iter < max_iter-1:
+            print(" Continue CMF optimization")
+            # form 1rdm from reference state
+            rdm_a, rdm_b = tools.build_1rdm(ci_vector)
+            e_last = e_curr
+    
+    
+    # Now compute the full basis and associated operators
+    for ci_idx, ci in enumerate(clusters):
+        print()
+        print()
+        print(" Form basis by diagonalize local Hamiltonian for cluster: ",ci_idx)
+        if rdm_a is not None and rdm_b is not None: 
+            ci.form_eigbasis_from_ints(h,g,max_roots=max_nroots, rdm1_a=rdm_a, rdm1_b=rdm_b)
+        else:
+            ci.form_eigbasis_from_ints(h,g,max_roots=max_nroots)
+        print(" Build these local operators")
+        print(" Build mats for cluster ",ci.idx)
+        ci.build_op_matrices()
+
+    return converged
+   # }}}
+
+    
 def matvec1(h,v,term_thresh=1e-12):
     """
     Compute the action of H onto a sparse trial vector v
@@ -507,6 +577,7 @@ def build_1rdm(ci_vector):
 
     print(ci_vector.norm())
     occs = np.linalg.eig(dm_aa + dm_bb)[0]
+    print(" Eigenvalues of density matrix")
     [print("%4i %12.8f"%(i,occs[i])) for i in range(len(occs))]
     print(np.trace(dm_aa + dm_bb))
     with np.printoptions(precision=6, suppress=True):
