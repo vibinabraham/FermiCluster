@@ -15,7 +15,8 @@ from tools import *
 
 def bc_cipsi_tucker(ci_vector, clustered_ham, 
         thresh_cipsi=1e-4, thresh_ci_clip=1e-5, thresh_cipsi_conv=1e-8, max_cipsi_iter=30, 
-        thresh_tucker_conv = 1e-6, max_tucker_iter=20, tucker_state_clip=None,hshift=1e-8,asci_clip=0):
+        thresh_tucker_conv = 1e-6, max_tucker_iter=20, tucker_state_clip=None,hshift=1e-8,asci_clip=0,
+        search_max_nbody=4):
     """
     Run iterations of TP-CIPSI to make the tucker decomposition self-consistent
     """
@@ -29,7 +30,8 @@ def bc_cipsi_tucker(ci_vector, clustered_ham,
     ci_vector_ref = ci_vector.copy()
     for brdm_iter in range(max_tucker_iter):
         ci_vector, pt_vector, e0, e2 = bc_cipsi(ci_vector_ref.copy(), clustered_ham, 
-                thresh_cipsi=thresh_cipsi, thresh_ci_clip=thresh_ci_clip, thresh_conv=thresh_cipsi_conv, max_iter=max_cipsi_iter,asci_clip=asci_clip)
+                thresh_cipsi=thresh_cipsi, thresh_ci_clip=thresh_ci_clip, thresh_conv=thresh_cipsi_conv, max_iter=max_cipsi_iter,asci_clip=asci_clip,
+                search_max_nbody=search_max_nbody)
         
         print(" CIPSI: E0 = %12.8f E2 = %12.8f CI_DIM: %i" %(e0, e2, len(ci_vector)))
       
@@ -151,7 +153,8 @@ def bc_cipsi_tucker(ci_vector, clustered_ham,
 ## }}}
 
 
-def bc_cipsi(ci_vector, clustered_ham, thresh_cipsi=1e-4, thresh_ci_clip=1e-5, thresh_conv=1e-8, max_iter=30, n_roots=1,asci_clip=0):
+def bc_cipsi(ci_vector, clustered_ham, thresh_cipsi=1e-4, thresh_ci_clip=1e-5, thresh_conv=1e-8, max_iter=30, n_roots=1,asci_clip=0,
+        search_max_nbody=4):
 
     print(" Compute diagonal elements",flush=True)
     # compute local states energies
@@ -221,9 +224,9 @@ def bc_cipsi(ci_vector, clustered_ham, thresh_cipsi=1e-4, thresh_ci_clip=1e-5, t
 
         print(" Compute Matrix Vector Product:", flush=True)
         if asci_clip > 0:
-            pt_vector = matvec1(clustered_ham, asci_vector)
+            pt_vector = matvec1(clustered_ham, asci_vector, search_max_nbody=search_max_nbody)
         else:
-            pt_vector = matvec1(clustered_ham, ci_vector)
+            pt_vector = matvec1(clustered_ham, ci_vector, max_nbody=search_max_nbody)
         pt_vector.prune_empty_fock_spaces()
         #pt_vector.print()
 

@@ -79,11 +79,12 @@ def cmf(clustered_ham, ci_vector, h, g, max_iter=20, thresh=1e-8, max_nroots=100
    # }}}
 
     
-def matvec1(h,v,term_thresh=1e-12):
+def matvec1(h, v, max_nbody=4, term_thresh=1e-12):
     """
     Compute the action of H onto a sparse trial vector v
     returns a ClusteredState object. 
 
+    max_nbody limits the type of terms which are included
     """
 # {{{
     clusters = h.clusters
@@ -116,6 +117,8 @@ def matvec1(h,v,term_thresh=1e-12):
             configs_l = sigma[fock_l] 
             
             for term in h.terms[terms]:
+                #if len(term.active) > max_nbody:
+                #    continue
                 #print(" term: ", term)
                 state_sign = 1
                 for oi,o in enumerate(term.ops):

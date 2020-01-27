@@ -83,5 +83,5 @@ cmf(clustered_ham, ci_vector, h, g, max_iter=10, max_nroots=100)
 
 
 ci_vector, pt_vector, e0, e2, t_conv = bc_cipsi_tucker(ci_vector.copy(), clustered_ham, thresh_cipsi=1e-5,
-        thresh_ci_clip=1e-4, max_tucker_iter = 20)
+        thresh_ci_clip=1e-4, max_tucker_iter = 20, search_max_nbody=2)
 
