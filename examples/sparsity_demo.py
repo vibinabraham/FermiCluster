@@ -26,24 +26,66 @@ print(beta2)
 n_orb = dim_a * dim_b
 
 h, g = make_stack_lattice(dim_a,dim_b,beta1,beta2,U,pbc = True)
-np.save('h_local.npy',h)
+
+np.random.seed(2)
+h += .1*(np.random.random(h.shape)-.5)
+h = .5*(h + h.T)
+np.save('t_local.npy',h)
+print(h)
 
 blocks = [range(4),range(4,8)]
 init_fspace = ((2,2),(2,2))
 nelec = tuple([sum(x) for x in zip(*init_fspace)])
+np.save('t_local.npy',h)
+
 out_str = "H_cmf.npy"
+out_str = "H_tucker.npy"
+out_str = "H_hf.npy"
+out_str = "H_no.npy"
     
 
-deloc = True 
-deloc = False 
-if deloc:
-	# get scf orbitals 
-	Escf,orb,h,g,C = run_hubbard_scf(h,g,n_orb//2)
-	blocks = [range(i,i+1) for i in range(8)] 
-	init_fspace = ((1,1),(1,1),(1,1),(1,1),(0,0),(0,0),(0,0),(0,0))
-	nelec = tuple([sum(x) for x in zip(*init_fspace)])
-	out_str = "H_hf.npy"
-	np.save('h_scf.npy',h)
+if out_str == "H_hf.npy":
+    # get scf orbitals 
+    Escf,orb,h,g,C = run_hubbard_scf(h,g,n_orb//2)
+    blocks = [range(i,i+1) for i in range(8)] 
+    init_fspace = ((1,1),(1,1),(1,1),(1,1),(0,0),(0,0),(0,0),(0,0))
+    nelec = tuple([sum(x) for x in zip(*init_fspace)])
+    np.save('t_hf.npy',h)
+
+if out_str == "H_no.npy":
+    from pyscf import fci
+    pyscf.lib.num_threads(4)  #with degenerate states and multiple processors there can be issues
+    
+    Escf,orb,h,g,C = run_hubbard_scf(h,g,n_orb//2)
+    
+    cisolver = fci.direct_spin1.FCI()
+    cisolver.max_cycle = 200 
+    cisolver.conv_tol = 1e-14 
+    efci, ci = cisolver.kernel(h, g, h.shape[1], nelec, nroots=1,verbose=100)
+    d1 = cisolver.make_rdm1(ci, h.shape[1], nelec)
+    print(d1)
+    l,U = np.linalg.eig(d1)
+    idx = l.argsort()[::-1]
+    l = l[idx]
+    U = U[:,idx]
+    print(" Occupations:")
+    print(l)
+    C = C @ U                             
+    h = U.T @ h @ U                             
+    g = np.einsum("pqrs,pl->lqrs",g,U)
+    g = np.einsum("lqrs,qm->lmrs",g,U)
+    g = np.einsum("lmrs,rn->lmns",g,U)
+    g = np.einsum("lmns,so->lmno",g,U)
+	
+    blocks = [range(i,i+1) for i in range(8)] 
+    init_fspace = ((1,1),(1,1),(1,1),(1,1),(0,0),(0,0),(0,0),(0,0))
+    nelec = tuple([sum(x) for x in zip(*init_fspace)])
+    np.save('t_no.npy',h)
+    
+    print(" Old FCI: ", efci)
+    efci, ci = cisolver.kernel(h, g, h.shape[1], nelec, nroots=1,verbose=100)
+    print(" New FCI: ", efci)
+
 
 do_fci = 0
 do_hci = 0
@@ -78,15 +120,21 @@ if do_tci:
     # Get CMF reference
     cmf(clustered_ham, ci_vector, h, g, max_iter=10)
 
-    ci_vector.expand_to_full_space()
-    H = build_full_hamiltonian(clustered_ham, ci_vector)
-    np.save(out_str,H)
+    if out_str == "H_cmf.npy" or out_str == "H_hf.npy" or out_str == "H_no.npy":
+        ci_vector.expand_to_full_space()
+        H = build_full_hamiltonian(clustered_ham, ci_vector)
+        np.save(out_str,H)
+        exit() 
     
-    exit() 
-    ci_vector, pt_vector, etci, etci2 = run_tpsci(h,g,blocks,init_fspace,ecore=0,
-        thresh_ci_clip=1e-3,thresh_cipsi=1e-6,max_tucker_iter=10,max_cipsi_iter=20)
-    ci_vector.print_configs()
-    tci_dim = len(ci_vector)
+    if out_str == "H_tucker.npy":
+        tci_dim = len(ci_vector)
+        ci_vector, pt_vector, e0, e2, t_conv = bc_cipsi_tucker(ci_vector.copy(), clustered_ham, thresh_cipsi=1e-7,
+            thresh_ci_clip=1e-7, max_tucker_iter = 20, tucker_state_clip=1e-12)
+   
+        ci_vector.expand_to_full_space()
+        H = build_full_hamiltonian(clustered_ham, ci_vector)
+        np.save(out_str,H)
+        exit() 
 
 
 if do_fci:
