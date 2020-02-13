@@ -196,8 +196,19 @@ class PyscfHelper(object):
                 print(heff)
                 print("const",const)
                 print("ecore",ecore)
-                self.h = heff
-                self.g = g
+                
+                idx = range(cas_nstart,cas_nstop)
+                h = h[:,idx] 
+                h = h[idx,:] 
+                g = g[:,:,:,idx] 
+                g = g[:,:,idx,:] 
+                g = g[:,idx,:,:] 
+                g = g[idx,:,:,:] 
+
+                self.ecore = const
+                self.h = h + heff
+                self.g = g 
+
 
         elif cas==False:
             h = C.T.dot(mf.get_hcore()).dot(C)
