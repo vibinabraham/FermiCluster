@@ -115,8 +115,8 @@ def make_2d_lattice(dim_a,dim_b,beta1,beta2,U):
             ind = a *dim_b + b
             if a%2 == 0:
                 ind2 = (a+1) * dim_b + b
-                t[ind, ind2] = beta1 
-                t[ind2, ind] = beta1 
+                t[ind, ind2] = -beta1 
+                t[ind2, ind] = -beta1 
             else:
                 ind2 = (a+1) * dim_b + b
                 #print(ind,ind2)
@@ -127,8 +127,8 @@ def make_2d_lattice(dim_a,dim_b,beta1,beta2,U):
                     pass
             if b%2 == 0:
                 ind2 = (a) * dim_b + b+1
-                t[ind, ind2] = beta1 
-                t[ind2, ind] = beta1 
+                t[ind, ind2] = -beta1 
+                t[ind2, ind] = -beta1 
             elif b%2 ==1 and b%dim_b !=dim_b-1:
                 ind2 = (a) * dim_b + b+1
                 #print(ind,ind2)
