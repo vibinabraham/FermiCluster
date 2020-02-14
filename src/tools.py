@@ -273,14 +273,16 @@ def build_full_hamiltonian_open(clustered_ham,ci_vector,iprint=1):
 # }}}
 
 
-def build_full_hamiltonian_parallel1(clustered_ham,ci_vector_in,iprint=1):
+def build_full_hamiltonian_parallel1(clustered_ham_in,ci_vector_in,iprint=1):
     """
     Build hamiltonian in basis in ci_vector
     """
 # {{{
     global clusters
     global ci_vector
+    global clustered_ham
 
+    clustered_ham = clustered_ham_in
     ci_vector = ci_vector_in
     clusters = ci_vector.clusters
 
@@ -443,8 +445,9 @@ def build_full_hamiltonian_parallel1(clustered_ham,ci_vector_in,iprint=1):
         stop_r  = fock_space_shifts[fock_ri+1]
         H[start_l:stop_l,start_r:stop_r] = Hblocks[fi]
         if fock_l != fock_r:
-            H[start_r:stop_r,start_l:stop_l] = Hblocks[fi].T
-
+            if type(Hblocks[fi]) != None:
+                H[start_r:stop_r,start_l:stop_l] = Hblocks[fi].T
+            
     return H
     
 
