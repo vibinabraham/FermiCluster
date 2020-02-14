@@ -291,36 +291,6 @@ def bc_cipsi(ci_vector, clustered_ham, thresh_cipsi=1e-4, thresh_ci_clip=1e-5, t
 
 
 
-def test_parallel_Hbuild(ci_vector, clustered_ham):
-    print(" Compute diagonal elements",flush=True)
-    # compute local states energies
-    precompute_cluster_basis_energies(clustered_ham)
-    print(" done.",flush=True)
-
-    pt_vector = ci_vector.copy()
-    Hd_vector = ClusteredState(ci_vector.clusters)
-    e_prev = 0
-    print(" Build full Hamiltonian",flush=True)
-    
-    if 1:
-        H = build_full_hamiltonian(clustered_ham, ci_vector)
-    else:
-        H = build_full_hamiltonian_parallel(clustered_ham, ci_vector)
-    
-
-    print(" Diagonalize Hamiltonian Matrix:",flush=True)
-    vguess = ci_vector.get_vector()
-    if H.shape[0] > 100 and abs(np.sum(vguess)) >0:
-        e,v = scipy.sparse.linalg.eigsh(H,n_roots,v0=vguess,which='SA')
-    else:
-        e,v = np.linalg.eigh(H)
-    idx = e.argsort()
-    e = e[idx]
-    v = v[:,idx]
-    v0 = v[:,0]
-    e0 = e[0]
-    print(" Ground state of CI:                 %12.8f  CI Dim: %4i "%(e[0].real,len(ci_vector)))
-
 
 
 

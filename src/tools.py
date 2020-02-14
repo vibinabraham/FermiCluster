@@ -273,7 +273,7 @@ def build_full_hamiltonian_open(clustered_ham,ci_vector,iprint=1):
 # }}}
 
 
-def build_full_hamiltonian_parallel1(clustered_ham_in,ci_vector_in,iprint=1):
+def build_full_hamiltonian_parallel1(clustered_ham_in,ci_vector_in,iprint=1, nproc=None):
     """
     Build hamiltonian in basis in ci_vector
     """
@@ -412,7 +412,11 @@ def build_full_hamiltonian_parallel1(clustered_ham_in,ci_vector_in,iprint=1):
     import multiprocessing as mp
     from pathos.multiprocessing import ProcessingPool as Pool
 
-    pool = Pool(processes=4)
+    
+    if nproc == None:
+        pool = Pool()
+    else:
+        pool = Pool(processes=nproc)
 
     def test(f):
         fock_l  = f[0]
@@ -443,11 +447,19 @@ def build_full_hamiltonian_parallel1(clustered_ham_in,ci_vector_in,iprint=1):
         stop_l  = fock_space_shifts[fock_li+1]
         start_r = fock_space_shifts[fock_ri]
         stop_r  = fock_space_shifts[fock_ri+1]
-        H[start_l:stop_l,start_r:stop_r] = Hblocks[fi]
+        
+        if np.all(Hblocks[fi]) != None:
+            H[start_l:stop_l,start_r:stop_r] = Hblocks[fi]
         if fock_l != fock_r:
-            if type(Hblocks[fi]) != None:
+            if np.all(Hblocks[fi]) != None:
                 H[start_r:stop_r,start_l:stop_l] = Hblocks[fi].T
-            
+            #try:
+            #if np.all(Hblocks[fi]) != None:
+            #try:
+            #    H[start_r:stop_r,start_l:stop_l] = Hblocks[fi].T
+            #except:
+            #    pass
+    
     return H
     
 
