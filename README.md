@@ -1,13 +1,14 @@
-[![Build Status](https://travis-ci.com/vibinabraham/bc-ci.svg?token=xQgyGGx6x2UXYitmpAwa&branch=master)](https://travis-ci.com/vibinabraham/bc-ci)
+[![Build Status](https://travis-ci.com/vibinabraham/tpsci.svg?token=xQgyGGx6x2UXYitmpAwa&branch=master)](https://travis-ci.com/vibinabraham/tpsci)
 
-# bc-ci
-Block correlated CIPSI under construction
+# Tensor Product Selected Configuration Interaction
+Python program to run the TPSCI program.
+Used pyscf as a back-end for molecular systems
 
 ### Installation
 1. Download
     
-        git clone https://github.com/vibinabraham/bc-ci.git
-        cd bc-ci/
+        git clone https://github.com/vibinabraham/tpsci.git
+        cd tpsci/
 
 2. create virtual environment (optional)
          
