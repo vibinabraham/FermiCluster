@@ -77,6 +77,7 @@ def test_1():
         ci_vector.init(((4,4),(1,1)))
         ci_vector.init(((4,3),(1,2)))
         ci_vector.init(((3,4),(2,1)))
+        ci_vector.init(((3,3),(2,2)))
 
     #ci_vector.add_fockspace(((2,2),(3,3)))
     #ci_vector.add_fockspace(((3,3),(2,2)))
@@ -115,8 +116,9 @@ def test_1():
     #print("init DPS %16.8f"%(edps+ecore))
 
     print(" Build Hamiltonian. Space = ", len(ci_vector), flush=True)
-    H = build_full_hamiltonian_parallel(clustered_ham, ci_vector)
-    #H = build_full_hamiltonian(clustered_ham, ci_vector)
+    #H = build_full_hamiltonian_open(clustered_ham, ci_vector)
+    #H = build_full_hamiltonian_parallel1(clustered_ham, ci_vector)
+    H = build_full_hamiltonian(clustered_ham, ci_vector)
 
     print(" Diagonalize Hamiltonian Matrix:",flush=True)
     vguess = ci_vector.get_vector()
