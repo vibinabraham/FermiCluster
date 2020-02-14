@@ -183,13 +183,40 @@ def build_full_hamiltonian_parallel(clustered_ham,ci_vector,iprint=1):
 
             delta_fock= tuple([(fock_l[ci][0]-fock_r[ci][0], fock_l[ci][1]-fock_r[ci][1]) for ci in range(len(clusters))])
             
+           
+
+
             try:
                 terms = clustered_ham.terms[delta_fock]
             except KeyError:
                 continue 
             for term in terms:
-                # Check to make sure each cluster is allowed to make the requested transition
+                # Compute the state sign now - since it only depends on fock spaces
+                state_sign = 1
 
+                term_exists = True
+                for oi,o in enumerate(term.ops):
+                    if o == '':
+                        continue
+                    if len(o) == 1 or len(o) == 3:
+                        for cj in range(oi):
+                            state_sign *= (-1)**(fock_r[cj][0]+fock_r[cj][1])
+                
+                    # Check to make sure each cluster is allowed to make the requested transition
+                    try:
+                        do = clusters[oi].ops[o]
+                    except:
+                        print(" Couldn't find:", term)
+                        exit()
+                    try:
+                        d = do[(fock_l[oi],fock_r[oi])]
+                        #d = do[(fock_bra[oi],fock_ket[oi])][bra[oi],ket[oi]] #D(I,J,:,:...)
+                    except:
+                        term_exists = False
+                if not term_exists:
+                    continue 
+
+                
                 for config_li, config_l in enumerate(configs_l):
                     idx_l = fock_space_shifts[fock_li] + config_li 
                     for config_ri, config_r in enumerate(configs_r):        
@@ -198,12 +225,45 @@ def build_full_hamiltonian_parallel(clustered_ham,ci_vector,iprint=1):
                         if idx_r<idx_l:
                             continue
                 
-                        # Check to make sure each cluster is diagonal except if active 
+                        # Check to make sure each cluster is diagonal except if active
+                        allowed = True
                         for ci in range(n_clusters):
                             if (config_l[ci]!=config_r[ci]) and (ci not in term.active):
-                                continue
+                                allowed = False
+                        if not allowed:
+                            continue
+                       
 
-                        me = term.matrix_element(fock_l,config_l,fock_r,config_r)
+                        #d = do[(fock_bra[oi],fock_ket[oi])][bra[oi],ket[oi]] #D(I,J,:,:...)
+                        mats = []
+                        for ci in term.active:
+                            mats.append( clusters[ci].ops[term.ops[ci]][(fock_l[ci],fock_r[ci])][config_l[ci],config_r[ci]] ) 
+
+                        me = 0.0
+                      
+                        if len(mats) != len(term.active):
+                            continue
+                        
+                        #check that the mats where treated as views and also contiguous
+                        #for m in mats:
+                        #    print(m.flags['OWNDATA'])  #False -- apparently this is a view
+                        #    print(m.__array_interface__)
+                        #    print()
+
+                        # todo:
+                        #    For some reason, precompiled contract expression is slower than direct einsum - figure this out
+                        #me = term.contract_expression(*mats) * state_sign
+                        me = np.einsum(term.contract_string,*mats,term.ints) * state_sign
+
+#                        me2 = term.matrix_element(fock_l,config_l,fock_r,config_r)
+#                        try:
+#                            assert(abs(me - me2) < 1e-8)
+#                        except:
+#                            print(term)
+#                            print(mats)
+#                            print(me)
+#                            print(me2)
+#                            exit()
                         H[idx_l,idx_r] += me
                         if idx_r>idx_l:
                             H[idx_r,idx_l] += me
