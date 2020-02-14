@@ -2,7 +2,7 @@
 
 # Tensor Product Selected Configuration Interaction
 Python program to run the TPSCI program.
-Used pyscf as a back-end for molecular systems
+Uses pyscf as a back-end for molecular systems
 
 ### Installation
 1. Download
