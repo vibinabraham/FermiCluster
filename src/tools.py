@@ -112,20 +112,18 @@ def matvec1(h,v,term_thresh=1e-12):
 # }}}
 
 
-def matvec_open(h_in,v_in,term_thresh=1e-12):
+def matvec_open(h_in,v,term_thresh=1e-12, nproc=None):
     """
     Compute the action of H onto a sparse trial vector v
     returns a ClusteredState object. 
 
     """
 # {{{
-    global clusters
     global h 
-    global v 
+    global clusters
   
     h = h_in
-    v = v_in
-    clusters = h.clusters
+    clusters = h_in.clusters
     
 
     sigma = ClusteredState(clusters)
@@ -141,7 +139,7 @@ def matvec_open(h_in,v_in,term_thresh=1e-12):
         fock_r = v_curr[0]
         conf_r = v_curr[1]
         coeff  = v_curr[2]
-
+        sigma_out = ClusteredState(clusters)
         for terms in h.terms:
             fock_l= tuple([(terms[ci][0]+fock_r[ci][0], terms[ci][1]+fock_r[ci][1]) for ci in range(len(clusters))])
             good = True
@@ -154,10 +152,10 @@ def matvec_open(h_in,v_in,term_thresh=1e-12):
             
             #print(fock_l, "<--", fock_r)
             
-            if fock_l not in sigma.data:
-                sigma.add_fockspace(fock_l)
+            if fock_l not in sigma_out.data:
+                sigma_out.add_fockspace(fock_l)
         
-            configs_l = sigma[fock_l] 
+            configs_l = sigma_out[fock_l] 
             
             for term in h.terms[terms]:
                 #print(" term: ", term)
@@ -209,8 +207,9 @@ def matvec_open(h_in,v_in,term_thresh=1e-12):
                 tmp = np.einsum(term.contract_string_matvec, *mats, term.ints)
                 
         
-                v_coeff = v[fock_r][conf_r]
-                tmp = state_sign * tmp.ravel() * v_coeff
+                #v_coeff = v[fock_r][conf_r]
+                #tmp = state_sign * tmp.ravel() * v_coeff
+                tmp = state_sign * tmp.ravel() * coeff 
         
                 new_configs = [[i] for i in conf_r] 
                 for cacti,cact in enumerate(term.active):
@@ -222,11 +221,22 @@ def matvec_open(h_in,v_in,term_thresh=1e-12):
                             configs_l[spi] = tmp[sp_idx] 
                         else:
                             configs_l[spi] += tmp[sp_idx] 
+        return sigma_out
     
+    import multiprocessing as mp
+    from pathos.multiprocessing import ProcessingPool as Pool
 
+    
+    if nproc == None:
+        pool = Pool()
+    else:
+        pool = Pool(processes=nproc)
 
-
-    list(map(do_parallel_work, v))
+    #out = pool.map(do_parallel_work, v)
+    out = list(map(do_parallel_work, v))
+   
+    for o in out:
+        sigma.add(o)
 
     return sigma 
 # }}}
