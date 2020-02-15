@@ -159,7 +159,8 @@ class ClusteredTerm:
                 exit()
                 return 0
             try:
-                d = do[(fock_bra[oi],fock_ket[oi])][bra[oi],ket[oi]] #D(I,J,:,:...)
+                d = do[(fock_bra[oi],fock_ket[oi])][ket[oi],bra[oi]] #D(I,J,:,:...)
+                #d = do[(fock_bra[oi],fock_ket[oi])][bra[oi],ket[oi]] #D(I,J,:,:...)
             except:
                 #print(" Couldn't find:", self)
                 return 0
@@ -292,7 +293,8 @@ class ClusteredTerm:
                 exit()
                 return 0
             try:
-                d = do[(fock_bra[oi],fock_ket[oi])][bra[oi],ket[oi]] #D(I,J,:,:...)
+                d = do[(fock_bra[oi],fock_ket[oi])][ket[oi],bra[oi]] #D(I,J,:,:...)
+                #d = do[(fock_bra[oi],fock_ket[oi])][bra[oi],ket[oi]] #D(I,J,:,:...)
             except:
                 return 0
             mats.append(d)

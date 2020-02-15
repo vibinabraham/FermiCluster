@@ -40,7 +40,15 @@ class Cluster(object):
                                                      ...
                                                   }
                                             ...
-
+                                    
+                                    In order to maintain quick access to continguous data:
+                                    the access looks like this now:
+                                        self.ops['Aab'][((Na_bra, Nb_bra), (Na_ket, Nb_ket))][ket_index, bra_index, p,q,...]
+                                        notice that bra and ket are swapped in the dense tensor.
+                                    
+                                    The reason is that we often want to compute the action of the operator on some ket, to get a bra index. 
+                                    This allows us to index like: [ket_index, :]
+                                    which in C ordering, this gives a view of contiguous memory. 
         """
         self.idx = idx 
         self.orb_list = bl
@@ -221,10 +229,12 @@ class Cluster(object):
                 fspace_r = fspace_delta[1]
                 if fspace_l in U:
                     Ul = U[fspace_l]
-                    self.ops[op][fspace_delta] = np.einsum('pq,pr...->qr...',Ul,self.ops[op][fspace_delta])
+                    self.ops[op][fspace_delta] = np.einsum('rs,pr...->ps...',Ul,self.ops[op][fspace_delta])
+                    #self.ops[op][fspace_delta] = np.einsum('pq,pr...->qr...',Ul,self.ops[op][fspace_delta])
                 if fspace_r in U:
                     Ur = U[fspace_r]
-                    self.ops[op][fspace_delta] = np.einsum('rs,pr...->ps...',Ur,self.ops[op][fspace_delta])
+                    self.ops[op][fspace_delta] = np.einsum('pq,pr...->qr...',Ur,self.ops[op][fspace_delta])
+                    #self.ops[op][fspace_delta] = np.einsum('rs,pr...->ps...',Ur,self.ops[op][fspace_delta])
     
     def build_op_matrices(self):
         """
@@ -470,218 +480,17 @@ class Cluster(object):
                     continue
         
 
-#        #  Ab
-#        for na in range(1,self.n_orb+1):
-#            for nb in range(1,self.n_orb+1):
-#                b = self.ops['b'][(na-1,nb-1),(na-1,nb)]
-#                A = self.ops['A'][(na,nb-1),(na-1,nb-1)]
-#                self.ops['Ab'][(na,nb-1),(na-1,nb)] = oe.contract('abp,bcq->acpq',A,b)
-#        
-#        #  Ba
-#        for na in range(1,self.n_orb+1):
-#            for nb in range(1,self.n_orb+1):
-#                a = self.ops['a'][(na-1,nb-1),(na,nb-1)]
-#                B = self.ops['B'][(na-1,nb),(na-1,nb-1)]
-#                self.ops['Ba'][(na-1,nb),(na,nb-1)] = oe.contract('abp,bcq->acpq',B,a)
-       
-       
-#        #  AAaa
-#        for na in range(2,self.n_orb+1):
-#            for nb in range(0,self.n_orb+1):
-#                a2 = self.ops['a'][(na-1,nb),(na,nb)]
-#                a1 = self.ops['a'][(na-2,nb),(na-1,nb)]
-#                A2 = self.ops['A'][(na-1,nb),(na-2,nb)]
-#                A1 = self.ops['A'][(na,nb),(na-1,nb)]
-#               
-#                # <IJ|p'q'rs|KL>
-#                self.ops['AAaa'][(na,nb),(na,nb)] = oe.contract('abp,bcq,cdr,des->aepqrs',A1,A2,a1,a2)
-#        #  BBbb
-#        for na in range(0,self.n_orb+1):
-#            for nb in range(2,self.n_orb+1):
-#                b2 = self.ops['b'][(na,nb-1),(na,nb)]
-#                b1 = self.ops['b'][(na,nb-2),(na,nb-1)]
-#                B2 = self.ops['B'][(na,nb-1),(na,nb-2)]
-#                B1 = self.ops['B'][(na,nb),(na,nb-1)]
-#               
-#                # <IJ|p'q'rs|KL>
-#                self.ops['BBbb'][(na,nb),(na,nb)] = oe.contract('abp,bcq,cdr,des->aepqrs',B1,B2,b1,b2)
+        print(" Swapping axes to get contiguous data")
+        for o in self.ops:
+            for f in self.ops[o]:
+                #print(self.ops[o][f].shape)
+                #self.ops[o][f] = cp.deepcopy(np.swapaxes(self.ops[o][f],0,1))
+                self.ops[o][f] = np.ascontiguousarray(np.swapaxes(self.ops[o][f],0,1))
+                #print(self.ops[o][f].shape)
 
-#        #  ABba
-#        for na in range(1,self.n_orb+1):
-#            for nb in range(1,self.n_orb+1):
-#                a = self.ops['a'][(na-1,nb),(na,nb)]
-#                b = self.ops['b'][(na-1,nb-1),(na-1,nb)]
-#                B = self.ops['B'][(na-1,nb),(na-1,nb-1)]
-#                A = self.ops['A'][(na,nb),(na-1,nb)]
-#               
-#                # <IJ|p'q'rs|KL>
-#                self.ops['ABba'][(na,nb),(na,nb)] = oe.contract('abp,bcq,cdr,des->aepqrs',A,B,b,a)
-#        #  BAab
-#        for na in range(1,self.n_orb+1):
-#            for nb in range(1,self.n_orb+1):
-#                b = self.ops['b'][(na,nb-1),(na,nb)]
-#                a = self.ops['a'][(na-1,nb-1),(na,nb-1)]
-#                A = self.ops['A'][(na,nb-1),(na-1,nb-1)]
-#                B = self.ops['B'][(na,nb),(na,nb-1)]
-#               
-#                # <IJ|p'q'rs|KL>
-#                self.ops['BAab'][(na,nb),(na,nb)] = oe.contract('abp,bcq,cdr,des->aepqrs',B,A,a,b)
-       
-#        #  AA
-#        for na in range(2,self.n_orb+1):
-#            for nb in range(0,self.n_orb+1):
-#                A2 = self.ops['A'][(na-1,nb),(na-2,nb)]
-#                A1 = self.ops['A'][(na,nb),(na-1,nb)]
-#                self.ops['AA'][(na,nb),(na-2,nb)] = oe.contract('abp,bcq->acpq',A1,A2)
-        
-#        #  aa
-#        for na in range(2,self.n_orb+1):
-#            for nb in range(0,self.n_orb+1):
-#                a2 = self.ops['a'][(na-1,nb),(na,nb)]
-#                a1 = self.ops['a'][(na-2,nb),(na-1,nb)]
-#                self.ops['aa'][(na-2,nb),(na,nb)] = oe.contract('abp,bcq->acpq',a1,a2)
-
-#        #  BB
-#        for na in range(0,self.n_orb+1):
-#            for nb in range(2,self.n_orb+1):
-#                B2 = self.ops['B'][(na,nb-1),(na,nb-2)]
-#                B1 = self.ops['B'][(na,nb),(na,nb-1)]
-#                self.ops['BB'][(na,nb),(na,nb-2)] = oe.contract('abp,bcq->acpq',B1,B2)
-        
-#        #  bb
-#        for na in range(0,self.n_orb+1):
-#            for nb in range(2,self.n_orb+1):
-#                b2 = self.ops['b'][(na,nb-1),(na,nb)]
-#                b1 = self.ops['b'][(na,nb-2),(na,nb-1)]
-#                self.ops['bb'][(na,nb-2),(na,nb)] = oe.contract('abp,bcq->acpq',b1,b2)
-
-#        #  ab
-#        for na in range(1,self.n_orb+1):
-#            for nb in range(1,self.n_orb+1):
-#                b = self.ops['b'][(na,nb-1),(na,nb)]
-#                a = self.ops['a'][(na-1,nb-1),(na,nb-1)]
-#                self.ops['ab'][(na-1,nb-1),(na,nb)] = oe.contract('abp,bcq->acpq',a,b)
-#
-#        #  ba
-#        for na in range(1,self.n_orb+1):
-#            for nb in range(1,self.n_orb+1):
-#                a = self.ops['a'][(na-1,nb),(na,nb)]
-#                b = self.ops['b'][(na-1,nb-1),(na-1,nb)]
-#                self.ops['ba'][(na-1,nb-1),(na,nb)] = oe.contract('abp,bcq->acpq',b,a)
-#        
-#        #  AB
-#        for na in range(1,self.n_orb+1):
-#            for nb in range(1,self.n_orb+1):
-#                B = self.ops['B'][(na-1,nb),(na-1,nb-1)]
-#                A = self.ops['A'][(na,nb),(na-1,nb)]
-#                self.ops['AB'][(na,nb),(na-1,nb-1)] = oe.contract('abp,bcq->acpq',A,B)
-#        
-#        #  BA
-#        for na in range(1,self.n_orb+1):
-#            for nb in range(1,self.n_orb+1):
-#                A = self.ops['A'][(na,nb-1),(na-1,nb-1)]
-#                B = self.ops['B'][(na,nb),(na,nb-1)]
-#                self.ops['BA'][(na,nb),(na-1,nb-1)] = oe.contract('abp,bcq->acpq',B,A)
-       
-
-#        #  AAa
-#        for na in range(2,self.n_orb+1):
-#            for nb in range(0,self.n_orb+1):
-#                a  = self.ops['a'][(na-2,nb),(na-1,nb)]
-#                A1 = self.ops['A'][(na-1,nb),(na-2,nb)]
-#                A2 = self.ops['A'][(na,nb),(na-1,nb)]
-#                self.ops['AAa'][(na,nb),(na-1,nb)] = oe.contract('abp,bcq,cdr->adpqr',A2,A1,a)
-#        
-#        #  BBb
-#        for na in range(0,self.n_orb+1):
-#            for nb in range(2,self.n_orb+1):
-#                b  = self.ops['b'][(na,nb-2),(na,nb-1)]
-#                B1 = self.ops['B'][(na,nb-1),(na,nb-2)]
-#                B2 = self.ops['B'][(na,nb),(na,nb-1)]
-#                self.ops['BBb'][(na,nb),(na,nb-1)] = oe.contract('abp,bcq,cdr->adpqr',B2,B1,b)
-       
-#        #  ABb
-#        for na in range(1,self.n_orb+1):
-#            for nb in range(1,self.n_orb+1):
-#                b = self.ops['b'][(na-1,nb-1),(na-1,nb)]
-#                B = self.ops['B'][(na-1,nb),(na-1,nb-1)]
-#                A = self.ops['A'][(na,nb),(na-1,nb)]
-#                self.ops['ABb'][(na,nb),(na-1,nb)] = oe.contract('abp,bcq,cdr->adpqr',A,B,b)
-#
-#        #  BAa
-#        for na in range(1,self.n_orb+1):
-#            for nb in range(1,self.n_orb+1):
-#                a = self.ops['a'][(na-1,nb-1),(na,nb-1)]
-#                A = self.ops['A'][(na,nb-1),(na-1,nb-1)]
-#                B = self.ops['B'][(na,nb),(na,nb-1)]
-#                self.ops['BAa'][(na,nb),(na,nb-1)] = oe.contract('abp,bcq,cdr->adpqr',B,A,a)
-
-#        #  ABa
-#        for na in range(1,self.n_orb+1):
-#            for nb in range(1,self.n_orb+1):
-#                a = self.ops['a'][(na-1,nb-1),(na,nb-1)]
-#                B = self.ops['B'][(na-1,nb),(na-1,nb-1)]
-#                A = self.ops['A'][(na,nb),(na-1,nb)]
-#                self.ops['ABa'][(na,nb),(na,nb-1)] = oe.contract('abp,bcq,cdr->adpqr',A,B,a)
-
-#        #  BAb
-#        for na in range(1,self.n_orb+1):
-#            for nb in range(1,self.n_orb+1):
-#                b = self.ops['b'][(na-1,nb-1),(na-1,nb)]
-#                A = self.ops['A'][(na,nb-1),(na-1,nb-1)]
-#                B = self.ops['B'][(na,nb),(na,nb-1)]
-#                self.ops['BAb'][(na,nb),(na-1,nb)] = oe.contract('abp,bcq,cdr->adpqr',B,A,b)
-
-#        #  Aaa
-#        for na in range(2,self.n_orb+1):
-#            for nb in range(0,self.n_orb+1):
-#                a1 = self.ops['a'][(na-1,nb),(na,nb)]
-#                a2 = self.ops['a'][(na-2,nb),(na-1,nb)]
-#                A  = self.ops['A'][(na-1,nb),(na-2,nb)]
-#                self.ops['Aaa'][(na-1,nb),(na,nb)] = oe.contract('abp,bcq,cdr->adpqr',A,a2,a1)
-#        
-#        #  Bbb
-#        for na in range(0,self.n_orb+1):
-#            for nb in range(2,self.n_orb+1):
-#                b1 = self.ops['b'][(na,nb-1),(na,nb)]
-#                b2 = self.ops['b'][(na,nb-2),(na,nb-1)]
-#                B  = self.ops['B'][(na,nb-1),(na,nb-2)]
-#                self.ops['Bbb'][(na,nb-1),(na,nb)] = oe.contract('abp,bcq,cdr->adpqr',B,b2,b1)
-#        #  Aab
-#        for na in range(1,self.n_orb+1):
-#            for nb in range(1,self.n_orb+1):
-#                b = self.ops['b'][(na,nb-1),(na,nb)]
-#                a = self.ops['a'][(na-1,nb-1),(na,nb-1)]
-#                A = self.ops['A'][(na,nb-1),(na-1,nb-1)]
-#                self.ops['Aab'][(na,nb-1),(na,nb)] = oe.contract('abp,bcq,cdr->adpqr',A,a,b)
-#        
-#        #  Bba
-#        for na in range(1,self.n_orb+1):
-#            for nb in range(1,self.n_orb+1):
-#                a = self.ops['a'][(na-1,nb),(na,nb)]
-#                b = self.ops['b'][(na-1,nb-1),(na-1,nb)]
-#                B = self.ops['B'][(na-1,nb),(na-1,nb-1)]
-#                self.ops['Bba'][(na-1,nb),(na,nb)] = oe.contract('abp,bcq,cdr->adpqr',B,b,a)
-
-#        #  Aba
-#        for na in range(1,self.n_orb+1):
-#            for nb in range(1,self.n_orb+1):
-#                a = self.ops['a'][(na-1,nb),(na,nb)]
-#                b = self.ops['b'][(na-1,nb-1),(na-1,nb)]
-#                A = self.ops['A'][(na,nb-1),(na-1,nb-1)]
-#                self.ops['Aba'][(na,nb-1),(na,nb)] = oe.contract('abp,bcq,cdr->adpqr',A,b,a)
-       
-#        #  Bab
-#        for na in range(1,self.n_orb+1):
-#            for nb in range(1,self.n_orb+1):
-#                b = self.ops['b'][(na,nb-1),(na,nb)]
-#                a = self.ops['a'][(na-1,nb-1),(na,nb-1)]
-#                B = self.ops['B'][(na-1,nb),(na-1,nb-1)]
-#                self.ops['Bab'][(na-1,nb),(na,nb)] = oe.contract('abp,bcq,cdr->adpqr',B,a,b)
-        
-        #Add remaining operators ....
-
-
+                #print(self.ops[o][f].flags['OWNDATA'])  #False -- apparently this is a view
+                #print(self.ops[o][f].__array_interface__)
+                #print()
 
 ###################################################################################################################
 
