@@ -112,11 +112,10 @@ def matvec1(h,v,term_thresh=1e-12):
 # }}}
 
 
-def matvec_open(h_in,v,term_thresh=1e-12, nproc=None):
+def matvec_parallel1(h_in,v,term_thresh=1e-12, nproc=None):
     """
     Compute the action of H onto a sparse trial vector v
     returns a ClusteredState object. 
-
     """
 # {{{
     global h 
@@ -670,6 +669,66 @@ def build_hamiltonian_diagonal(clustered_ham,ci_vector):
 # }}}
 
 
+def build_hamiltonian_diagonal_parallel1(clustered_ham_in,ci_vector, nproc=None):
+    """
+    Build hamiltonian diagonal in basis in ci_vector
+    """
+# {{{
+    global clusters
+    global clustered_ham
+
+    clustered_ham = clustered_ham_in
+    clusters = ci_vector.clusters
+    global delta_fock
+    delta_fock= tuple([(0,0) for ci in range(len(clusters))])
+   
+    global Hd
+    Hd = ci_vector.copy()
+    Hd.zero()
+   
+    idx = 0
+    for fock,conf,coeff in ci_vector:
+        Hd[fock][conf] = idx
+        idx += 1
+    
+    def do_parallel_work(v_curr):
+        fockspace = v_curr[0]
+        config = v_curr[1]
+        coeff  = v_curr[2]
+        
+        delta_fock= tuple([(0,0) for ci in range(len(clusters))])
+        terms = clustered_ham.terms[delta_fock]
+        ## add diagonal energies
+        tmp = 0
+        for ci in clusters:
+            tmp += ci.energies[fockspace[ci.idx]][config[ci.idx]]
+        
+        for term in terms:
+            #Hd_out[fockspace][config] = term.diag_matrix_element(fockspace,config)
+            tmp += term.diag_matrix_element(fockspace,config)
+        return Hd[fockspace][config], tmp
+
+
+    import multiprocessing as mp
+    from pathos.multiprocessing import ProcessingPool as Pool
+    if nproc == None:
+        pool = Pool()
+    else:
+        pool = Pool(processes=nproc)
+
+    out = pool.map(do_parallel_work, ci_vector, batches=100)
+    #out = list(map(do_parallel_work, ci_vector))
+
+    Hdv = np.zeros((len(ci_vector)))
+    for o in out:
+        Hdv[o[0]] = o[1]
+
+    
+    return Hdv 
+
+# }}}
+
+
 def update_hamiltonian_diagonal(clustered_ham,ci_vector,Hd_vector):
     """
     Build hamiltonian diagonal in basis in ci_vector, 
@@ -712,6 +771,68 @@ def update_hamiltonian_diagonal(clustered_ham,ci_vector,Hd_vector):
 
 # }}}
 
+#def update_hamiltonian_diagonal_parallel1(clustered_ham,ci_vector,Hd_vector):
+#    """
+#    Build hamiltonian diagonal in basis in ci_vector, 
+#    Use already computed values if stored in Hd_vector, otherwise compute, updating Hd_vector 
+#    with new values.
+#    """
+## {{{
+#    clusters = ci_vector.clusters
+#    Hd = np.zeros((len(ci_vector)))
+#    delta_fock = tuple([(0,0) for ci in range(len(clusters))])
+#   
+#    Hd_out = ci_vector.copy()
+#    Hd_out.zero()
+#
+#    idx = 0
+#    #get terms we already have
+#    for fockspace, config, coeff in ci_vector:
+#        try:
+#            Hd[idx] = Hd_vector[fockspace][config]
+#        except KeyError:
+#            pass
+#        idx += 1
+#
+#    for fockspace, config, coeff in ci_vector:
+#        if fockspace not in Hd_outuuz
+#        try:
+#            a = Hd_vector[fockspace][config]
+#        except KeyError:
+#            try:
+#                Hd_out[fockspace][config] = 0 
+#            except KeyError:
+#                Hd_vector.add_fockspace(fockspace)
+#                Hd_vector[fockspace][config] = 0 
+#            terms = clustered_ham.terms[delta_fock]
+#
+#            ## add diagonal energies
+#            tmp = 0
+#            for ci in clusters:
+#                tmp += ci.energies[fockspace[ci.idx]][config[ci.idx]]
+#            
+#            for term in terms:
+#                #Hd[idx] += term.matrix_element(fockspace,config,fockspace,config)
+#                tmp += term.diag_matrix_element(fockspace,config)
+#            #print(" nick: %12.8f"%(Hd[idx]-tmp))
+#            Hd[idx] = tmp
+#            Hd_vector[fockspace][config] = Hd[idx] 
+#        idx += 1
+#    
+#
+#    for fockspace, config, coeff in ci_vector:
+#
+#    out = list(map(do_parallel_work, ci_vector))
+#  
+#    for fock,conf,coeff in Hd_out:
+#        Hd_vector[fock][conf] = coeff
+#
+#    for o in out:
+#        Hd_out.add(o)
+#    return Hd.get_vector()
+#
+## }}}
+
 def precompute_cluster_basis_energies(clustered_ham):
     """
     For each cluster grab the local operator from clustered_ham, and store the expectation values
@@ -734,7 +855,7 @@ def precompute_cluster_basis_energies(clustered_ham):
         for fspace in ci.basis:
             fspace_curr = cp.deepcopy(list(delta_fock))
             fspace_curr[ci.idx] = fspace
-            print(fspace_curr)
+            #print(fspace_curr)
             for config in range(ci.basis[fspace].shape[1]):
                 config_curr = cp.deepcopy(config_ref)
                 config_curr[ci.idx] = config

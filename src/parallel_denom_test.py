@@ -16,7 +16,7 @@ ttt = time.time()
 
 
 def test_1():
-# {{{
+
     pyscf.lib.num_threads(1)  #with degenerate states and multiple processors there can be issues
     np.set_printoptions(suppress=True, precision=3, linewidth=1500)
     n_cluster_states = 1000
@@ -83,7 +83,7 @@ def test_1():
         ci_vector.init(((4,4),(1,1)))
         ci_vector.init(((4,3),(1,2)))
         ci_vector.init(((3,4),(2,1)))
-        ci_vector.init(((3,3),(2,2)))
+        #ci_vector.init(((3,3),(2,2)))
 
     #ci_vector.add_fockspace(((2,2),(3,3)))
     #ci_vector.add_fockspace(((3,3),(2,2)))
@@ -122,7 +122,10 @@ def test_1():
     #print("init DPS %16.8f"%(edps+ecore))
 
     print(" Build Hamiltonian. Space = ", len(ci_vector), flush=True)
-    H = build_full_hamiltonian(clustered_ham, ci_vector)
+    start = timer()
+    H = build_full_hamiltonian_parallel1(clustered_ham, ci_vector)
+    stop = timer()
+    print(" Time lapse: ",(stop-start))
 
     n_roots=1
     print(" Diagonalize Hamiltonian Matrix:",flush=True)
@@ -140,32 +143,40 @@ def test_1():
 
 
     print(" Compute Matrix Vector Product:", flush=True)
+
     start = timer()
-    pt_vector1 = matvec1(clustered_ham, ci_vector)
-    pt_vector1.prune_empty_fock_spaces()
-    print(" Length of pt_vector", len(pt_vector1)) 
-    for f in pt_vector1.fblocks():
-        print(f, len(pt_vector1[f]))
+    pt_vector = matvec_parallel1(clustered_ham, ci_vector)
+    stop = timer()
+    print(" Time lapse: ",(stop-start))
     
+    pt_vector.prune_empty_fock_spaces()
+
+    print(" Remove CI space from pt_vector vector")
+    for fockspace,configs in pt_vector.items():
+        if fockspace in ci_vector.fblocks():
+            for config,coeff in list(configs.items()):
+                if config in ci_vector[fockspace]:
+                    del pt_vector[fockspace][config]
+    
+    pt_vector.prune_empty_fock_spaces()
+
+    precompute_cluster_basis_energies(clustered_ham)
+    Hd_vector1 = ClusteredState(ci_vector.clusters)
+    start = timer()
+    Hd1 = update_hamiltonian_diagonal(clustered_ham, pt_vector, Hd_vector1)
     stop = timer()
-    print(" Time lapse: ",(stop-start))
-    print(" Compute Matrix Vector Product:", flush=True)
+    print(" Denomiator Time lapse: ",(stop-start))
+    
+    pt_vector.prune_empty_fock_spaces()
 
     start = timer()
-    pt_vector2 = matvec_parallel1(clustered_ham, ci_vector)
-    pt_vector2.prune_empty_fock_spaces()
-    print(" Length of pt_vector", len(pt_vector2)) 
-    #pt_vector.print()
-    for f in pt_vector2.fblocks():
-        print(f, len(pt_vector2[f]))
+    Hd2 = build_hamiltonian_diagonal_parallel1(clustered_ham, pt_vector)
     stop = timer()
-    print(" Time lapse: ",(stop-start))
+    print(" Denomiator Time lapse: ",(stop-start))
 
-    for f in pt_vector1.fblocks():
-        for c in pt_vector1[f]:
-            assert(abs(pt_vector1[f][c] - pt_vector2[f][c]) < 1e-8)
-# }}}
-
+    #assert(len(Hd_vector2) == len(Hd_vector1))
+    for a in range(len(Hd_vector1)):
+        assert(abs(Hd1[a]-Hd2[a]) < 1e-8)
 
 
 if __name__== "__main__":
