@@ -1,4 +1,5 @@
 import sys, os
+from timeit import default_timer as timer
 sys.path.append('../')
 sys.path.append('../src/')
 import numpy as np
@@ -77,8 +78,8 @@ def test_1():
     if orb_basis == 'boys':
         ci_vector.init(((3,2),(2,3)))
         ci_vector.add_fockspace(((2,3),(3,2)))
-        #ci_vector.add_fockspace(((1,4),(4,1)))
-        #ci_vector.add_fockspace(((4,1),(1,4)))
+        ci_vector.add_fockspace(((1,4),(4,1)))
+        ci_vector.add_fockspace(((4,1),(1,4)))
     elif orb_basis == 'scf':
         ci_vector.init(((4,4),(1,1)))
         ci_vector.init(((4,3),(1,2)))
@@ -140,19 +141,31 @@ def test_1():
 
 
     print(" Compute Matrix Vector Product:", flush=True)
-    pt_vector = matvec1(clustered_ham, ci_vector)
-    pt_vector.prune_empty_fock_spaces()
-    print(" Length of pt_vector", len(pt_vector)) 
+    start = timer()
+    pt_vector1 = matvec1(clustered_ham, ci_vector)
+    pt_vector1.prune_empty_fock_spaces()
+    print(" Length of pt_vector", len(pt_vector1)) 
+    for f in pt_vector1.fblocks():
+        print(f, len(pt_vector1[f]))
     
+    stop = timer()
+    print(" Time lapse: ",(stop-start))
     print(" Compute Matrix Vector Product:", flush=True)
 
-    pt_vector = matvec_open(clustered_ham, ci_vector, nproc=1)
-    pt_vector.prune_empty_fock_spaces()
-    print(" Length of pt_vector", len(pt_vector)) 
+    start = timer()
+    pt_vector2 = matvec_open(clustered_ham, ci_vector)
+    #pt_vector = matvec_open(clustered_ham, ci_vector, nproc=1)
+    pt_vector2.prune_empty_fock_spaces()
+    print(" Length of pt_vector", len(pt_vector2)) 
     #pt_vector.print()
-    for f in pt_vector.fblocks():
-        print(f, len(pt_vector[f]))
+    for f in pt_vector2.fblocks():
+        print(f, len(pt_vector2[f]))
+    stop = timer()
+    print(" Time lapse: ",(stop-start))
 
+    for f in pt_vector1.fblocks():
+        for c in pt_vector1[f]:
+            assert(abs(pt_vector1[f][c] - pt_vector2[f][c]) < 1e-8)
 # }}}
 
 

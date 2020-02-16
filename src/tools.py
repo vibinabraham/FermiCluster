@@ -121,6 +121,7 @@ def matvec_open(h_in,v,term_thresh=1e-12, nproc=None):
 # {{{
     global h 
     global clusters
+    global sigma 
   
     h = h_in
     clusters = h_in.clusters
@@ -139,6 +140,7 @@ def matvec_open(h_in,v,term_thresh=1e-12, nproc=None):
         fock_r = v_curr[0]
         conf_r = v_curr[1]
         coeff  = v_curr[2]
+        
         sigma_out = ClusteredState(clusters)
         for terms in h.terms:
             fock_l= tuple([(terms[ci][0]+fock_r[ci][0], terms[ci][1]+fock_r[ci][1]) for ci in range(len(clusters))])
@@ -221,7 +223,7 @@ def matvec_open(h_in,v,term_thresh=1e-12, nproc=None):
                             configs_l[spi] = tmp[sp_idx] 
                         else:
                             configs_l[spi] += tmp[sp_idx] 
-        return sigma_out
+        return sigma_out.data
     
     import multiprocessing as mp
     from pathos.multiprocessing import ProcessingPool as Pool
@@ -232,8 +234,8 @@ def matvec_open(h_in,v,term_thresh=1e-12, nproc=None):
     else:
         pool = Pool(processes=nproc)
 
-    #out = pool.map(do_parallel_work, v)
-    out = list(map(do_parallel_work, v))
+    out = pool.map(do_parallel_work, v, batches=100)
+    #out = list(map(do_parallel_work, v))
    
     for o in out:
         sigma.add(o)
