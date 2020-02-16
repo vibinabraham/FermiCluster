@@ -1,5 +1,4 @@
 import sys, os
-from timeit import default_timer as timer
 sys.path.append('../')
 sys.path.append('../src/')
 import numpy as np
@@ -8,7 +7,7 @@ import itertools
 import time
 from math import factorial
 import copy as cp
-import sys
+from timeit import default_timer as timer
 
 from tpsci import *
 from pyscf_helper import *
