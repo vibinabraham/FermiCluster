@@ -8,6 +8,7 @@ import time
 from math import factorial
 import copy as cp
 import sys
+from timeit import default_timer as timer
 
 from tpsci import *
 from pyscf_helper import *
@@ -77,13 +78,13 @@ def test_1():
     if orb_basis == 'boys':
         ci_vector.init(((3,2),(2,3)))
         ci_vector.add_fockspace(((2,3),(3,2)))
-        #ci_vector.add_fockspace(((1,4),(4,1)))
-        #ci_vector.add_fockspace(((4,1),(1,4)))
+        ci_vector.add_fockspace(((1,4),(4,1)))
+        ci_vector.add_fockspace(((4,1),(1,4)))
     elif orb_basis == 'scf':
         ci_vector.init(((4,4),(1,1)))
         ci_vector.init(((4,3),(1,2)))
         ci_vector.init(((3,4),(2,1)))
-        #ci_vector.init(((3,3),(2,2)))
+        ci_vector.init(((3,3),(2,2)))
 
     #ci_vector.add_fockspace(((2,2),(3,3)))
     #ci_vector.add_fockspace(((3,3),(2,2)))
@@ -123,8 +124,10 @@ def test_1():
 
     print(" Build Hamiltonian. Space = ", len(ci_vector), flush=True)
     #H = build_full_hamiltonian_open(clustered_ham, ci_vector)
+    start = timer()
     H = build_full_hamiltonian_parallel1(clustered_ham, ci_vector)
-    #H = build_full_hamiltonian(clustered_ham, ci_vector)
+    stop = timer()
+    print(" Time lapse: ",(stop-start))
 
     n_roots=1
     print(" Diagonalize Hamiltonian Matrix:",flush=True)
@@ -138,7 +141,10 @@ def test_1():
     print(" Ground state of CI:                 %12.8f  CI Dim: %4i "%(ecore+e0.real,len(ci_vector)))
 
     print(" Now do the serial version")
+    start = timer()
     H = build_full_hamiltonian(clustered_ham, ci_vector)
+    stop = timer()
+    print(" Time lapse: ",(stop-start))
     
     print(" Diagonalize Hamiltonian Matrix:",flush=True)
     e,v = scipy.sparse.linalg.eigsh(H,n_roots,which='SA')
@@ -261,7 +267,10 @@ def test_2():
 
     print(" Build Hamiltonian. Space = ", len(ci_vector), flush=True)
     #H = build_full_hamiltonian_open(clustered_ham, ci_vector)
+    start = timer()
     H = build_full_hamiltonian_parallel1(clustered_ham, ci_vector,nproc=1)
+    stop = timer()
+    print(" Time lapse: ",(stop-start))
     #H = build_full_hamiltonian(clustered_ham, ci_vector)
 
     n_roots=1
@@ -276,7 +285,10 @@ def test_2():
     print(" Ground state of CI:                 %12.8f  CI Dim: %4i "%(ecore+e0.real,len(ci_vector)))
 
     print(" Now do the serial version")
+    start = timer()
     H = build_full_hamiltonian(clustered_ham, ci_vector)
+    stop = timer()
+    print(" Time lapse: ",(stop-start))
     
     print(" Diagonalize Hamiltonian Matrix:",flush=True)
     e,v = scipy.sparse.linalg.eigsh(H,n_roots,which='SA')
