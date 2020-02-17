@@ -234,6 +234,9 @@ def matvec_parallel1(h_in,v,term_thresh=1e-12, nproc=None):
         pool = Pool(processes=nproc)
 
     out = pool.map(do_parallel_work, v, batches=100)
+    pool.close()
+    pool.join()
+    pool.clear()
     #out = list(map(do_parallel_work, v))
    
     for o in out:
@@ -679,9 +682,12 @@ def build_hamiltonian_diagonal_parallel1(clustered_ham_in,ci_vector, nproc=None)
 
     clustered_ham = clustered_ham_in
     clusters = ci_vector.clusters
+    
     global delta_fock
     delta_fock= tuple([(0,0) for ci in range(len(clusters))])
-   
+  
+    global glob_test
+    glob_test = 'nick'
     global Hd
     Hd = ci_vector.copy()
     Hd.zero()
@@ -696,7 +702,6 @@ def build_hamiltonian_diagonal_parallel1(clustered_ham_in,ci_vector, nproc=None)
         config = v_curr[1]
         coeff  = v_curr[2]
         
-        delta_fock= tuple([(0,0) for ci in range(len(clusters))])
         terms = clustered_ham.terms[delta_fock]
         ## add diagonal energies
         tmp = 0
@@ -706,8 +711,7 @@ def build_hamiltonian_diagonal_parallel1(clustered_ham_in,ci_vector, nproc=None)
         for term in terms:
             #Hd_out[fockspace][config] = term.diag_matrix_element(fockspace,config)
             tmp += term.diag_matrix_element(fockspace,config)
-        return Hd[fockspace][config], tmp
-
+        return tmp
 
     import multiprocessing as mp
     from pathos.multiprocessing import ProcessingPool as Pool
@@ -716,13 +720,18 @@ def build_hamiltonian_diagonal_parallel1(clustered_ham_in,ci_vector, nproc=None)
     else:
         pool = Pool(processes=nproc)
 
-    out = pool.map(do_parallel_work, ci_vector, batches=100)
+    out = pool.map(do_parallel_work, ci_vector)
+    pool.close()
+    pool.join()
+    pool.clear()
+    
+    #out = pool.map(do_parallel_work, ci_vector, batches=100)
     #out = list(map(do_parallel_work, ci_vector))
 
-    Hdv = np.zeros((len(ci_vector)))
-    for o in out:
-        Hdv[o[0]] = o[1]
-
+    #Hdv = np.zeros((len(ci_vector)))
+    #for o in out:
+    #    Hdv[o[0]] = o[1]
+    Hdv = np.array(out)
     
     return Hdv 
 

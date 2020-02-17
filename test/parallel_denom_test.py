@@ -83,7 +83,6 @@ def test_1():
         ci_vector.init(((4,4),(1,1)))
         ci_vector.init(((4,3),(1,2)))
         ci_vector.init(((3,4),(2,1)))
-        #ci_vector.init(((3,3),(2,2)))
 
     #ci_vector.add_fockspace(((2,2),(3,3)))
     #ci_vector.add_fockspace(((3,3),(2,2)))
@@ -114,52 +113,57 @@ def test_1():
         print(" Build mats for cluster ",c.idx)
         c.build_op_matrices()
 
-    #ci_vector.expand_to_full_space()
+    ci_vector.expand_to_full_space()
     ci_vector.expand_each_fock_space()
     #ci_vector.add_single_excitonic_states()
     #ci_vector.print_configs()
     edps = build_hamiltonian_diagonal(clustered_ham,ci_vector)
     #print("init DPS %16.8f"%(edps+ecore))
 
-    print(" Build Hamiltonian. Space = ", len(ci_vector), flush=True)
-    start = timer()
-    H = build_full_hamiltonian_parallel1(clustered_ham, ci_vector)
-    stop = timer()
-    print(" Time lapse: ",(stop-start))
+    if 0:
+        print(" Build Hamiltonian. Space = ", len(ci_vector), flush=True)
+        start = timer()
+        H = build_full_hamiltonian_parallel1(clustered_ham, ci_vector)
+        stop = timer()
+        print(" Time lapse: ",(stop-start))
+        
+        n_roots=1
+        print(" Diagonalize Hamiltonian Matrix:",flush=True)
+        e,v = scipy.sparse.linalg.eigsh(H,n_roots,which='SA')
+        idx = e.argsort()
+        e = e[idx]
+        v = v[:,idx]
+        v0 = v[:,0]
+        e0 = e[0]
+        print(" Ground state of CI:                 %12.8f  CI Dim: %4i "%(ecore+e0.real,len(ci_vector)))
+        
+        
+        ci_vector.zero()
+        ci_vector.set_vector(v0)
+        
+        
+        print(" Compute Matrix Vector Product:", flush=True)
+        
+        start = timer()
+        pt_vector = matvec_parallel1(clustered_ham, ci_vector)
+        stop = timer()
+        print(" Time lapse: ",(stop-start))
+        
+        pt_vector.prune_empty_fock_spaces()
+        
+        print(" Remove CI space from pt_vector vector")
+        for fockspace,configs in pt_vector.items():
+            if fockspace in ci_vector.fblocks():
+                for config,coeff in list(configs.items()):
+                    if config in ci_vector[fockspace]:
+                        del pt_vector[fockspace][config]
+        
+        pt_vector.prune_empty_fock_spaces()
 
-    n_roots=1
-    print(" Diagonalize Hamiltonian Matrix:",flush=True)
-    e,v = scipy.sparse.linalg.eigsh(H,n_roots,which='SA')
-    idx = e.argsort()
-    e = e[idx]
-    v = v[:,idx]
-    v0 = v[:,0]
-    e0 = e[0]
-    print(" Ground state of CI:                 %12.8f  CI Dim: %4i "%(ecore+e0.real,len(ci_vector)))
+    else:
+        pt_vector = ci_vector
 
-
-    ci_vector.zero()
-    ci_vector.set_vector(v0)
-
-
-    print(" Compute Matrix Vector Product:", flush=True)
-
-    start = timer()
-    pt_vector = matvec_parallel1(clustered_ham, ci_vector)
-    stop = timer()
-    print(" Time lapse: ",(stop-start))
-    
-    pt_vector.prune_empty_fock_spaces()
-
-    print(" Remove CI space from pt_vector vector")
-    for fockspace,configs in pt_vector.items():
-        if fockspace in ci_vector.fblocks():
-            for config,coeff in list(configs.items()):
-                if config in ci_vector[fockspace]:
-                    del pt_vector[fockspace][config]
-    
-    pt_vector.prune_empty_fock_spaces()
-
+    print(" Length of ci vector: ", len(ci_vector))
     precompute_cluster_basis_energies(clustered_ham)
     Hd_vector1 = ClusteredState(ci_vector.clusters)
     start = timer()
@@ -169,7 +173,9 @@ def test_1():
     
     pt_vector.prune_empty_fock_spaces()
 
+    print(" Length of ci vector: ", len(ci_vector))
     start = timer()
+    #Hd2 = build_hamiltonian_diagonal_parallel1(clustered_ham, pt_vector, nproc=1)
     Hd2 = build_hamiltonian_diagonal_parallel1(clustered_ham, pt_vector)
     stop = timer()
     print(" Denomiator Time lapse: ",(stop-start))
