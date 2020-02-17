@@ -83,7 +83,7 @@ def test_1():
         ci_vector.init(((4,4),(1,1)))
         ci_vector.init(((4,3),(1,2)))
         ci_vector.init(((3,4),(2,1)))
-        #ci_vector.init(((3,3),(2,2)))
+        ci_vector.init(((3,3),(2,2)))
 
     #ci_vector.add_fockspace(((2,2),(3,3)))
     #ci_vector.add_fockspace(((3,3),(2,2)))
@@ -139,6 +139,7 @@ def test_1():
     ci_vector.set_vector(v0)
 
 
+    exit()
     print(" Compute Matrix Vector Product:", flush=True)
     start = timer()
     pt_vector1 = matvec1(clustered_ham, ci_vector)
@@ -146,13 +147,12 @@ def test_1():
     print(" Length of pt_vector", len(pt_vector1)) 
     for f in pt_vector1.fblocks():
         print(f, len(pt_vector1[f]))
-    
     stop = timer()
     print(" Time lapse: ",(stop-start))
     print(" Compute Matrix Vector Product:", flush=True)
 
     start = timer()
-    pt_vector2 = matvec_parallel1(clustered_ham, ci_vector)
+    pt_vector2 = matvec1_parallel1(clustered_ham, ci_vector)
     pt_vector2.prune_empty_fock_spaces()
     print(" Length of pt_vector", len(pt_vector2)) 
     #pt_vector.print()
@@ -169,4 +169,4 @@ def test_1():
 
 
 if __name__== "__main__":
-    test_1() 
+    test_1()

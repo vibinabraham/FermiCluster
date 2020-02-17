@@ -104,11 +104,13 @@ def bc_cipsi(ci_vector, clustered_ham, thresh_cipsi=1e-4, thresh_ci_clip=1e-5, t
         print("     Selected CI Iteration: %4i epsilon: %12.8f" %(it,thresh_cipsi))
         print(" ===================================================================")
         print(" Build full Hamiltonian",flush=True)
+        start = time.time()
         if nproc==1:
             H = build_full_hamiltonian(clustered_ham, ci_vector)
         else:
             H = build_full_hamiltonian_parallel1(clustered_ham, ci_vector, nproc=nproc)
-
+        stop = time.time()
+        print(" Time spent building Hamiltonian matrix: ", stop-start)
         print(" Diagonalize Hamiltonian Matrix:",flush=True)
         vguess = ci_vector.get_vector()
         if H.shape[0] > 100 and abs(np.sum(vguess)) >0:
@@ -159,6 +161,7 @@ def bc_cipsi(ci_vector, clustered_ham, thresh_cipsi=1e-4, thresh_ci_clip=1e-5, t
             #asci_vector.print_configs()
 
         print(" Compute Matrix Vector Product:", flush=True)
+        start = time.time()
         if asci_clip > 0:
             if nproc==1:
                 pt_vector = matvec1(clustered_ham, asci_vector)
@@ -170,6 +173,10 @@ def bc_cipsi(ci_vector, clustered_ham, thresh_cipsi=1e-4, thresh_ci_clip=1e-5, t
                 pt_vector = matvec1(clustered_ham, ci_vector)
             else:
                 pt_vector = matvec1_parallel1(clustered_ham, ci_vector, nproc=nproc)
+        
+        stop = time.time()
+        print(" Time spent in matvec: ", stop-start)
+        
         pt_vector.prune_empty_fock_spaces()
         #pt_vector.print()
 

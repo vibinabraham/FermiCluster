@@ -121,7 +121,7 @@ def matvec1_parallel1(h_in,v,term_thresh=1e-12, nproc=None):
     global h 
     global clusters
     global sigma 
-  
+    print(" In matvec1_parallel1. nproc=",nproc) 
     h = h_in
     clusters = h_in.clusters
     
@@ -415,6 +415,8 @@ def build_full_hamiltonian_parallel1(clustered_ham_in,ci_vector_in,iprint=1, npr
     global clusters
     global ci_vector
     global clustered_ham
+    
+    print(" In build_full_hamiltonian_parallel1. nproc=",nproc) 
 
     clustered_ham = clustered_ham_in
     ci_vector = ci_vector_in
@@ -436,15 +438,14 @@ def build_full_hamiltonian_parallel1(clustered_ham_in,ci_vector_in,iprint=1, npr
         if fock_li > fock_ri:
             return 
         
-        print("Processing the block: ")
-        print(fock_l,fock_r)
+        #print("Processing the block: ")
+        #print(fock_l,fock_r)
         
         configs_l = ci_vector[fock_l]
         configs_r = ci_vector[fock_r]
         
         Hblock = np.zeros((len(configs_l),len(configs_r)))
 
-        print(Hblock.shape)
         delta_fock= tuple([(fock_l[ci][0]-fock_r[ci][0], fock_l[ci][1]-fock_r[ci][1]) for ci in range(len(clusters))])
         try:
             terms = clustered_ham.terms[delta_fock]
@@ -679,6 +680,7 @@ def build_hamiltonian_diagonal_parallel1(clustered_ham_in,ci_vector, nproc=None)
 # {{{
     global clusters
     global clustered_ham
+    print(" In build_hamiltonian_diagonal_parallel1. nproc=",nproc) 
 
     clustered_ham = clustered_ham_in
     clusters = ci_vector.clusters
