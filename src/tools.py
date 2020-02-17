@@ -112,7 +112,7 @@ def matvec1(h,v,term_thresh=1e-12):
 # }}}
 
 
-def matvec_parallel1(h_in,v,term_thresh=1e-12, nproc=None):
+def matvec1_parallel1(h_in,v,term_thresh=1e-12, nproc=None):
     """
     Compute the action of H onto a sparse trial vector v
     returns a ClusteredState object. 
