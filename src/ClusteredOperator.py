@@ -169,7 +169,9 @@ class ClusteredTerm:
         me = 0.0
         if len(mats) == 0:
             return 0 
-       
+      
+        #print('sign2:',state_sign)
+        #print()
         # todo:
         #    For some reason, precompiled contract expression is slower than direct einsum - figure this out
         #me = self.contract_expression(*mats) * state_sign

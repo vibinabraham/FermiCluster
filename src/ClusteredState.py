@@ -24,6 +24,7 @@ class ClusteredState(OrderedDict):
             self.n_orb += c.n_orb
 
         self.data = OrderedDict()
+        self.dummy_index = 0  # this shouldn't really be used
 
         #self._len = 0
     
