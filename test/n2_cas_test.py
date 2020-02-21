@@ -17,7 +17,7 @@ ttt = time.time()
 
 
 
-def test_1(nproc):
+def run(nproc=None):
     pyscf.lib.num_threads(1)  #with degenerate states and multiple processors there can be issues
     np.set_printoptions(suppress=True, precision=3, linewidth=1500)
     n_cluster_states = 1000
@@ -86,7 +86,12 @@ def test_1(nproc):
     #assert(abs(tci_dim - 67)<1e-15)
     assert(abs(efci   --108.85574521)< 1e-7)
 
+def test_1():
+    run(nproc=None)
+
+def test_2():
+    run(nproc=1)
 
 if __name__== "__main__":
-    #test_1(1) 
-    test_1(None) 
+    test_1() 
+    test_2() 
