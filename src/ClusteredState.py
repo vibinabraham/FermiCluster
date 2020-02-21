@@ -321,7 +321,7 @@ class ClusteredState(OrderedDict):
         self.clip(1e-12)
         print(" Total Length: %5i (clipped)" %len(self), 1e-12)
         l1 = 0
-        diag_l2 = 0
+        #diag_l2 = 0
         for f in self.fblocks():
             print(" Fock Space Config: ",f)
             f_weight = 0
@@ -334,14 +334,14 @@ class ClusteredState(OrderedDict):
                     #print_row(value)
                     print(" %12.8f"%self[f][c])
                 
-                diag = True
                 
-                for ci in range(1,len(c)):
-                    if c[ci-1] != c[ci]:
-                        diag = False
-                        break
-                if diag:
-                    diag_l2 += self[f][c] * self[f][c]
+                #diag = True
+                #for ci in range(1,len(c)):
+                #    if c[ci-1] != c[ci]:
+                #        diag = False
+                #        break
+                #if diag:
+                #    diag_l2 += self[f][c] * self[f][c]
                     
             l1 += f_l1
             print("     Population: %12.8f" %f_weight)
