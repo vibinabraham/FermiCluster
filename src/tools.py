@@ -34,9 +34,9 @@ def cmf(clustered_ham, ci_vector, h, g, max_iter=20, thresh=1e-8, max_nroots=100
         for ci_idx, ci in enumerate(clusters):
             assert(ci_idx == ci.idx)
             if cmf_iter > 0:
-                ci.form_eigbasis_from_ints(h,g,max_roots=1, rdm1_a=rdm_a, rdm1_b=rdm_b)
+                ci.form_eigbasis_from_ints(h,g,max_roots=max_nroots, rdm1_a=rdm_a, rdm1_b=rdm_b)
             else: 
-                ci.form_eigbasis_from_ints(h,g,max_roots=1)
+                ci.form_eigbasis_from_ints(h,g,max_roots=max_nroots)
         
             print(" Build new operators for cluster ",ci.idx)
             ci.build_op_matrices()
@@ -75,7 +75,7 @@ def cmf(clustered_ham, ci_vector, h, g, max_iter=20, thresh=1e-8, max_nroots=100
         print(" Build mats for cluster ",ci.idx)
         ci.build_op_matrices()
 
-    return converged
+    return e_curr,converged
    # }}}
 
     
