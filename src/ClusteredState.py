@@ -117,6 +117,16 @@ class ClusteredState(OrderedDict):
                 v[idx] = coeff
                 idx += 1
         return v
+    def get_fspace_vector(self,fspace):
+        """
+        return a ndarray for the coefficients associated with fockspace=fspace 
+        """
+        v = np.zeros((len(self[fspace]),1))
+        idx = 0
+        for config,coeff in self[fspace].items():
+            v[idx] = coeff
+            idx += 1
+        return v
     def set_vector(self,v):
         """
         input a ndarray vector for the state and update coeffs
@@ -241,6 +251,18 @@ class ClusteredState(OrderedDict):
         return
 # }}}
 
+    def randomize_vector(self,seed=None):
+        """
+        randomize coefficients in defined space 
+        """
+        # {{{
+        np.random.seed(seed)
+        for fockspace,config,coeff in self:
+            self[fockspace][config] = np.random.normal() - .5
+        self.normalize()
+        return
+    # }}}
+
     def add(self,other):
         """
         add clusteredstate vector coefficients to self
@@ -254,6 +276,22 @@ class ClusteredState(OrderedDict):
                 else:
                     self.data[fockspace][config] = coeff
         return 
+
+    def dot(self,other):
+        """
+        Compute dot product of state with other
+
+        loop is over self, so use the dot function belonging to the shortest vector
+        """
+        dot = 0
+        for fockspace,config,coeff in self:
+        
+            try:
+                coeff2 = other[fockspace][config]
+            except KeyError:
+                pass
+            dot += coeff * coeff2
+        return dot
     
     def add_basis(self,other):
         """
@@ -300,7 +338,7 @@ class ClusteredState(OrderedDict):
         for f in self.data:
             if len(self.data[f]) == 0:
                 continue
-            print(" Dim %4i fock_space: "%len(f),end='')
+            print(" Dim %4i fock_space: "%len(self.data[f]),end='')
             [print(" Cluster %-2i(%ia:%ib) "%(fii,fi[0],fi[1]),end='') for fii,fi in enumerate(f)] 
             print()
             for config, value in self.data[f].items():

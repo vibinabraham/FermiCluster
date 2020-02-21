@@ -4,10 +4,81 @@ import itertools
 import copy as cp
 from helpers import *
 import opt_einsum as oe
+import tools
 
 from ClusteredOperator import *
 from ClusteredState import *
 
+
+def cmf(clustered_ham, ci_vector, h, g, max_iter=20, thresh=1e-8, max_nroots=1000):
+    """ Do CMF for a tensor product state 
+       
+        This modifies the data in clustered_ham.clusters, both the basis, and the operators
+
+        h is the 1e integrals
+        g is the 2e integrals
+
+        thresh: how tightly to converge energy
+        max_nroots: what is the max number of cluster states to allow in each fock space of each cluster
+                    after the potential is optimized?
+    """
+  # {{{
+    rdm_a = None
+    rdm_b = None
+    converged = False
+    clusters = clustered_ham.clusters
+    e_last = 999
+    for cmf_iter in range(max_iter):
+        
+        print(" Build cluster basis and operators")
+        for ci_idx, ci in enumerate(clusters):
+            assert(ci_idx == ci.idx)
+            if cmf_iter > 0:
+                ci.form_eigbasis_from_ints(h,g,max_roots=1, rdm1_a=rdm_a, rdm1_b=rdm_b)
+            else: 
+                ci.form_eigbasis_from_ints(h,g,max_roots=1)
+        
+            print(" Build new operators for cluster ",ci.idx)
+            ci.build_op_matrices()
+      
+        print(" Compute CMF energy")
+        e_curr = build_full_hamiltonian(clustered_ham, ci_vector)[0,0]
+        print(" CMF Iter: %4i Energy: %12.8f" %(cmf_iter,e_curr))
+
+        print(" Converged?")
+        if abs(e_curr-e_last) < thresh:
+            print(" CMF Converged. ")
+             
+            # form 1rdm from reference state
+            rdm_a, rdm_b = tools.build_1rdm(ci_vector)
+            converged = True
+            break
+        elif abs(e_curr-e_last) >= thresh and cmf_iter == max_iter-1:
+            print(" Max CMF iterations reached. Just continue anyway")
+        elif abs(e_curr-e_last) >= thresh and cmf_iter < max_iter-1:
+            print(" Continue CMF optimization")
+            # form 1rdm from reference state
+            rdm_a, rdm_b = tools.build_1rdm(ci_vector)
+            e_last = e_curr
+    
+    
+    # Now compute the full basis and associated operators
+    for ci_idx, ci in enumerate(clusters):
+        print()
+        print()
+        print(" Form basis by diagonalize local Hamiltonian for cluster: ",ci_idx)
+        if rdm_a is not None and rdm_b is not None: 
+            ci.form_eigbasis_from_ints(h,g,max_roots=max_nroots, rdm1_a=rdm_a, rdm1_b=rdm_b)
+        else:
+            ci.form_eigbasis_from_ints(h,g,max_roots=max_nroots)
+        print(" Build these local operators")
+        print(" Build mats for cluster ",ci.idx)
+        ci.build_op_matrices()
+
+    return converged
+   # }}}
+
+    
 def matvec1(h,v,term_thresh=1e-12):
     """
     Compute the action of H onto a sparse trial vector v
@@ -923,46 +994,171 @@ def build_1rdm(ci_vector):
     Build 1rdm C_{I,J,K}<IJK|p'q|LMN> C_{L,M,N}
     """
     # {{{
-    dm_aa = np.zeros((ci_vector.n_orb,ci_vector.n_orb))
-    dm_bb = np.zeros((ci_vector.n_orb,ci_vector.n_orb))
+    n_orb = ci_vector.n_orb
+    dm_aa = np.zeros((n_orb,n_orb))
+    dm_bb = np.zeros((n_orb,n_orb))
+    clusters = ci_vector.clusters
+   
+    if 0:
+        # build 1rdm in slow (easy) way
+        dm_aa_slow = np.zeros((n_orb,n_orb))
+        for i in range(n_orb):
+            for j in range(n_orb):
+                op = ClusteredOperator(clusters)
+                h = np.zeros((n_orb,n_orb))
+                h[i,j] = 1
+                op.add_1b_terms(h)
+                Nv = matvec1(op, ci_vector, term_thresh=0)
+                Nv = ci_vector.dot(Nv)
+                dm_aa_slow[i,j] = Nv
+        print(" Here is the slow version:")
+        occs = np.linalg.eig(dm_aa_slow)[0]
+        [print("%4i %12.8f"%(i,occs[i])) for i in range(len(occs))]
+        with np.printoptions(precision=6, suppress=True):
+            print(dm_aa_slow)
 
-
-    shift_l = 0 
-    for fock_li, fock_l in enumerate(ci_vector.data):
-        configs_l = ci_vector[fock_l]
-        if iprint > 0:
-            print(fock_l)
-       
-        for config_li, config_l in enumerate(configs_l):
-            idx_l = shift_l + config_li 
-            
-            shift_r = 0 
-            for fock_ri, fock_r in enumerate(ci_vector.data):
-                configs_r = ci_vector[fock_r]
-                delta_fock= tuple([(fock_l[ci][0]-fock_r[ci][0], fock_l[ci][1]-fock_r[ci][1]) for ci in range(len(clusters))])
-                if fock_ri<fock_li:
-                    shift_r += len(configs_r) 
+    # define orbital index shifts
+    tmp = 0
+    shifts = []
+    for ci in range(len(clusters)):
+        shifts.append(tmp)
+        tmp += clusters[ci].n_orb
+   
+    iprint = 1
+ 
+    # Diagonal terms
+    for fock in ci_vector.fblocks():
+        for ci in clusters:
+            #if ci.idx != 1:
+            #    continue
+            #Aa terms
+            if fock[ci.idx][0] > 0:
+                # c(ijk...) <ijk...|p'q|lmk...> c(lmk...)
+                # c(ijk...) <i|p'q|l> c(ljk...)
+                for config_l in ci_vector.fblock(fock):
+                    for config_r in ci_vector.fblock(fock):
+                        # make sure all state indices are the same aside for clusters i and j
+                        delta_conf = [config_l[i] == config_r[i] for i in range(len(clusters))] 
+                        delta_conf[ci.idx] = True
+                        diag = True
+                        for i in delta_conf:
+                            if i is False:
+                                diag = False
+                        
+                        if diag == False:
+                            continue
+                        pq = ci.get_op_mel('Aa', fock[ci.idx], fock[ci.idx], config_l[ci.idx], config_r[ci.idx])*ci_vector[fock][config_l] * ci_vector[fock][config_r]
+                        dm_aa[shifts[ci.idx]:shifts[ci.idx]+ci.n_orb, shifts[ci.idx]:shifts[ci.idx]+ci.n_orb] += pq
+ 
+            #Bb terms
+            if fock[ci.idx][1] > 0:
+                # c(ijk...) <ijk...|p'q|lmk...> c(lmk...)
+                # c(ijk...) <i|p'q|l> c(ljk...)
+                for config_l in ci_vector.fblock(fock):
+                    for config_r in ci_vector.fblock(fock):
+                        # make sure all state indices are the same aside for clusters i and j
+                        delta_conf = [config_l[i] == config_r[i] for i in range(len(clusters))] 
+                        delta_conf[ci.idx] = True
+                        diag = True
+                        for i in delta_conf:
+                            if i is False:
+                                diag = False
+                        
+                        if diag == False:
+                            continue
+                        pq = ci.get_op_mel('Bb', fock[ci.idx], fock[ci.idx], config_l[ci.idx], config_r[ci.idx])*ci_vector[fock][config_l] * ci_vector[fock][config_r]
+                        dm_bb[shifts[ci.idx]:shifts[ci.idx]+ci.n_orb, shifts[ci.idx]:shifts[ci.idx]+ci.n_orb] += pq
+ 
+    # Off-diagonal terms
+    for fock_l in ci_vector.fblocks():
+        #continue 
+        for ci in clusters:
+            for cj in clusters:
+                if cj.idx >= ci.idx:
                     continue
-                try:
-                    terms = clustered_ham.terms[delta_fock]
-                except KeyError:
-                    shift_r += len(configs_r) 
-                    continue 
-                
-                for config_ri, config_r in enumerate(configs_r):        
-                    idx_r = shift_r + config_ri
-                    if idx_r<idx_l:
-                        continue
+                #A,a terms
+                if fock_l[cj.idx][0] < ci.n_orb and fock_l[ci.idx][0] > 0:
+                    fock_r = list(fock_l)
+                    fock_r[ci.idx] = tuple([fock_l[ci.idx][0]-1, fock_l[ci.idx][1]])
+                    fock_r[cj.idx] = tuple([fock_l[cj.idx][0]+1, fock_l[cj.idx][1]])
+                    fock_r = tuple(fock_r)
+                    #print("A,a", fock_l, '-->', fock_r)
+                    # c(ijk...) <ijk...|p'q|lmk...> c(lmk...)
+                    # c(ijk...) <i|p'|l> <j|q|m> c(lmk...) (-1)^N(l)
+                    try:
+                        for config_l in ci_vector.fblock(fock_l):
+                            for config_r in ci_vector.fblock(fock_r):
+                                # make sure all state indices are the same aside for clusters i and j
+                                delta_conf = [abs(config_l[i]-config_r[i]) for i in range(len(clusters))] 
+                                delta_conf[ci.idx] = 0
+                                delta_conf[cj.idx] = 0
+                                if sum(delta_conf) > 0:
+                                    continue
+                                #print(" Here:", config_l, config_r, delta_conf)
+                                pmat = ci.get_op_mel('A', fock_l[ci.idx], fock_r[ci.idx], config_l[ci.idx], config_r[ci.idx])
+                                qmat = cj.get_op_mel('a', fock_l[cj.idx], fock_r[cj.idx], config_l[cj.idx], config_r[cj.idx])
+                                pq = np.einsum('p,q->pq',pmat,qmat) * ci_vector[fock_l][config_l] * ci_vector[fock_r][config_r]
+                                pq.shape = (ci.n_orb,cj.n_orb)
+                                # get state sign
+                                state_sign = 1
+                                for ck in range(ci.idx):
+                                    state_sign *= (-1)**(fock_l[ck][0]+fock_l[ck][1])
+                                for ck in range(cj.idx):
+                                    state_sign *= (-1)**(fock_l[ck][0]+fock_l[ck][1])
+                                pq = pq * state_sign
+                                dm_aa[shifts[ci.idx]:shifts[ci.idx]+ci.n_orb, shifts[cj.idx]:shifts[cj.idx]+cj.n_orb] += pq
+                                dm_aa[shifts[cj.idx]:shifts[cj.idx]+cj.n_orb, shifts[ci.idx]:shifts[ci.idx]+ci.n_orb] += pq.T
+                    except KeyError:
+                        pass 
                     
-                    for term in terms:
-                        me = term.matrix_element(fock_l,config_l,fock_r,config_r)
-                        H[idx_l,idx_r] += me
-                        if idx_r>idx_l:
-                            H[idx_r,idx_l] += me
-                        #print(" %4i %4i = %12.8f"%(idx_l,idx_r,me),"  :  ",config_l,config_r, " :: ", term)
-                shift_r += len(configs_r) 
-        shift_l += len(configs_l)
-    return H
+                
+                #B,b terms
+                if fock_l[cj.idx][1] < ci.n_orb and fock_l[ci.idx][1] > 0:
+                    fock_r = list(fock_l)
+                    fock_r[ci.idx] = tuple([fock_l[ci.idx][0], fock_l[ci.idx][1]-1])
+                    fock_r[cj.idx] = tuple([fock_l[cj.idx][0], fock_l[cj.idx][1]+1])
+                    fock_r = tuple(fock_r)
+                    #print("A,a", fock_l, '-->', fock_r)
+                    # c(ijk...) <ijk...|p'q|lmk...> c(lmk...)
+                    # c(ijk...) <i|p'|l> <j|q|m> c(lmk...) (-1)^N(l)
+                    try:
+                        for config_l in ci_vector.fblock(fock_l):
+                            for config_r in ci_vector.fblock(fock_r):
+                                # make sure all state indices are the same aside for clusters i and j
+                                delta_conf = [abs(config_l[i]-config_r[i]) for i in range(len(clusters))] 
+                                delta_conf[ci.idx] = 0
+                                delta_conf[cj.idx] = 0
+                                if sum(delta_conf) > 0:
+                                    continue
+                                #print(" Here:", config_l, config_r, delta_conf)
+                                pmat = ci.get_op_mel('B', fock_l[ci.idx], fock_r[ci.idx], config_l[ci.idx], config_r[ci.idx])
+                                qmat = cj.get_op_mel('b', fock_l[cj.idx], fock_r[cj.idx], config_l[cj.idx], config_r[cj.idx])
+                                pq = np.einsum('p,q->pq',pmat,qmat) * ci_vector[fock_l][config_l] * ci_vector[fock_r][config_r]
+                                pq.shape = (ci.n_orb,cj.n_orb)
+                                # get state sign
+                                state_sign = 1
+                                for ck in range(ci.idx):
+                                    state_sign *= (-1)**(fock_l[ck][0]+fock_l[ck][1])
+                                for ck in range(cj.idx):
+                                    state_sign *= (-1)**(fock_l[ck][0]+fock_l[ck][1])
+                                pq = pq * state_sign
+                                dm_bb[shifts[ci.idx]:shifts[ci.idx]+ci.n_orb, shifts[cj.idx]:shifts[cj.idx]+cj.n_orb] += pq
+                                dm_bb[shifts[cj.idx]:shifts[cj.idx]+cj.n_orb, shifts[ci.idx]:shifts[ci.idx]+ci.n_orb] += pq.T
+                    except KeyError:
+                        pass 
+                    
+                
+                
+
+    print(ci_vector.norm())
+    occs = np.linalg.eig(dm_aa + dm_bb)[0]
+    print(" Eigenvalues of density matrix")
+    [print("%4i %12.8f"%(i,occs[i])) for i in range(len(occs))]
+    print(np.trace(dm_aa + dm_bb))
+    with np.printoptions(precision=6, suppress=True):
+        print(dm_aa + dm_bb)
+    return dm_aa, dm_bb 
+
 # }}}
 
 

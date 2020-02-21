@@ -79,14 +79,17 @@ class Cluster(object):
         else:
             self.ops[op] = {}
     
-    def form_eigbasis_from_ints(self,hin,vin,max_roots=1000):
+    def form_eigbasis_from_ints(self,hin,vin,max_roots=1000, rdm1_a=None, rdm1_b=None, ecore=0):
         """
         grab integrals acting locally and form eigenbasis by FCI
+
+        rdm1 is the spin summed density matrix
         """
 # {{{
         h = np.zeros([self.n_orb]*2)
+        f = np.zeros([self.n_orb]*2)
         v = np.zeros([self.n_orb]*4)
-      
+        
         for pidx,p in enumerate(self.orb_list):
             for qidx,q in enumerate(self.orb_list):
                 h[pidx,qidx] = hin[p,q]
@@ -97,10 +100,78 @@ class Cluster(object):
                     for sidx,s in enumerate(self.orb_list):
                         v[pidx,qidx,ridx,sidx] = vin[p,q,r,s]
 
+
+        if rdm1_a is not None and rdm1_b is not None:
+            print(" here:")
+
+            denv_a = 1*rdm1_a
+            denv_b = 1*rdm1_b
+            for pidx,p in enumerate(self.orb_list):
+                for qidx,q in enumerate(range(rdm1_a.shape[0])):
+                    denv_a[p,q] = 0
+                    denv_b[p,q] = 0
+                    denv_a[q,p] = 0
+                    denv_b[q,p] = 0
+           
+            print(" Environment 1RDM:")
+            print_mat(denv_a+denv_b)
+            print(" Trace of env 1RDM: %12.8f" %np.trace(denv_a + denv_b))
+            print(" Compute energy of 1rdm:")
+            e1 =  np.trace(hin @ rdm1_a )
+            e1 += np.trace(hin @ rdm1_b )
+            e2 =  np.einsum('pqrs,pq,rs->',vin,rdm1_a,rdm1_a)
+            e2 -= np.einsum('pqrs,ps,qr->',vin,rdm1_a,rdm1_a)
+            
+            e2 += np.einsum('pqrs,pq,rs->',vin,rdm1_b,rdm1_b)
+            e2 -= np.einsum('pqrs,ps,qr->',vin,rdm1_b,rdm1_b)
+            
+            e2 += np.einsum('pqrs,pq,rs->',vin,rdm1_a,rdm1_b)
+            e2 += np.einsum('pqrs,pq,rs->',vin,rdm1_b,rdm1_a)
+            #e += np.einsum('pqrs,pq,rs->',vin,d,d)
+           
+            e = e1 + .5*e2
+            print(" E: %12.8f" %(e+ecore))
+           
+            fa =  hin*0 
+            fb =  hin*0
+            fa += np.einsum('pqrs,pq->rs',vin,denv_a)
+            fa += np.einsum('pqrs,pq->rs',vin,denv_b)
+            fa -= np.einsum('pqrs,ps->qr',vin,denv_a)
+            fb += np.einsum('pqrs,pq->rs',vin,denv_b)
+            fb += np.einsum('pqrs,pq->rs',vin,denv_a)
+            fb -= np.einsum('pqrs,ps->qr',vin,denv_b)
+
+        
+            for pidx,p in enumerate(self.orb_list):
+                for qidx,q in enumerate(self.orb_list):
+                    f[pidx,qidx] = .5*(fa[p,q] + fb[p,q])
+           
+            print(" 1 particle potential from environment")
+            print_mat(f)
+#            e = 0
+#            n_alpha = int(np.trace(d))
+#            n_beta = int(np.trace(d))
+#            for i in range(n_alpha):
+#                e += hin[i,i]
+#            for i in range(n_beta):
+#                e += hin[i,i]
+#            for i in range(n_alpha):
+#                for j in range(i,n_alpha):
+#                    e += vin[i,i,j,j] - vin[i,j,j,i]
+#            for i in range(n_beta):
+#                for j in range(i,n_beta):
+#                    e += vin[i,i,j,j] - vin[i,j,j,i]
+#            for i in range(n_alpha):
+#                for j in range(n_beta):
+#                    e += vin[i,i,j,j] 
+#            
+#            print(" E:       %12.8f" %(e))
+#            print(" E+ecore: %12.8f" %(e+ecore))
+
         H = Hamiltonian()
         H.S = np.eye(h.shape[0])
         H.C = H.S
-        H.t = h
+        H.t = h + f
         H.V = v
         self.basis = {}
         print(" Do CI for each particle number block")
@@ -218,6 +289,7 @@ class Cluster(object):
         Rotate cluster's basis using U, which is an dictionary mapping fock spaces to unitary rotation matrices.
         rotate basis, and all associated operators
         """
+# {{{
         for fspace,mat in U.items():
             self.basis[fspace] = self.basis[fspace] @ mat
             self.Hci[fspace] = self.basis[fspace].T @ self.Hci[fspace] @ self.basis[fspace]
@@ -235,7 +307,19 @@ class Cluster(object):
                     Ur = U[fspace_r]
                     self.ops[op][fspace_delta] = np.einsum('pq,pr...->qr...',Ur,self.ops[op][fspace_delta])
                     #self.ops[op][fspace_delta] = np.einsum('rs,pr...->ps...',Ur,self.ops[op][fspace_delta])
+   # }}}
     
+    
+    def get_ops(self):
+        return self.ops
+
+    def get_op(self,opstr):
+        return self.ops[opstr]
+
+    def get_op_mel(self,opstr,fI,fJ,I,J):
+        return self.ops[opstr][(fI,fJ)][I,J,:]
+
+
     def build_op_matrices(self):
         """
         build all operators needed

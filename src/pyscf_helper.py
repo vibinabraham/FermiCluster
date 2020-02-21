@@ -19,10 +19,12 @@ class PyscfHelper(object):
 
         self.h      = None
         self.g      = None
+        self.n_orb  = None
         #self.na     = 0
         #self.nb     = 0
         self.ecore  = 0
         self.C      = None
+        self.S      = None
         self.J      = None
         self.K      = None
 
@@ -56,6 +58,9 @@ class PyscfHelper(object):
         mf = scf.RHF(mol).run()
         #C = mf.mo_coeff #MO coeffs
         enu = mf.energy_nuc()
+       
+        print(mf.get_fock())
+        print(np.linalg.eig(mf.get_fock())[0])
         
         if mol.symmetry == True:
             from pyscf import symm
@@ -69,6 +74,7 @@ class PyscfHelper(object):
         n_orb = mol.nao_nr()
         n_b , n_a = mol.nelec 
         nel = n_a + n_b
+        self.n_orb = mol.nao_nr()
 
 
         if cas == True:
@@ -226,16 +232,24 @@ class PyscfHelper(object):
             self.K = self.C.T @ J @ self.C
     # }}}
 
-def run_fci_pyscf( h, g, nelec, ecore=0,nroots=1):
+def run_fci_pyscf( h, g, nelec, ecore=0,nroots=1, conv_tol=None, max_cycle=None):
 # {{{
     # FCI
     from pyscf import fci
     #efci, ci = fci.direct_spin1.kernel(h, g, h.shape[0], nelec,ecore=ecore, verbose=5) #DO NOT USE 
     cisolver = fci.direct_spin1.FCI()
+    if max_cycle != None:
+        cisolver.max_cycle = max_cycle 
+    if conv_tol != None:
+        cisolver.conv_tol = conv_tol 
     efci, ci = cisolver.kernel(h, g, h.shape[1], nelec, ecore=ecore,nroots =nroots,verbose=100)
     fci_dim = ci.shape[0]*ci.shape[1]
-    #d1 = cisolver.make_rdm1(ci, h.shape[1], nelec)
-    #print(d1)
+    d1 = cisolver.make_rdm1(ci, h.shape[1], nelec)
+    print(" PYSCF 1RDM: ")
+    occs = np.linalg.eig(d1)[0]
+    [print("%4i %12.8f"%(i,occs[i])) for i in range(len(occs))]
+    with np.printoptions(precision=6, suppress=True):
+        print(d1)
     print(" FCI:        %12.8f Dim:%6d"%(efci,fci_dim))
     #for i in range(0,nroots):
     #    print("FCI %10.8f"%(efci[i]))
