@@ -308,3 +308,54 @@ class ClusteredState(OrderedDict):
                 #print_row(value)
                 print(" %12.8f"%value)
                 #[print(" %12.8f"%value) for value in values]
+    
+    def analyze(self, print_thresh=1e-2):
+        """
+        Print out analysis of wavefunction
+        """
+        print()
+        print(" -----------------------------------------------------")
+        print(" Analysis of wavefunction")
+        print(" -----------------------------------------------------")
+        print(" Total Length: %5i" %len(self))
+        self.clip(1e-12)
+        print(" Total Length: %5i (clipped)" %len(self), 1e-12)
+        l1 = 0
+        #diag_l2 = 0
+        for f in self.fblocks():
+            print(" Fock Space Config: ",f)
+            f_weight = 0
+            f_l1 = 0
+            for c in self[f]:
+                f_weight += self[f][c]*self[f][c]
+                f_l1 += abs(self[f][c])
+                if abs(self[f][c]) > print_thresh:
+                    print("%20s"%str(c),end="")
+                    #print_row(value)
+                    print(" %12.8f"%self[f][c])
+                
+                
+                #diag = True
+                #for ci in range(1,len(c)):
+                #    if c[ci-1] != c[ci]:
+                #        diag = False
+                #        break
+                #if diag:
+                #    diag_l2 += self[f][c] * self[f][c]
+                    
+            l1 += f_l1
+            print("     Population: %12.8f" %f_weight)
+            print("     Dimension : %12i" %len(self[f]))
+            print("     L1:         %12.8f" %f_l1)
+        
+        print(" ")
+        print(" Length of vector:................... %-8i" % len(self))
+        print(" Number of Fock space configurations: %-8i" % len(self.fblocks()))
+        print(" Total L1:........................... %-8.2f" %l1)
+        print(" -----------------------------------------------------")
+
+            #for config, value in self.data[f].items():
+            #    print("%20s"%str(config),end="")
+            #    #print_row(value)
+            #    print(" ",value)
+

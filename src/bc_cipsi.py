@@ -47,15 +47,21 @@ def bc_cipsi_tucker(ci_vector, clustered_ham,
         print(" After:",len(pt_vector))
         for ci in clustered_ham.clusters:
             print()
+            print(" --------------------------------------------------------")
+            print(" Density matrix: Cluster ", ci)
+            print()
             print(" Compute BRDM",flush=True)
             print(" Hshift = ",hshift)
             rdms = build_brdm(pt_vector, ci.idx)
             print(" done.",flush=True)
             #rdms = build_brdm(ci_vector, ci.idx)
             norm = 0
+            entropy = 0
             rotations = {}
             for fspace,rdm in rdms.items():
-                
+               
+                fspace_norm = 0
+                fspace_entropy = 0
                 print(" Diagonalize RDM for Cluster %2i in Fock space:"%ci.idx, fspace,flush=True)
                 n,U = np.linalg.eigh(rdm)
                 idx = n.argsort()[::-1]
@@ -72,11 +78,19 @@ def bc_cipsi_tucker(ci_vector, clustered_ham,
                     U = U[:,idx]
                 
                 norm += sum(n)
+                fspace_norm = sum(n)
                 for ni_idx,ni in enumerate(n):
-                    if abs(ni) > 1e-12:
-                        print("   Rotated State %4i: %12.8f"%(ni_idx,ni))
+                    if abs(ni/norm) > 1e-12:
+                        fspace_entropy -= ni*np.log(ni/norm)/norm
+                        entropy -=  ni*np.log(ni)
+                        print("   Rotated State %4i:    %12.8f"%(ni_idx,ni))
+                print("   ----")
+                print("   Entanglement entropy:  %12.8f" %fspace_entropy) 
+                print("   Norm:                  %12.8f" %fspace_norm) 
                 rotations[fspace] = U
-            print(" Final norm: %12.8f"%norm)
+            print(" Final entropy:.... %12.8f"%entropy)
+            print(" Final norm:....... %12.8f"%norm)
+            print(" --------------------------------------------------------")
         
             ci.rotate_basis(rotations)
         delta_e = e0 - e_last
