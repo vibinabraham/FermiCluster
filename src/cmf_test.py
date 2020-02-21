@@ -67,6 +67,9 @@ def test_1():
     ecore = pmol.ecore
     n_orb = pmol.n_orb
 
+    h_save = cp.deepcopy(h)
+    g_save = cp.deepcopy(g)
+    
     print(" Ecore: %12.8f" %ecore)
     
     #cluster using hcore
@@ -147,14 +150,14 @@ def test_1():
             
             new_clustered_ham = ClusteredOperator(new_clusters)
             print(" Add 1-body terms")
-            new_clustered_ham.add_1b_terms(h)
+            new_clustered_ham.add_1b_terms(cp.deepcopy(h_save))
             print(" Add 2-body terms")
-            new_clustered_ham.add_2b_terms(g)
+            new_clustered_ham.add_2b_terms(cp.deepcopy(g_save))
             #clustered_ham.combine_common_terms(iprint=1)
            
            
             # Get CMF reference
-            e_curr,converged = cmf(new_clustered_ham, new_ci_vector, h, g, max_iter=10)
+            e_curr,converged = cmf(new_clustered_ham, new_ci_vector, cp.deepcopy(h_save), cp.deepcopy(g_save), max_iter=10)
             
             print(" Pairwise-CMF(%i,%i) Energy = %12.8f" %(i,j,e_curr))
             dimer_energies[(i,j)] = e_curr

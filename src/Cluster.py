@@ -94,8 +94,7 @@ class Cluster(object):
 
 
         if rdm1_a is not None and rdm1_b is not None:
-            print(" here:")
-
+            print(" Compute single particle embedding potential")
             denv_a = 1*rdm1_a
             denv_b = 1*rdm1_b
             for pidx,p in enumerate(self.orb_list):

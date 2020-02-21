@@ -996,7 +996,7 @@ def build_1rdm(ci_vector):
     dm_bb = np.zeros((n_orb,n_orb))
     clusters = ci_vector.clusters
    
-    if 0:
+    if 1:
         # build 1rdm in slow (easy) way
         dm_aa_slow = np.zeros((n_orb,n_orb))
         for i in range(n_orb):
@@ -1009,6 +1009,7 @@ def build_1rdm(ci_vector):
                 Nv = ci_vector.dot(Nv)
                 dm_aa_slow[i,j] = Nv
         print(" Here is the slow version:")
+        print(dm_aa_slow)
         occs = np.linalg.eig(dm_aa_slow)[0]
         [print("%4i %12.8f"%(i,occs[i])) for i in range(len(occs))]
         with np.printoptions(precision=6, suppress=True):
@@ -1143,8 +1144,18 @@ def build_1rdm(ci_vector):
                                 dm_bb[shifts[cj.idx]:shifts[cj.idx]+cj.n_orb, shifts[ci.idx]:shifts[ci.idx]+ci.n_orb] += pq.T
                     except KeyError:
                         pass 
-                    
-                
+                   
+
+    # density is being made in a reindexed fasion - reorder now 
+    new_index = []
+    for ci in clusters:
+        for cij in ci.orb_list:
+            new_index.append(cij)
+    new_index = np.array(new_index)
+
+    idx = new_index.argsort()
+    dm_aa = dm_aa[:,idx][idx,:]
+    dm_bb = dm_bb[:,idx][idx,:]
                 
 
     print(ci_vector.norm())
