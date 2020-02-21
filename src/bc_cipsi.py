@@ -15,7 +15,7 @@ from tools import *
 
 def bc_cipsi_tucker(ci_vector, clustered_ham, 
         thresh_cipsi=1e-4, thresh_ci_clip=1e-5, thresh_cipsi_conv=1e-8, max_cipsi_iter=30, 
-        thresh_tucker_conv = 1e-6, max_tucker_iter=20, tucker_state_clip=None,hshift=1e-8,asci_clip=0):
+        thresh_tucker_conv = 1e-6, max_tucker_iter=20, tucker_state_clip=None,hshift=1e-8,asci_clip=0,nproc=None):
     """
     Run iterations of TP-CIPSI to make the tucker decomposition self-consistent
     """
@@ -29,7 +29,8 @@ def bc_cipsi_tucker(ci_vector, clustered_ham,
     ci_vector_ref = ci_vector.copy()
     for brdm_iter in range(max_tucker_iter):
         ci_vector, pt_vector, e0, e2 = bc_cipsi(ci_vector_ref.copy(), clustered_ham, 
-                thresh_cipsi=thresh_cipsi, thresh_ci_clip=thresh_ci_clip, thresh_conv=thresh_cipsi_conv, max_iter=max_cipsi_iter,asci_clip=asci_clip)
+                thresh_cipsi=thresh_cipsi, thresh_ci_clip=thresh_ci_clip, thresh_conv=thresh_cipsi_conv, max_iter=max_cipsi_iter,asci_clip=asci_clip,
+                nproc=nproc)
         
         print(" CIPSI: E0 = %12.8f E2 = %12.8f CI_DIM: %i" %(e0, e2, len(ci_vector)))
       
@@ -46,15 +47,21 @@ def bc_cipsi_tucker(ci_vector, clustered_ham,
         print(" After:",len(pt_vector))
         for ci in clustered_ham.clusters:
             print()
+            print(" --------------------------------------------------------")
+            print(" Density matrix: Cluster ", ci)
+            print()
             print(" Compute BRDM",flush=True)
             print(" Hshift = ",hshift)
             rdms = build_brdm(pt_vector, ci.idx)
             print(" done.",flush=True)
             #rdms = build_brdm(ci_vector, ci.idx)
             norm = 0
+            entropy = 0
             rotations = {}
             for fspace,rdm in rdms.items():
-                
+               
+                fspace_norm = 0
+                fspace_entropy = 0
                 print(" Diagonalize RDM for Cluster %2i in Fock space:"%ci.idx, fspace,flush=True)
                 n,U = np.linalg.eigh(rdm)
                 idx = n.argsort()[::-1]
@@ -71,11 +78,19 @@ def bc_cipsi_tucker(ci_vector, clustered_ham,
                     U = U[:,idx]
                 
                 norm += sum(n)
+                fspace_norm = sum(n)
                 for ni_idx,ni in enumerate(n):
-                    if abs(ni) > 1e-12:
-                        print("   Rotated State %4i: %12.8f"%(ni_idx,ni))
+                    if abs(ni/norm) > 1e-12:
+                        fspace_entropy -= ni*np.log(ni/norm)/norm
+                        entropy -=  ni*np.log(ni)
+                        print("   Rotated State %4i:    %12.8f"%(ni_idx,ni))
+                print("   ----")
+                print("   Entanglement entropy:  %12.8f" %fspace_entropy) 
+                print("   Norm:                  %12.8f" %fspace_norm) 
                 rotations[fspace] = U
-            print(" Final norm: %12.8f"%norm)
+            print(" Final entropy:.... %12.8f"%entropy)
+            print(" Final norm:....... %12.8f"%norm)
+            print(" --------------------------------------------------------")
         
             ci.rotate_basis(rotations)
         delta_e = e0 - e_last
@@ -151,7 +166,7 @@ def bc_cipsi_tucker(ci_vector, clustered_ham,
 ## }}}
 
 
-def bc_cipsi(ci_vector, clustered_ham, thresh_cipsi=1e-4, thresh_ci_clip=1e-5, thresh_conv=1e-8, max_iter=30, n_roots=1,asci_clip=0):
+def bc_cipsi(ci_vector, clustered_ham, thresh_cipsi=1e-4, thresh_ci_clip=1e-5, thresh_conv=1e-8, max_iter=30, n_roots=1,asci_clip=0,nproc=None):
 
     print(" Compute diagonal elements",flush=True)
     # compute local states energies
@@ -168,8 +183,13 @@ def bc_cipsi(ci_vector, clustered_ham, thresh_cipsi=1e-4, thresh_ci_clip=1e-5, t
         print("     Selected CI Iteration: %4i epsilon: %12.8f" %(it,thresh_cipsi))
         print(" ===================================================================")
         print(" Build full Hamiltonian",flush=True)
-        H = build_full_hamiltonian(clustered_ham, ci_vector)
-
+        start = time.time()
+        if nproc==1:
+            H = build_full_hamiltonian(clustered_ham, ci_vector)
+        else:
+            H = build_full_hamiltonian_parallel1(clustered_ham, ci_vector, nproc=nproc)
+        stop = time.time()
+        print(" Time spent building Hamiltonian matrix: ", stop-start)
         print(" Diagonalize Hamiltonian Matrix:",flush=True)
         vguess = ci_vector.get_vector()
         if H.shape[0] > 100 and abs(np.sum(vguess)) >0:
@@ -220,10 +240,22 @@ def bc_cipsi(ci_vector, clustered_ham, thresh_cipsi=1e-4, thresh_ci_clip=1e-5, t
             #asci_vector.print_configs()
 
         print(" Compute Matrix Vector Product:", flush=True)
+        start = time.time()
         if asci_clip > 0:
-            pt_vector = matvec1(clustered_ham, asci_vector)
+            if nproc==1:
+                pt_vector = matvec1(clustered_ham, asci_vector)
+            else:
+                pt_vector = matvec1_parallel1(clustered_ham, asci_vector, nproc=nproc)
+
         else:
-            pt_vector = matvec1(clustered_ham, ci_vector)
+            if nproc==1:
+                pt_vector = matvec1(clustered_ham, ci_vector)
+            else:
+                pt_vector = matvec1_parallel1(clustered_ham, ci_vector, nproc=nproc)
+        
+        stop = time.time()
+        print(" Time spent in matvec: ", stop-start)
+        
         pt_vector.prune_empty_fock_spaces()
         #pt_vector.print()
 
@@ -258,8 +290,11 @@ def bc_cipsi(ci_vector, clustered_ham, thresh_cipsi=1e-4, thresh_ci_clip=1e-5, t
         #import cProfile
         #pr = cProfile.Profile()
         #pr.enable()
-            
-        Hd = update_hamiltonian_diagonal(clustered_ham, pt_vector, Hd_vector)
+           
+        if nproc==1:
+            Hd = update_hamiltonian_diagonal(clustered_ham, pt_vector, Hd_vector)
+        else:
+            Hd = build_hamiltonian_diagonal_parallel1(clustered_ham, pt_vector, nproc=nproc)
         #pr.disable()
         #pr.print_stats(sort='time')
         end = time.time()
@@ -353,6 +388,10 @@ def bc_cipsi(ci_vector, clustered_ham, thresh_cipsi=1e-4, thresh_ci_clip=1e-5, t
     #        ci.form_eigbasis_from_local_operator(opi,max_roots=1000)
     #        exit()
     return ci_vector, pt_vector, e0, e0+e2
+
+
+
+
 
 
 

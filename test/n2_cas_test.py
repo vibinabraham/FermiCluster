@@ -15,7 +15,9 @@ import pyscf
 ttt = time.time()
 
 
-def test_1():
+
+
+def test_1(nproc):
     pyscf.lib.num_threads(1)  #with degenerate states and multiple processors there can be issues
     np.set_printoptions(suppress=True, precision=3, linewidth=1500)
     n_cluster_states = 1000
@@ -40,6 +42,8 @@ def test_1():
     cas_nel = 10
 
     ###     TPSCI CLUSTER INPUT
+    #blocks = [[0,1],[2,3],[4,5],[6,7]]
+    #init_fspace = ((2, 2), (1, 1), (1, 1), (1, 1))
     blocks = [[0,1,2,3],[4,5],[6,7]]
     init_fspace = ((3, 3), (1, 1), (1, 1))
 
@@ -69,7 +73,7 @@ def test_1():
         ehci, hci_dim = run_hci_pyscf(h,g,cas_nel,ecore=ecore,select_cutoff=1e-4,ci_cutoff=1e-4)
     if do_tci:
         ci_vector, pt_vector, etci, etci2 = run_tpsci(h,g,blocks,init_fspace,ecore=ecore,
-            thresh_ci_clip=1e-6,thresh_cipsi=1e-5,max_tucker_iter=20,hshift=1e-8)
+            thresh_ci_clip=1e-6,thresh_cipsi=1e-5,max_tucker_iter=20,hshift=1e-8, nproc=nproc)
         ci_vector.print_configs()
         tci_dim = len(ci_vector)
 
@@ -84,4 +88,5 @@ def test_1():
 
 
 if __name__== "__main__":
-    test_1() 
+    #test_1(1) 
+    test_1(None) 
