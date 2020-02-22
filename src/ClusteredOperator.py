@@ -601,16 +601,6 @@ class ClusteredOperator:
                         term_bb.active = sorted(list(set([ci.idx,cj.idx,ck.idx,cl.idx])))
                         
                         
-                       
-                        #term_aa.sign = sign
-                        #term_ab.sign = sign
-                        #term_ba.sign = sign
-                        #term_bb.sign = sign
-                        #term_aa.ints *= sign
-                        #term_ab.ints *= sign
-                        #term_ba.ints *= sign
-                        #term_bb.ints *= sign
-                        
                         term_aa.contract_string = contract_string
                         term_ab.contract_string = contract_string
                         term_ba.contract_string = contract_string
@@ -633,12 +623,15 @@ class ClusteredOperator:
                             shapes.append(shape)
                         shapes.append(vijkl)
                         #exit()
-                        term_aa.contract_expression = oe.contract_expression(term_aa.contract_string,*shapes,constants=[len(shapes)-1])
-                        term_ab.contract_expression = oe.contract_expression(term_ab.contract_string,*shapes,constants=[len(shapes)-1])
-                        term_ba.contract_expression = oe.contract_expression(term_ba.contract_string,*shapes,constants=[len(shapes)-1])
-                        term_bb.contract_expression = oe.contract_expression(term_bb.contract_string,*shapes,constants=[len(shapes)-1])
-                        #print(term_aa.contract_expression)
-                        #print(term_bb, [ci.idx,cj.idx,ck.idx,cl.idx])
+
+                        #uncomment the following to use the optimized contraction strings in opteinsum
+                        if 0:
+                            term_aa.contract_expression = oe.contract_expression(term_aa.contract_string,*shapes,constants=[len(shapes)-1])
+                            term_ab.contract_expression = oe.contract_expression(term_ab.contract_string,*shapes,constants=[len(shapes)-1])
+                            term_ba.contract_expression = oe.contract_expression(term_ba.contract_string,*shapes,constants=[len(shapes)-1])
+                            term_bb.contract_expression = oe.contract_expression(term_bb.contract_string,*shapes,constants=[len(shapes)-1])
+                            #print(term_aa.contract_expression)
+                            #print(term_bb, [ci.idx,cj.idx,ck.idx,cl.idx])
                        
                         try:
                             self.terms[delta_aa].append(term_aa)

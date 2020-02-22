@@ -189,6 +189,20 @@ class ClusteredState(OrderedDict):
         if block not in self.data:
             self.data[block] = OrderedDict()
 
+    def compute_max_fock_space_dim(self,fspace):
+        """
+        Compute the max number of configurations in a given fock space
+        """
+        # {{{
+        print(fspace)
+        dim = 1
+        for c in self.clusters:
+            print(c.basis)
+            # get number of vectors for current fock space
+            dim *= c.basis[fspace[c.idx]].shape[1]
+        return dim
+# }}}
+    
     def expand_each_fock_space(self):
         """
         expand basis to full space

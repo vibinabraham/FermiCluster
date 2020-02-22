@@ -8,6 +8,7 @@ import tools
 
 from ClusteredOperator import *
 from ClusteredState import *
+from Cluster import *
 
 
 def cmf(clustered_ham, ci_vector, h, g, max_iter=20, thresh=1e-8, max_nroots=1000):
@@ -1203,3 +1204,88 @@ def build_brdm(ci_vector, ci_idx):
     return rdms
 # }}}
 
+def do_2body_search(blocks, init_fspace, h, g, max_cluster_size=4, max_iter_cmf=10 ):
+    dimer_energies = {}
+    init_dim = 1
+    clusters = []
+    for ci,c in enumerate(blocks):
+        clusters.append(Cluster(ci,c))
+    for ci,c in enumerate(clusters):
+        init_dim = init_dim * calc_nchk(c.n_orb,init_fspace[ci][0])
+        init_dim = init_dim * calc_nchk(c.n_orb,init_fspace[ci][1])
+    
+    for i in range(len(blocks)):
+        for j in range(i+1,len(blocks)):
+            if len(blocks[i]) + len(blocks[j]) > max_cluster_size:
+                continue
+            
+            new_block = []
+            new_block.extend(blocks[i])
+            new_block.extend(blocks[j])
+            new_block = sorted(new_block)
+            new_blocks = [new_block]
+            new_init_fspace = [(init_fspace[i][0]+init_fspace[j][0],init_fspace[i][1]+init_fspace[j][1])]
+            for k in range(len(blocks)):
+                if k!=i and k!=j:
+                    new_blocks.append(blocks[k])
+                    new_init_fspace.append(init_fspace[k])
+            new_init_fspace = tuple(new_init_fspace)
+            
+            new_clusters = []
+            for ci,c in enumerate(new_blocks):
+                new_clusters.append(Cluster(ci,c))
+            
+            new_ci_vector = ClusteredState(new_clusters)
+            new_ci_vector.init(new_init_fspace)
+         
+            # make sure new dimension is greater than 1
+            dim = 1
+            for ci,c in enumerate(new_clusters):
+                dim = dim * calc_nchk(c.n_orb,new_init_fspace[ci][0])
+                dim = dim * calc_nchk(c.n_orb,new_init_fspace[ci][1])
+            if dim <= init_dim:
+                continue
+            
+            print(" Clusters:")
+            [print(ci) for ci in new_clusters]
+            
+            new_clustered_ham = ClusteredOperator(new_clusters)
+            print(" Add 1-body terms")
+            new_clustered_ham.add_1b_terms(cp.deepcopy(h))
+            print(" Add 2-body terms")
+            new_clustered_ham.add_2b_terms(cp.deepcopy(g))
+            #clustered_ham.combine_common_terms(iprint=1)
+           
+           
+            # Get CMF reference
+            print(" Let's do CMF for blocks %4i:%-4i"%(i,j))
+            e_curr,converged = cmf(new_clustered_ham, new_ci_vector, cp.deepcopy(h), cp.deepcopy(g), max_iter=10, max_nroots=1)
+            
+            print(" Pairwise-CMF(%i,%i) Energy = %12.8f" %(i,j,e_curr))
+            dimer_energies[(i,j)] = e_curr
+    
+    import operator
+    dimer_energies = OrderedDict(sorted(dimer_energies.items(), key=lambda x: x[1]))
+    for d in dimer_energies:
+        print(" || %10s | %12.8f" %(d,dimer_energies[d]))
+        
+    target_pair = next(iter(dimer_energies))
+    
+    i = target_pair[0]
+    j = target_pair[1]
+    print(target_pair)
+    new_block = []
+    new_block.extend(blocks[i])
+    new_block.extend(blocks[j])
+    new_blocks = [new_block]
+    new_init_fspace = [(init_fspace[i][0]+init_fspace[j][0],init_fspace[i][1]+init_fspace[j][1])]
+    for k in range(len(blocks)):
+        if k!=i and k!=j:
+            new_blocks.append(blocks[k])
+            new_init_fspace.append(init_fspace[k])
+    print(" This is the new clustering")
+    print(" | %12.8f" %dimer_energies[(i,j)], new_blocks)
+    new_init_fspace = tuple(new_init_fspace)
+    print(new_init_fspace)
+    print()
+    return new_blocks, new_init_fspace

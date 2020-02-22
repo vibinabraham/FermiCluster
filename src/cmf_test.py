@@ -33,8 +33,8 @@ def test_1():
     '''
     charge = 0
     spin  = 0
-    basis_set = 'sto-3g'
-    #basis_set = '3-21g'
+    #basis_set = 'sto-3g'
+    basis_set = '6-31g'
 
     ###     TPSCI BASIS INPUT
     orb_basis = 'scf'
@@ -44,9 +44,10 @@ def test_1():
     #cas_nel = 10
 
     ###     TPSCI CLUSTER INPUT
-    blocks = [[i] for i in range(4)] 
-    init_fspace = ((1, 1), (1, 1), (0, 0), (0, 0))
-    #init_fspace = ((1, 1), (1, 1), (0, 0), (0, 0), (0, 0), (0, 0), (0, 0), (0, 0))
+    #blocks = [[i] for i in range(4)] 
+    #init_fspace = ((1, 1), (1, 1), (0, 0), (0, 0))
+    blocks = [[i] for i in range(8)] 
+    init_fspace = ((1, 1), (1, 1), (0, 0), (0, 0), (0, 0), (0, 0), (0, 0), (0, 0))
    
     #blocks = [[0],[1,2],[3]]
     #init_fspace = ((1, 1), (1, 1), (0, 0))
@@ -114,59 +115,21 @@ def test_1():
     clustered_ham.add_2b_terms(g)
     #clustered_ham.combine_common_terms(iprint=1)
    
-   
+    
     # Get CMF reference
     cmf(clustered_ham, ci_vector, h, g, max_iter=10)
 
-    dimer_energies = {}
-    for i in range(len(blocks)):
-        for j in range(i+1,len(blocks)):
-            print(" Let's do CMF for blocks %4i:%-4i"%(i,j))
-            new_block = []
-            new_block.extend(blocks[i])
-            new_block.extend(blocks[j])
-            new_blocks = [new_block]
-            new_init_fspace = [(init_fspace[i][0]+init_fspace[j][0],init_fspace[i][1]+init_fspace[j][1])]
-            for k in range(len(blocks)):
-                if k!=i and k!=j:
-                    new_blocks.append(blocks[k])
-                    new_init_fspace.append(init_fspace[k])
-            print(" This is the new clustering")
-            print(new_blocks)
-            new_init_fspace = tuple(new_init_fspace)
-            print(new_init_fspace)
-            print()
-            
-            new_clusters = []
-            for ci,c in enumerate(new_blocks):
-                new_clusters.append(Cluster(ci,c))
-            
-            new_ci_vector = ClusteredState(new_clusters)
-            new_ci_vector.init(new_init_fspace)
-           
-            
-            print(" Clusters:")
-            [print(ci) for ci in new_clusters]
-            
-            new_clustered_ham = ClusteredOperator(new_clusters)
-            print(" Add 1-body terms")
-            new_clustered_ham.add_1b_terms(cp.deepcopy(h_save))
-            print(" Add 2-body terms")
-            new_clustered_ham.add_2b_terms(cp.deepcopy(g_save))
-            #clustered_ham.combine_common_terms(iprint=1)
-           
-           
-            # Get CMF reference
-            e_curr,converged = cmf(new_clustered_ham, new_ci_vector, cp.deepcopy(h_save), cp.deepcopy(g_save), max_iter=10)
-            
-            print(" Pairwise-CMF(%i,%i) Energy = %12.8f" %(i,j,e_curr))
-            dimer_energies[(i,j)] = e_curr
+    blocks, init_fspace = do_2body_search(blocks, init_fspace, h, g)
+    blocks, init_fspace = do_2body_search(blocks, init_fspace, h, g)
+    blocks, init_fspace = do_2body_search(blocks, init_fspace, h, g)
+    blocks, init_fspace = do_2body_search(blocks, init_fspace, h, g)
+    blocks, init_fspace = do_2body_search(blocks, init_fspace, h, g)
+    blocks, init_fspace = do_2body_search(blocks, init_fspace, h, g)
+    blocks, init_fspace = do_2body_search(blocks, init_fspace, h, g)
+    blocks, init_fspace = do_2body_search(blocks, init_fspace, h, g)
+    blocks, init_fspace = do_2body_search(blocks, init_fspace, h, g)
 
-    import operator
-    dimer_energies = OrderedDict(sorted(dimer_energies.items(), key=lambda x: x[1]))
-    for d in dimer_energies:
-        print(" || %10s | %12.8f" %(d,dimer_energies[d]))
-
+    
 
 if __name__== "__main__":
     test_1() 
