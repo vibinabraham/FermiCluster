@@ -40,7 +40,6 @@ class PyscfHelper(object):
         print("                                                          ")
 
         mol = gto.Mole()
-        print("here")
         mol.atom = molecule
 
         mol.max_memory = 1000 # MB
@@ -58,7 +57,9 @@ class PyscfHelper(object):
         mf = scf.RHF(mol).run()
         #C = mf.mo_coeff #MO coeffs
         enu = mf.energy_nuc()
-       
+        
+        print(" SCF Total energy: %12.8f" %mf.e_tot) 
+        print(" SCF Elec  energy: %12.8f" %(mf.e_tot-enu))
         print(mf.get_fock())
         print(np.linalg.eig(mf.get_fock())[0])
         

@@ -5,6 +5,7 @@ import copy as cp
 from helpers import *
 import opt_einsum as oe
 import tools
+import time
 
 from ClusteredOperator import *
 from ClusteredState import *
@@ -997,7 +998,7 @@ def build_1rdm(ci_vector):
     dm_bb = np.zeros((n_orb,n_orb))
     clusters = ci_vector.clusters
    
-    if 1:
+    if 0:
         # build 1rdm in slow (easy) way
         dm_aa_slow = np.zeros((n_orb,n_orb))
         for i in range(n_orb):
@@ -1012,7 +1013,7 @@ def build_1rdm(ci_vector):
         print(" Here is the slow version:")
         print(dm_aa_slow)
         occs = np.linalg.eig(dm_aa_slow)[0]
-        [print("%4i %12.8f"%(i,occs[i])) for i in range(len(occs))]
+        #[print("%4i %12.8f"%(i,occs[i])) for i in range(len(occs))]
         with np.printoptions(precision=6, suppress=True):
             print(dm_aa_slow)
 
@@ -1204,7 +1205,12 @@ def build_brdm(ci_vector, ci_idx):
     return rdms
 # }}}
 
-def do_2body_search(blocks, init_fspace, h, g, max_cluster_size=4, max_iter_cmf=10 ):
+
+def do_2body_search(blocks, init_fspace, h, g, max_cluster_size=4, max_iter_cmf=10, do_pt2=True):
+    """
+    Sort the cluster pairs based on how much correlation energy is recovered when combined
+    """
+# {{{
     dimer_energies = {}
     init_dim = 1
     clusters = []
@@ -1238,13 +1244,14 @@ def do_2body_search(blocks, init_fspace, h, g, max_cluster_size=4, max_iter_cmf=
             new_ci_vector = ClusteredState(new_clusters)
             new_ci_vector.init(new_init_fspace)
          
-            # make sure new dimension is greater than 1
-            dim = 1
-            for ci,c in enumerate(new_clusters):
-                dim = dim * calc_nchk(c.n_orb,new_init_fspace[ci][0])
-                dim = dim * calc_nchk(c.n_orb,new_init_fspace[ci][1])
-            if dim <= init_dim:
-                continue
+            ## unless doing PT2, make sure new dimension is greater than 1
+            if do_pt2 == False:
+                dim = 1
+                for ci,c in enumerate(new_clusters):
+                    dim = dim * calc_nchk(c.n_orb,new_init_fspace[ci][0])
+                    dim = dim * calc_nchk(c.n_orb,new_init_fspace[ci][1])
+                if dim <= init_dim:
+                    continue
             
             print(" Clusters:")
             [print(ci) for ci in new_clusters]
@@ -1260,7 +1267,13 @@ def do_2body_search(blocks, init_fspace, h, g, max_cluster_size=4, max_iter_cmf=
             # Get CMF reference
             print(" Let's do CMF for blocks %4i:%-4i"%(i,j))
             e_curr,converged = cmf(new_clustered_ham, new_ci_vector, cp.deepcopy(h), cp.deepcopy(g), max_iter=10, max_nroots=1)
-            
+           
+            if do_pt2:
+                e2, v = compute_pt2_correction(new_ci_vector, new_clustered_ham, e_curr)
+                print(" PT2 Energy Total      = %12.8f" %(e_curr+e2))
+               
+                e_curr += e2
+
             print(" Pairwise-CMF(%i,%i) Energy = %12.8f" %(i,j,e_curr))
             dimer_energies[(i,j)] = e_curr
     
@@ -1268,9 +1281,14 @@ def do_2body_search(blocks, init_fspace, h, g, max_cluster_size=4, max_iter_cmf=
     dimer_energies = OrderedDict(sorted(dimer_energies.items(), key=lambda x: x[1]))
     for d in dimer_energies:
         print(" || %10s | %12.8f" %(d,dimer_energies[d]))
-        
-    target_pair = next(iter(dimer_energies))
-    
+  
+    pairs = list(dimer_energies.keys())
+    if len(pairs) == 0:
+        return blocks, init_fspace
+
+    #target_pair = next(iter(dimer_energies))
+    target_pair = pairs[0]
+
     i = target_pair[0]
     j = target_pair[1]
     print(target_pair)
@@ -1289,3 +1307,71 @@ def do_2body_search(blocks, init_fspace, h, g, max_cluster_size=4, max_iter_cmf=
     print(new_init_fspace)
     print()
     return new_blocks, new_init_fspace
+# }}}
+
+def compute_pt2_correction(ci_vector, clustered_ham, e0, nproc=1):
+    # {{{
+    print(" Compute Matrix Vector Product:", flush=True)
+    start = time.time()
+    if nproc==1:
+        pt_vector = matvec1(clustered_ham, ci_vector)
+    else:
+        pt_vector = matvec1_parallel1(clustered_ham, ci_vector, nproc=nproc)
+    stop = time.time()
+    print(" Time spent in matvec: ", stop-start)
+    
+    pt_vector.prune_empty_fock_spaces()
+    
+    
+    tmp = ci_vector.dot(pt_vector)
+    var = pt_vector.norm() - tmp*tmp 
+    print(" Variance: %12.8f" % var,flush=True)
+    
+    
+    print(" Remove CI space from pt_vector vector")
+    for fockspace,configs in pt_vector.items():
+        if fockspace in ci_vector.fblocks():
+            for config,coeff in list(configs.items()):
+                if config in ci_vector[fockspace]:
+                    del pt_vector[fockspace][config]
+    
+    
+    for fockspace,configs in ci_vector.items():
+        if fockspace in pt_vector:
+            for config,coeff in configs.items():
+                assert(config not in pt_vector[fockspace])
+    
+    print(" Norm of CI vector = %12.8f" %ci_vector.norm())
+    print(" Dimension of CI space: ", len(ci_vector))
+    print(" Dimension of PT space: ", len(pt_vector))
+    print(" Compute Denominator",flush=True)
+    #next_ci_vector = cp.deepcopy(ci_vector)
+    # compute diagonal for PT2
+    start = time.time()
+    pt_vector.prune_empty_fock_spaces()
+        
+    #import cProfile
+    #pr = cProfile.Profile()
+    #pr.enable()
+       
+    if nproc==1:
+        Hd = build_hamiltonian_diagonal(clustered_ham, pt_vector)
+    else:
+        Hd = build_hamiltonian_diagonal_parallel1(clustered_ham, pt_vector, nproc=nproc)
+    #pr.disable()
+    #pr.print_stats(sort='time')
+    end = time.time()
+    print(" Time spent in demonimator: ", end - start)
+
+    denom = 1/(e0 - Hd)
+    pt_vector_v = pt_vector.get_vector()
+    pt_vector_v.shape = (pt_vector_v.shape[0])
+
+    e2 = np.multiply(denom,pt_vector_v)
+    pt_vector.set_vector(e2)
+    e2 = np.dot(pt_vector_v,e2)
+
+    print(" PT2 Energy Correction = %12.8f" %e2)
+    return e2,pt_vector
+# }}}
+
