@@ -1,3 +1,4 @@
+import sys
 import numpy as np
 import scipy
 import itertools
@@ -181,6 +182,8 @@ def matvec1(h,v,term_thresh=1e-12):
                                 configs_l[spi] = tmp[sp_idx] 
                             else:
                                 configs_l[spi] += tmp[sp_idx] 
+    
+    print(" This is how much memory is being used to store collected results: ",sys.getsizeof(sigma.data)) 
     return sigma 
 # }}}
 
@@ -213,7 +216,8 @@ def matvec1_parallel1(h_in,v,term_thresh=1e-12, nproc=None):
         conf_r = v_curr[1]
         coeff  = v_curr[2]
         
-        sigma_out = ClusteredState(clusters)
+        #sigma_out = ClusteredState(clusters)
+        sigma_out = OrderedDict() 
         for terms in h.terms:
             fock_l= tuple([(terms[ci][0]+fock_r[ci][0], terms[ci][1]+fock_r[ci][1]) for ci in range(len(clusters))])
             good = True
@@ -226,9 +230,10 @@ def matvec1_parallel1(h_in,v,term_thresh=1e-12, nproc=None):
             
             #print(fock_l, "<--", fock_r)
             
-            if fock_l not in sigma_out.data:
-                sigma_out.add_fockspace(fock_l)
-        
+            #if fock_l not in sigma_out.data:
+            if fock_l not in sigma_out:
+                sigma_out[fock_l] = OrderedDict()
+            
             configs_l = sigma_out[fock_l] 
             
             for term in h.terms[terms]:
@@ -295,7 +300,7 @@ def matvec1_parallel1(h_in,v,term_thresh=1e-12, nproc=None):
                             configs_l[spi] = tmp[sp_idx] 
                         else:
                             configs_l[spi] += tmp[sp_idx] 
-        return sigma_out.data
+        return sigma_out
     
     import multiprocessing as mp
     from pathos.multiprocessing import ProcessingPool as Pool
@@ -311,10 +316,11 @@ def matvec1_parallel1(h_in,v,term_thresh=1e-12, nproc=None):
     pool.join()
     pool.clear()
     #out = list(map(do_parallel_work, v))
-   
+    print(" This is how much memory is being used to store matvec results:    ",sys.getsizeof(out)) 
     for o in out:
         sigma.add(o)
 
+    print(" This is how much memory is being used to store collected results: ",sys.getsizeof(sigma.data)) 
     return sigma 
 # }}}
 
