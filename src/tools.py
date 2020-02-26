@@ -211,7 +211,8 @@ def matvec1_parallel1(h_in,v,term_thresh=1e-12, nproc=None):
         conf_r = v_curr[1]
         coeff  = v_curr[2]
         
-        sigma_out = ClusteredState(clusters)
+        #sigma_out = ClusteredState(clusters)
+        sigma_out = OrderedDict() 
         for terms in h.terms:
             fock_l= tuple([(terms[ci][0]+fock_r[ci][0], terms[ci][1]+fock_r[ci][1]) for ci in range(len(clusters))])
             good = True
@@ -224,9 +225,10 @@ def matvec1_parallel1(h_in,v,term_thresh=1e-12, nproc=None):
             
             #print(fock_l, "<--", fock_r)
             
-            if fock_l not in sigma_out.data:
-                sigma_out.add_fockspace(fock_l)
-        
+            #if fock_l not in sigma_out.data:
+            if fock_l not in sigma_out:
+                sigma_out[fock_l] = OrderedDict()
+            
             configs_l = sigma_out[fock_l] 
             
             for term in h.terms[terms]:
