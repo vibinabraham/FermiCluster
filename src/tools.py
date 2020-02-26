@@ -1,3 +1,4 @@
+import sys
 import numpy as np
 import scipy
 import itertools
@@ -179,6 +180,8 @@ def matvec1(h,v,term_thresh=1e-12):
                                 configs_l[spi] = tmp[sp_idx] 
                             else:
                                 configs_l[spi] += tmp[sp_idx] 
+    
+    print(" This is how much memory is being used to store collected results: ",sys.getsizeof(sigma.data)) 
     return sigma 
 # }}}
 
@@ -295,7 +298,7 @@ def matvec1_parallel1(h_in,v,term_thresh=1e-12, nproc=None):
                             configs_l[spi] = tmp[sp_idx] 
                         else:
                             configs_l[spi] += tmp[sp_idx] 
-        return sigma_out.data
+        return sigma_out
     
     import multiprocessing as mp
     from pathos.multiprocessing import ProcessingPool as Pool
@@ -311,10 +314,11 @@ def matvec1_parallel1(h_in,v,term_thresh=1e-12, nproc=None):
     pool.join()
     pool.clear()
     #out = list(map(do_parallel_work, v))
-   
+    print(" This is how much memory is being used to store matvec results:    ",sys.getsizeof(out)) 
     for o in out:
         sigma.add(o)
 
+    print(" This is how much memory is being used to store collected results: ",sys.getsizeof(sigma.data)) 
     return sigma 
 # }}}
 
