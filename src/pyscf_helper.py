@@ -196,6 +196,31 @@ class PyscfHelper(object):
             J,K = mf.get_jk()
             self.J = self.C.T @ J @ self.C
             self.K = self.C.T @ J @ self.C
+
+            #HF density
+            if orb_basis == 'scf':
+                #C = C[:,cas_nstart:cas_nstop]
+                D = mf.make_rdm1(mo_coeff=C)
+                S = mf.get_ovlp()
+                sal, svec = np.linalg.eigh(S)
+                idx = sal.argsort()[::-1]
+                sal = sal[idx]
+                svec = svec[:, idx]
+                sal = sal**-0.5
+                sal = np.diagflat(sal)
+                X = svec @ sal @ svec.T
+                C_ao2mo = np.linalg.inv(X) @ C
+                Cocc = C_ao2mo[:, :n_a]
+                D = Cocc @ Cocc.T
+                DMO = C_ao2mo.T   @ D @ C_ao2mo
+                
+                #only for cas space 
+                DMO = DMO[cas_nstart:cas_nstop,cas_nstart:cas_nstop]
+                self.dm_aa = DMO
+                self.dm_bb = DMO
+                print("DENSITY")
+                print(self.dm_aa.shape)
+
             if 0:
                 h = C.T.dot(mf.get_hcore()).dot(C)
                 g = ao2mo.kernel(mol,C,aosym='s4',compact=False).reshape(4*((n_orb),))
@@ -231,6 +256,26 @@ class PyscfHelper(object):
             J,K = mf.get_jk()
             self.J = self.C.T @ J @ self.C
             self.K = self.C.T @ J @ self.C
+
+            #HF density
+            if orb_basis == 'scf':
+                D = mf.make_rdm1(mo_coeff=None)
+                S = mf.get_ovlp()
+                sal, svec = np.linalg.eigh(S)
+                idx = sal.argsort()[::-1]
+                sal = sal[idx]
+                svec = svec[:, idx]
+                sal = sal**-0.5
+                sal = np.diagflat(sal)
+                X = svec @ sal @ svec.T
+                C_ao2mo = np.linalg.inv(X) @ C
+                Cocc = C_ao2mo[:, :n_a]
+                D = Cocc @ Cocc.T
+                DMO = C_ao2mo.T   @ D @ C_ao2mo
+                self.dm_aa = DMO
+                self.dm_bb = DMO
+                print("DENSITY")
+                print(self.dm_aa)
     # }}}
 
 def run_fci_pyscf( h, g, nelec, ecore=0,nroots=1, conv_tol=None, max_cycle=None):
