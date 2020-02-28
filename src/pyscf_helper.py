@@ -448,3 +448,51 @@ def get_eff_for_casci(n_start,n_stop,h,g):
     return const, eff
 # }}}
 
+def ordering_diatomics(mol,C):
+# {{{
+    ##DZ basis diatomics reordering with frozen 1s
+
+    orb_type = ['s','pz','dz','px','dxz','py','dyz','dx2-y2','dxy']
+    ref = np.zeros(C.shape[1]) 
+
+    ## Find dimension of each space
+    dim_orb = []
+    for orb in orb_type:
+        print("Orb type",orb)
+        idx = 0
+        for label in mol.ao_labels():
+            if orb in label:
+                #print(label)
+                idx += 1
+
+        ##frozen 1s orbitals
+        if orb == 's':
+            idx -= 2 
+        dim_orb.append(idx)
+        print(idx)
+    
+
+    new_idx = []
+    ## Find orbitals corresponding to each orb space
+    for i,orb in enumerate(orb_type):
+        print("Orbital type:",orb)
+        from pyscf import mo_mapping
+        s_pop = mo_mapping.mo_comps(orb, mol, C)
+        #print(s_pop)
+        ref += s_pop
+        cas_list = s_pop.argsort()[-dim_orb[i]:]
+        print('cas_list', np.array(cas_list))
+        new_idx.extend(cas_list) 
+        #print(orb,' population for active space orbitals', s_pop[cas_list])
+
+    ao_labels = mol.ao_labels()
+    #idx = mol.search_ao_label(['N.*s'])
+    #for i in idx:
+    #    print(i, ao_labels[i])
+    print(ref)
+    print(new_idx)
+    for label in mol.ao_labels():
+        print(label)
+
+    return new_idx
+# }}}
