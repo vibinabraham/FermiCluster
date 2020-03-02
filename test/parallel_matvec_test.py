@@ -139,7 +139,7 @@ def test_1():
     ci_vector.set_vector(v0)
 
 
-    if 0:
+    if 1:
         print(" Compute Matrix Vector Product:", flush=True)
         start = timer()
         pt_vector1 = matvec1(clustered_ham, ci_vector)
@@ -150,6 +150,7 @@ def test_1():
         stop = timer()
         print(" Time lapse: ",(stop-start))
 
+    print("\n\n")
     print(" Compute Matrix Vector Product:", flush=True)
     start = timer()
     pt_vector2 = matvec1_parallel1(clustered_ham, ci_vector)
@@ -160,10 +161,24 @@ def test_1():
         print(f, len(pt_vector2[f]))
     stop = timer()
     print(" Time lapse: ",(stop-start))
+    
+
+    print("\n\n")
+    print(" Compute Matrix Vector Product:", flush=True)
+    start = timer()
+    pt_vector3 = matvec1_parallel2(clustered_ham, ci_vector)
+    pt_vector3.prune_empty_fock_spaces()
+    print(" Length of pt_vector", len(pt_vector3)) 
+    #pt_vector.print()
+    for f in pt_vector3.fblocks():
+        print(f, len(pt_vector3[f]))
+    stop = timer()
+    print(" Time lapse: ",(stop-start))
 
     for f in pt_vector1.fblocks():
         for c in pt_vector1[f]:
             assert(abs(pt_vector1[f][c] - pt_vector2[f][c]) < 1e-8)
+            assert(abs(pt_vector1[f][c] - pt_vector3[f][c]) < 1e-8)
 # }}}
 
 

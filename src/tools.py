@@ -1,3 +1,4 @@
+import math
 import sys
 import numpy as np
 import scipy
@@ -318,6 +319,171 @@ def matvec1_parallel1(h_in,v,term_thresh=1e-12, nproc=None):
         pool = Pool(processes=nproc)
 
     out = pool.map(do_parallel_work, v, batches=100)
+    pool.close()
+    pool.join()
+    pool.clear()
+    #out = list(map(do_parallel_work, v))
+    print(" This is how much memory is being used to store matvec results:    ",sys.getsizeof(out)) 
+    for o in out:
+        sigma.add(o)
+
+    print(" This is how much memory is being used to store collected results: ",sys.getsizeof(sigma.data)) 
+    return sigma 
+# }}}
+
+
+def matvec1_parallel2(h_in,v,term_thresh=1e-12, nproc=None):
+    """
+    Compute the action of H onto a sparse trial vector v
+    returns a ClusteredState object. 
+    """
+# {{{
+    global h 
+    global clusters
+    global sigma 
+    print(" In matvec1_parallel1. nproc=",nproc) 
+    h = h_in
+    clusters = h_in.clusters
+    
+
+    sigma = ClusteredState(clusters)
+    sigma = v.copy() 
+    sigma.zero()
+    
+
+    def do_batch(batch):
+        sigma_out = OrderedDict() 
+        for v_curr in batch:
+            do_parallel_work(v_curr,sigma_out)
+        return sigma_out
+
+    def do_parallel_work(v_curr,sigma_out):
+        fock_r = v_curr[0]
+        conf_r = v_curr[1]
+        coeff  = v_curr[2]
+        
+        #sigma_out = ClusteredState(clusters)
+        for terms in h.terms:
+            fock_l= tuple([(terms[ci][0]+fock_r[ci][0], terms[ci][1]+fock_r[ci][1]) for ci in range(len(clusters))])
+            good = True
+            for c in clusters:
+                if min(fock_l[c.idx]) < 0 or max(fock_l[c.idx]) > c.n_orb:
+                    good = False
+                    break
+            if good == False:
+                continue
+            
+            #print(fock_l, "<--", fock_r)
+            
+            #if fock_l not in sigma_out.data:
+            if fock_l not in sigma_out:
+                sigma_out[fock_l] = OrderedDict()
+            
+            configs_l = sigma_out[fock_l] 
+            
+            for term in h.terms[terms]:
+                #print(" term: ", term)
+                state_sign = 1
+                for oi,o in enumerate(term.ops):
+                    if o == '':
+                        continue
+                    if len(o) == 1 or len(o) == 3:
+                        for cj in range(oi):
+                            state_sign *= (-1)**(fock_r[cj][0]+fock_r[cj][1])
+                    
+                #print("  ", conf_r)
+                
+                #if abs(v[fock_r][conf_r]) < 5e-2:
+                #    continue
+                # get state sign 
+                #print('state_sign ', state_sign)
+                opii = -1
+                mats = []
+                good = True
+                for opi,op in enumerate(term.ops):
+                    if op == "":
+                        continue
+                    opii += 1
+                    #print(opi,term.active)
+                    ci = clusters[opi]
+                    #ci = clusters[term.active[opii]]
+                    try:
+                        oi = ci.ops[op][(fock_l[ci.idx],fock_r[ci.idx])][:,conf_r[ci.idx],:]
+                        mats.append(oi)
+                    except KeyError:
+                        good = False
+                        break
+                if good == False:
+                    continue                        
+                    #break
+               
+                if len(mats) == 0:
+                    continue
+                #print('mats:', end='')
+                #[print(m.shape,end='') for m in mats]
+                #print()
+                #print('ints:', term.ints.shape)
+                #print("contract_string       :", term.contract_string)
+                #print("contract_string_matvec:", term.contract_string_matvec)
+                
+                
+                #tmp = oe.contract(term.contract_string_matvec, *mats, term.ints)
+                tmp = np.einsum(term.contract_string_matvec, *mats, term.ints)
+                
+        
+                #v_coeff = v[fock_r][conf_r]
+                #tmp = state_sign * tmp.ravel() * v_coeff
+                tmp = state_sign * tmp.ravel() * coeff 
+        
+                new_configs = [[i] for i in conf_r] 
+                for cacti,cact in enumerate(term.active):
+                    new_configs[cact] = range(mats[cacti].shape[0])
+                for sp_idx, spi in enumerate(itertools.product(*new_configs)):
+                    #print(" New config: %12.8f" %tmp[sp_idx], spi)
+                    if abs(tmp[sp_idx]) > term_thresh:
+                        if spi not in configs_l:
+                            configs_l[spi] = tmp[sp_idx] 
+                        else:
+                            configs_l[spi] += tmp[sp_idx] 
+        return sigma_out
+    
+    import multiprocessing as mp
+    from pathos.multiprocessing import ProcessingPool as Pool
+
+    
+    if nproc == None:
+        pool = Pool()
+    else:
+        pool = Pool(processes=nproc)
+   
+   
+
+    print(" Using Pathos library for parallelization. Number of workers: ", pool.ncpus)
+    # define batches
+    conf_batches = []
+    batch_size = math.ceil(len(v)/pool.ncpus)
+    batch = []
+    print(" Form batches. Max batch size: ", batch_size)
+    for i,j,k in v:
+        if len(batch) < batch_size:
+            batch.append((i,j,k))
+        else:
+            conf_batches.append(batch)
+            batch = []
+            batch.append((i,j,k))
+    if len(batch) > 0:
+        conf_batches.append(batch)
+        batch = []
+
+    tmp = 0
+    for b in conf_batches:
+        for bi in b:
+            tmp += 1
+    assert(len(v) == tmp)
+
+
+    out = pool.map(do_batch, conf_batches)
+    #out = pool.map(do_parallel_work, v, batches=100)
     pool.close()
     pool.join()
     pool.clear()
