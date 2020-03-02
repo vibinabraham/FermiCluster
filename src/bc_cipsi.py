@@ -245,13 +245,13 @@ def bc_cipsi(ci_vector, clustered_ham, thresh_cipsi=1e-4, thresh_ci_clip=1e-5, t
             if nproc==1:
                 pt_vector = matvec1(clustered_ham, asci_vector)
             else:
-                pt_vector = matvec1_parallel1(clustered_ham, asci_vector, nproc=nproc)
+                pt_vector = matvec1_parallel2(clustered_ham, asci_vector, nproc=nproc)
 
         else:
             if nproc==1:
                 pt_vector = matvec1(clustered_ham, ci_vector)
             else:
-                pt_vector = matvec1_parallel1(clustered_ham, ci_vector, nproc=nproc)
+                pt_vector = matvec1_parallel2(clustered_ham, ci_vector, nproc=nproc)
         
         stop = time.time()
         print(" Time spent in matvec: ", stop-start)
