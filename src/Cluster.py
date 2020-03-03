@@ -175,7 +175,7 @@ class Cluster(object):
                 Hci = ci.run()
                 #self.basis[(na,nb)] = np.eye(ci.results_v.shape[0])
                 self.basis[(na,nb)] = ci.results_v
-                self.Hci[(na,nb)] = Hci
+                self.Hci[(na,nb)] = ci.results_v.T @ Hci @ ci.results_v
     # }}}
     
     def form_eigbasis_from_local_operator(self,local_op,max_roots=1000,ratio = 1,s2_shift=False):
