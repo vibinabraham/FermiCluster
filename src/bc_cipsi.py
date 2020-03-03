@@ -28,11 +28,14 @@ def bc_cipsi_tucker(ci_vector, clustered_ham,
     e_last = 0
     ci_vector_ref = ci_vector.copy()
     for brdm_iter in range(max_tucker_iter):
+        start = time.time()
+        
         ci_vector, pt_vector, e0, e2 = bc_cipsi(ci_vector_ref.copy(), clustered_ham, 
                 thresh_cipsi=thresh_cipsi, thresh_ci_clip=thresh_ci_clip, thresh_conv=thresh_cipsi_conv, max_iter=max_cipsi_iter,asci_clip=asci_clip,
                 nproc=nproc)
         
-        print(" CIPSI: E0 = %12.8f E2 = %12.8f CI_DIM: %i" %(e0, e2, len(ci_vector)))
+        end = time.time()
+        print(" CIPSI: E0 = %12.8f E2 = %12.8f CI_DIM: %-12i Time spent %-12.2f" %(e0, e2, len(ci_vector), end-start))
       
         if abs(e_prev-e2) < thresh_tucker_conv:
             print(" Converged BRDMs")
@@ -52,8 +55,11 @@ def bc_cipsi_tucker(ci_vector, clustered_ham,
             print()
             print(" Compute BRDM",flush=True)
             print(" Hshift = ",hshift)
+            start = time.time()
             rdms = build_brdm(pt_vector, ci.idx)
+            end = time.time()
             print(" done.",flush=True)
+            print(" Time spent building BRDMs: %12.2f" %(end-start))
             #rdms = build_brdm(ci_vector, ci.idx)
             norm = 0
             entropy = 0
@@ -83,16 +89,19 @@ def bc_cipsi_tucker(ci_vector, clustered_ham,
                     if abs(ni/norm) > 1e-12:
                         fspace_entropy -= ni*np.log(ni/norm)/norm
                         entropy -=  ni*np.log(ni)
-                        print("   Rotated State %4i:    %12.8f"%(ni_idx,ni))
+                        print("   Rotated State %4i:    %12.8f"%(ni_idx,ni), flush=True)
                 print("   ----")
-                print("   Entanglement entropy:  %12.8f" %fspace_entropy) 
-                print("   Norm:                  %12.8f" %fspace_norm) 
+                print("   Entanglement entropy:  %12.8f" %fspace_entropy, flush=True) 
+                print("   Norm:                  %12.8f" %fspace_norm, flush=True) 
                 rotations[fspace] = U
             print(" Final entropy:.... %12.8f"%entropy)
             print(" Final norm:....... %12.8f"%norm)
-            print(" --------------------------------------------------------")
+            print(" --------------------------------------------------------", flush=True)
         
+            start = time.time()
             ci.rotate_basis(rotations)
+            end = time.time()
+            print(" Time spent rotating cluster basis: %12.2f" %(end-start))
         delta_e = e0 - e_last
         e_last = e0
         if abs(delta_e) < 1e-8:
@@ -298,7 +307,7 @@ def bc_cipsi(ci_vector, clustered_ham, thresh_cipsi=1e-4, thresh_ci_clip=1e-5, t
         #pr.disable()
         #pr.print_stats(sort='time')
         end = time.time()
-        print(" Time spent in demonimator: ", end - start)
+        print(" Time spent in demonimator: ", end - start, flush=True)
 
         denom = 1/(e0 - Hd)
         pt_vector_v = pt_vector.get_vector()
@@ -311,8 +320,9 @@ def bc_cipsi(ci_vector, clustered_ham, thresh_cipsi=1e-4, thresh_ci_clip=1e-5, t
         print(" PT2 Energy Correction = %12.8f" %e2)
         print(" PT2 Energy Total      = %12.8f" %(e0+e2))
 
-        print(" Choose which states to add to CI space")
+        print(" Choose which states to add to CI space", flush=True)
 
+        start = time.time()
         for fockspace,configs in pt_vector.items():
             for config,coeff in configs.items():
                 if coeff*coeff > thresh_cipsi:
@@ -321,6 +331,9 @@ def bc_cipsi(ci_vector, clustered_ham, thresh_cipsi=1e-4, thresh_ci_clip=1e-5, t
                     else:
                         ci_vector.add_fockspace(fockspace)
                         ci_vector[fockspace][config] = 0
+        end = time.time()
+        print(" Time spent in finding new CI space: ", end - start, flush=True)
+
         delta_e = e0 - e_prev
         e_prev = e0
         if len(ci_vector) <= old_dim and abs(delta_e) < thresh_conv:
@@ -368,7 +381,7 @@ def bc_cipsi(ci_vector, clustered_ham, thresh_cipsi=1e-4, thresh_ci_clip=1e-5, t
                 #pr.disable()
                 #pr.print_stats(sort='time')
                 end = time.time()
-                print(" Time spent in demonimator: ", end - start)
+                print(" Time spent in demonimator: ", end - start, flush=True)
 
                 denom = 1/(e0 - Hd)
                 pt_vector_v = pt_vector.get_vector()
@@ -378,8 +391,8 @@ def bc_cipsi(ci_vector, clustered_ham, thresh_cipsi=1e-4, thresh_ci_clip=1e-5, t
                 pt_vector.set_vector(e2)
                 e2 = np.dot(pt_vector_v,e2)
 
-                print(" PT2 Energy Correction = %12.8f" %e2)
-                print(" PT2 Energy Total      = %12.8f" %(e0+e2))
+                print(" PT2 Energy Correction = %12.8f" %e2, flush=True)
+                print(" PT2 Energy Total      = %12.8f" %(e0+e2), flush=True)
             break
         print(" Next iteration CI space dimension", len(ci_vector))
     #    print(" Do CMF:")
