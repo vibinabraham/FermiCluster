@@ -3,7 +3,7 @@ import scipy
 import itertools as it
 
 import opt_einsum as oe
-
+import time
 from ci_string import *
 from Hamiltonian import *
 from davidson import *
@@ -315,6 +315,7 @@ class Cluster(object):
         """
         build all operators needed
         """
+        start = time.time()
         self.ops['A'] = {}
         self.ops['a'] = {}
         self.ops['B'] = {}
@@ -554,7 +555,8 @@ class Cluster(object):
                 except KeyError:
                     continue
         
-
+        stop = time.time() 
+        print(" Time spent building TDMs %12.2f" %(stop-start))
 #        #  Ab
 #        for na in range(1,self.n_orb+1):
 #            for nb in range(1,self.n_orb+1):
