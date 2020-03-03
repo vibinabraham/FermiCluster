@@ -361,7 +361,10 @@ def bc_cipsi(ci_vector, clustered_ham, thresh_cipsi=1e-4, thresh_ci_clip=1e-5, t
                 #pr = cProfile.Profile()
                 #pr.enable()
                     
-                Hd = update_hamiltonian_diagonal(clustered_ham, pt_vector, Hd_vector)
+                if nproc==1:
+                    Hd = update_hamiltonian_diagonal(clustered_ham, pt_vector, Hd_vector)
+                else:
+                    Hd = build_hamiltonian_diagonal_parallel1(clustered_ham, pt_vector, nproc=nproc)
                 #pr.disable()
                 #pr.print_stats(sort='time')
                 end = time.time()
