@@ -283,7 +283,8 @@ class Cluster(object):
 # {{{
         for fspace,mat in U.items():
             self.basis[fspace] = self.basis[fspace] @ mat
-            self.Hci[fspace] = self.basis[fspace].T @ self.Hci[fspace] @ self.basis[fspace]
+            self.Hci[fspace] = mat.T @ self.Hci[fspace] @ mat 
+            #self.Hci[fspace] = self.basis[fspace].T @ self.Hci[fspace] @ self.basis[fspace]
         #print(" Build all operators:")
         #self.build_op_matrices()
         for op,fspace_deltas in self.ops.items():
