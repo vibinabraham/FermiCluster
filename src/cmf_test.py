@@ -225,5 +225,5 @@ def test_truncate_basis():
 
 
 if __name__== "__main__":
-    #test_cmf() 
+    test_cmf() 
     test_truncate_basis() 
