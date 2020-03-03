@@ -82,7 +82,7 @@ def run(nproc=None):
     print(" HCI:        %12.9f Dim:%6d"%(ehci,hci_dim))
     print(" FCI:        %12.9f Dim:%6d"%(efci,fci_dim))
     assert(abs(etci --108.855580197)< 1e-7)
-    assert(abs(etci2 --108.85574547)< 1e-7)
+    assert(abs(etci2 --108.85574517)< 1e-7)
     #assert(abs(tci_dim - 67)<1e-15)
     assert(abs(efci   --108.85574521)< 1e-7)
 

@@ -939,16 +939,6 @@ def build_hamiltonian_diagonal_parallel1(clustered_ham_in,ci_vector, nproc=None)
     global delta_fock
     delta_fock= tuple([(0,0) for ci in range(len(clusters))])
   
-    global glob_test
-    glob_test = 'nick'
-    global Hd
-    Hd = ci_vector.copy()
-    Hd.zero()
-   
-    idx = 0
-    for fock,conf,coeff in ci_vector:
-        Hd[fock][conf] = idx
-        idx += 1
     
     def do_parallel_work(v_curr):
         fockspace = v_curr[0]
@@ -962,16 +952,19 @@ def build_hamiltonian_diagonal_parallel1(clustered_ham_in,ci_vector, nproc=None)
             tmp += ci.energies[fockspace[ci.idx]][config[ci.idx]]
         
         for term in terms:
-            #Hd_out[fockspace][config] = term.diag_matrix_element(fockspace,config)
+            #tmp += term.matrix_element(fockspace,config,fockspace,config)
             tmp += term.diag_matrix_element(fockspace,config)
         return tmp
 
     import multiprocessing as mp
     from pathos.multiprocessing import ProcessingPool as Pool
+    
     if nproc == None:
         pool = Pool()
     else:
         pool = Pool(processes=nproc)
+
+    print(" Using Pathos library for parallelization. Number of workers: ", pool.ncpus)
 
     out = pool.map(do_parallel_work, ci_vector)
     pool.close()
