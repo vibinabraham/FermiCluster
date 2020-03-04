@@ -340,7 +340,13 @@ def bc_cipsi(ci_vector, clustered_ham, thresh_cipsi=1e-4, thresh_ci_clip=1e-5, t
             print(" Converged")
             if asci_clip > 0:
                 print("\n Compute Final PT vector and correction with full variational space")
-                pt_vector = matvec1(clustered_ham, ci_vector)
+                start = time.time()
+                if nproc==1:
+                    pt_vector = matvec1(clustered_ham, ci_vector)
+                else:
+                    pt_vector = matvec1_parallel2(clustered_ham, ci_vector, nproc=nproc)
+                stop = time.time()
+                print(" Time spent in matvec: ", stop-start, flush=True)
                 pt_vector.prune_empty_fock_spaces()
 
                 var = pt_vector.norm() - e0*e0
