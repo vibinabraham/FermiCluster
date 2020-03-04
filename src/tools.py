@@ -14,7 +14,7 @@ from ClusteredState import *
 from Cluster import *
 
 
-def cmf(clustered_ham, ci_vector, h, g, max_iter=20, thresh=1e-8, max_nroots=1000,dm_guess=None):
+def cmf(clustered_ham, ci_vector, h, g, max_iter=20, thresh=1e-8, max_nroots=1000,dm_guess=None,diis=True,diis_start=1,max_diis=6):
     """ Do CMF for a tensor product state 
        
         This modifies the data in clustered_ham.clusters, both the basis, and the operators
@@ -27,6 +27,8 @@ def cmf(clustered_ham, ci_vector, h, g, max_iter=20, thresh=1e-8, max_nroots=100
                     after the potential is optimized?
     """
   # {{{
+
+
     if dm_guess == None:
         rdm_a = None
         rdm_b = None
@@ -36,7 +38,17 @@ def cmf(clustered_ham, ci_vector, h, g, max_iter=20, thresh=1e-8, max_nroots=100
     converged = False
     clusters = clustered_ham.clusters
     e_last = 999
+
+    if diis==True:
+        diis_start = diis_start
+        max_diis = max_diis
+        diis_vals_dm = [rdm_a.copy()]
+        diis_errors = []
+        diis_size = 0
+
     for cmf_iter in range(max_iter):
+        rdm_a_old = rdm_a
+        rdm_b_old = rdm_b
         
         print(" Build cluster basis and operators")
         for ci_idx, ci in enumerate(clusters):
@@ -67,8 +79,62 @@ def cmf(clustered_ham, ci_vector, h, g, max_iter=20, thresh=1e-8, max_nroots=100
             print(" Max CMF iterations reached. Just continue anyway")
         elif abs(e_curr-e_last) >= thresh and cmf_iter < max_iter-1:
             print(" Continue CMF optimization")
-            # form 1rdm from reference state
-            rdm_a, rdm_b = tools.build_1rdm(ci_vector)
+
+
+            if diis==True:
+                ###  DIIS  ###
+                # form 1rdm from reference state
+                old_dm = rdm_a.copy()
+                rdm_a, rdm_b = tools.build_1rdm(ci_vector)
+                dm_new = rdm_a.copy()
+
+                diis_vals_dm.append(dm_new.copy())
+                error_dm = (dm_new - old_dm).ravel()
+                diis_errors.append(error_dm)
+
+                if cmf_iter > diis_start:
+                    # Limit size of DIIS vector
+                    if (len(diis_vals_dm) > max_diis):
+                        del diis_vals_dm[0]
+                        del diis_errors[0]
+                    diis_size = len(diis_vals_dm) - 1
+
+                    # Build error matrix B, [Pulay:1980:393], Eqn. 6, LHS
+                    B = np.ones((diis_size + 1, diis_size + 1)) * -1
+                    B[-1, -1] = 0
+
+                    for n1, e1 in enumerate(diis_errors):
+                        for n2, e2 in enumerate(diis_errors):
+                            # Vectordot the error vectors
+                            B[n1, n2] = np.dot(e1, e2)
+                    B[:-1, :-1] /= np.abs(B[:-1, :-1]).max()
+
+
+                    # Build residual vector, [Pulay:1980:393], Eqn. 6, RHS
+                    resid = np.zeros(diis_size + 1)
+                    resid[-1] = -1
+
+                    print("B")
+                    print(B)
+                    print("resid")
+                    print(resid)
+                    # Solve Pulay equations, [Pulay:1980:393], Eqn. 6
+                    ci = np.linalg.solve(B, resid)
+
+                    # Calculate new amplitudes
+                    dm_new[:] = 0
+
+                    for num in range(diis_size):
+                        dm_new += ci[num] * diis_vals_dm[num + 1]
+                    # End DIIS amplitude update
+                    
+                    rdm_a = dm_new.copy()
+                    rdm_b = dm_new.copy()
+                    print(rdm_a)
+            elif diis==False:
+                # form 1rdm from reference state
+                rdm_a, rdm_b = tools.build_1rdm(ci_vector)
+
             e_last = e_curr
     
     
