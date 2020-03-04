@@ -1462,7 +1462,8 @@ def build_cca_ss(no,bra_space,ket_space,basis,spin_case):
     
     if spin_case == "a":
         # v(IJt) <IJ|pqrs|KL> v(KLu)  = v(IJt) <I|pqrs|K> v(KJu) = A(tupqrs)
-        tdm = np.einsum('ijm,ikpqr,kjn->mnpqr',v1,tdm_1spin,v2)
+        tdm = oe.contract('ijm,ikpqr,kjn->mnpqr',v1,tdm_1spin,v2)
+        #tdm = np.einsum('ijm,ikpqr,kjn->mnpqr',v1,tdm_1spin,v2)
     elif spin_case == "b":
         # v(IJt) <IJ|pqrs|KL> v(KLu)   = v(IJt) tdm(JLpqrs) v(ILu) = A(tupqrs)
         sign = (-1)**ket_a.ne
@@ -1565,7 +1566,8 @@ def build_caa_ss(no,bra_space,ket_space,basis,spin_case):
     
     if spin_case == "a":
         # v(IJt) <IJ|pqrs|KL> v(KLu)  = v(IJt) <I|pqrs|K> v(KJu) = A(tupqrs)
-        tdm = np.einsum('ijm,ikpqr,kjn->mnpqr',v1,tdm_1spin,v2)
+        tdm = oe.contract('ijm,ikpqr,kjn->mnpqr',v1,tdm_1spin,v2)
+        #tdm = np.einsum('ijm,ikpqr,kjn->mnpqr',v1,tdm_1spin,v2)
     elif spin_case == "b":
         # v(IJt) <IJ|pqrs|KL> v(KLu)   = v(IJt) tdm(JLpqrs) v(ILu) = A(tupqrs)
         tdm = oe.contract('ijm,jlpqr,iln->mnpqr',v1,tdm_1spin,v2) * (-1)**ket_a.ne
