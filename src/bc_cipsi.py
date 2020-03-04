@@ -339,7 +339,7 @@ def bc_cipsi(ci_vector, clustered_ham, thresh_cipsi=1e-4, thresh_ci_clip=1e-5, t
         if len(ci_vector) <= old_dim and abs(delta_e) < thresh_conv:
             print(" Converged")
             if asci_clip > 0:
-                print("Compute Final PT vector and correction with full variational space")
+                print("\n Compute Final PT vector and correction with full variational space")
                 pt_vector = matvec1(clustered_ham, ci_vector)
                 pt_vector.prune_empty_fock_spaces()
 

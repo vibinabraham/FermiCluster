@@ -291,12 +291,16 @@ class Cluster(object):
             for fspace_delta,tdm in fspace_deltas.items():
                 fspace_l = fspace_delta[0]
                 fspace_r = fspace_delta[1]
-                if fspace_l in U:
+                #if fspace_l in U:
+                #    Ul = U[fspace_l]
+                #    self.ops[op][fspace_delta] = np.einsum('pq,pr...->qr...',Ul,self.ops[op][fspace_delta])
+                #if fspace_r in U:
+                #    Ur = U[fspace_r]
+                #    self.ops[op][fspace_delta] = np.einsum('rs,pr...->ps...',Ur,self.ops[op][fspace_delta])
+                if fspace_l in U and fspace_r in U:
                     Ul = U[fspace_l]
-                    self.ops[op][fspace_delta] = np.einsum('pq,pr...->qr...',Ul,self.ops[op][fspace_delta])
-                if fspace_r in U:
                     Ur = U[fspace_r]
-                    self.ops[op][fspace_delta] = np.einsum('rs,pr...->ps...',Ur,self.ops[op][fspace_delta])
+                    self.ops[op][fspace_delta] = np.einsum('pq,rs,pr...->qs...',Ul,Ur,self.ops[op][fspace_delta], optimize=True)
    # }}}
     
     
@@ -349,7 +353,10 @@ class Cluster(object):
         self.ops['Aba'] = {}
         self.ops['Bab'] = {}
 
-        #  a, A 
+        start_tot = time.time()
+
+        #  a, A
+        start = time.time()
         for na in range(1,self.n_orb+1):
             for nb in range(0,self.n_orb+1):
                 try:
@@ -361,8 +368,11 @@ class Cluster(object):
                 #   I did a deepcopy instead of reference. This increases memory requirements and 
                 #   basis transformation costs, but simplifies later manipulations. Later I need to 
                 #   remove the redundant storage by manually handling the transpositions from a to A
-        
+        stop = time.time()
+        print(" Time spent TDM 1: %12.2f" %(stop-start))
+
         #  b, B 
+        start = time.time()
         for na in range(0,self.n_orb+1):
             for nb in range(1,self.n_orb+1):
                 try:
@@ -374,25 +384,36 @@ class Cluster(object):
                 #   I did a deepcopy instead of reference. This increases memory requirements and 
                 #   basis transformation costs, but simplifies later manipulations. Later I need to 
                 #   remove the redundant storage by manually handling the transpositions from a to A
+        stop = time.time()
+        print(" Time spent TDM 2: %12.2f" %(stop-start))
 
         #  Aa
+        start = time.time()
         for na in range(1,self.n_orb+1):
             for nb in range(0,self.n_orb+1):
                 try:
                     self.ops['Aa'][(na,nb),(na,nb)] = build_ca_ss(self.n_orb, (na,nb),(na,nb),self.basis,'a')
                 except KeyError:
                     continue
+        stop = time.time()
+        print(" Time spent TDM 3: %12.2f" %(stop-start))
+        
         #  Bb
+        start = time.time()
         for na in range(0,self.n_orb+1):
             for nb in range(1,self.n_orb+1):
                 try:
                     self.ops['Bb'][(na,nb),(na,nb)] = build_ca_ss(self.n_orb, (na,nb),(na,nb),self.basis,'b')
                 except KeyError:
                     continue
+        stop = time.time()
+        print(" Time spent TDM 4: %12.2f" %(stop-start))
+
                
 
 
         #  Ab,Ba
+        start = time.time()
         for na in range(1,self.n_orb+1):
             for nb in range(1,self.n_orb+1):
                 try:
@@ -400,9 +421,13 @@ class Cluster(object):
                     self.ops['Ba'][(na-1,nb),(na,nb-1)] = build_ca_os(self.n_orb, (na-1,nb),(na,nb-1),self.basis,'ba')
                 except KeyError:
                     continue
+        stop = time.time()
+        print(" Time spent TDM 5: %12.2f" %(stop-start))
+
         
                
         #  AAaa,BBbb
+        start = time.time()
         for na in range(0,self.n_orb+1):
             for nb in range(0,self.n_orb+1):
                 try:
@@ -410,10 +435,14 @@ class Cluster(object):
                     self.ops['BBbb'][(na,nb),(na,nb)] = build_ccaa_ss(self.n_orb, (na,nb),(na,nb),self.basis,'b')
                 except KeyError:
                     continue
+        stop = time.time()
+        print(" Time spent TDM 6: %12.2f" %(stop-start))
+
 
 
         #  ABba
         #  BAab
+        start = time.time()
         for na in range(1,self.n_orb+1):
             for nb in range(1,self.n_orb+1):
                 try:
@@ -421,9 +450,13 @@ class Cluster(object):
                     self.ops['BAab'][(na,nb),(na,nb)] = build_ccaa_os(self.n_orb, (na,nb),(na,nb),self.basis,'baab')
                 except KeyError:
                     continue
+        stop = time.time()
+        print(" Time spent TDM 7: %12.2f" %(stop-start))
+
 
         
         #  AA
+        start = time.time()
         for na in range(2,self.n_orb+1):
             for nb in range(0,self.n_orb+1):
                 try:
@@ -433,7 +466,11 @@ class Cluster(object):
                     self.ops['AA'][(na,nb),(na-2,nb)] = cp.deepcopy(np.swapaxes(temp,2,3))
                 except KeyError:
                     continue
+        stop = time.time()
+        print(" Time spent TDM 8: %12.2f" %(stop-start))
+
         # BB
+        start = time.time()
         for na in range(0,self.n_orb+1):
             for nb in range(2,self.n_orb+1):
                 try:
@@ -443,9 +480,13 @@ class Cluster(object):
                     self.ops['BB'][(na,nb),(na,nb-2)] = cp.deepcopy(np.swapaxes(temp,2,3))
                 except KeyError:
                     continue
+        stop = time.time()
+        print(" Time spent TDM 9: %12.2f" %(stop-start))
+
 
 
         # Ab
+        start = time.time()
         for na in range(1,self.n_orb+1):
             for nb in range(1,self.n_orb+1):
                 try:
@@ -459,111 +500,166 @@ class Cluster(object):
                     self.ops['BA'][(na,nb),(na-1,nb-1)] = cp.deepcopy(np.swapaxes(temp,2,3))
                 except KeyError:
                     continue
+        stop = time.time()
+        print(" Time spent TDM10: %12.2f" %(stop-start))
+
         
                
         #  AAa #   have to fix the swapaxes
+        start = time.time()
         for na in range(2,self.n_orb+1):
             for nb in range(0,self.n_orb+1):
                 try:
                     self.ops['AAa'][(na,nb),(na-1,nb)] = build_cca_ss(self.n_orb, (na,nb),(na-1,nb),self.basis,'a')
                 except KeyError:
                     continue
+        stop = time.time()
+        print(" Time spent TDM11: %12.2f" %(stop-start))
+
 
         #  BBb
+        start = time.time()
         for na in range(0,self.n_orb+1):
             for nb in range(2,self.n_orb+1):
                 try:
                     self.ops['BBb'][(na,nb),(na,nb-1)] = build_cca_ss(self.n_orb, (na,nb),(na,nb-1),self.basis,'b')
                 except KeyError:
                     continue
+        stop = time.time()
+        print(" Time spent TDM12: %12.2f" %(stop-start))
+
 
         #  ABb
+        start = time.time()
         for na in range(1,self.n_orb+1):
             for nb in range(1,self.n_orb+1):
                 try:
                     self.ops['ABb'][(na,nb),(na-1,nb)] = build_cca_os(self.n_orb, (na,nb),(na-1,nb),self.basis,'abb')
                 except KeyError:
                     continue
+        stop = time.time()
+        print(" Time spent TDM13: %12.2f" %(stop-start))
+
         #  BAa
+        start = time.time()
         for na in range(1,self.n_orb+1):
             for nb in range(1,self.n_orb+1):
                 try:
                     self.ops['BAa'][(na,nb),(na,nb-1)] = build_cca_os(self.n_orb, (na,nb),(na,nb-1),self.basis,'baa')
                 except KeyError:
                     continue
+        stop = time.time()
+        print(" Time spent TDM14: %12.2f" %(stop-start))
+
 
         #  ABa
+        start = time.time()
         for na in range(1,self.n_orb+1):
             for nb in range(1,self.n_orb+1):
                 try:
                     self.ops['ABa'][(na,nb),(na,nb-1)] = build_cca_os(self.n_orb, (na,nb),(na,nb-1),self.basis,'aba')
                 except KeyError:
                     continue
+        stop = time.time()
+        print(" Time spent TDM15: %12.2f" %(stop-start))
+
         #  BAb
+        start = time.time()
         for na in range(1,self.n_orb+1):
             for nb in range(1,self.n_orb+1):
                 try:
                     self.ops['BAb'][(na,nb),(na-1,nb)] = build_cca_os(self.n_orb, (na,nb),(na-1,nb),self.basis,'bab')
                 except KeyError:
                     continue
+        stop = time.time()
+        print(" Time spent TDM16: %12.2f" %(stop-start))
+
 
         #  Aaa
+        start = time.time()
         for na in range(2,self.n_orb+1):
             for nb in range(0,self.n_orb+1):
                 try:
                     self.ops['Aaa'][(na-1,nb),(na,nb)] = build_caa_ss(self.n_orb, (na-1,nb),(na,nb),self.basis,'a')
                 except KeyError:
                     continue
+        stop = time.time()
+        print(" Time spent TDM17: %12.2f" %(stop-start))
+
         
         #  Bbb
+        start = time.time()
         for na in range(0,self.n_orb+1):
             for nb in range(2,self.n_orb+1):
                 try:
                     self.ops['Bbb'][(na,nb-1),(na,nb)] = build_caa_ss(self.n_orb, (na,nb-1),(na,nb),self.basis,'b')
                 except KeyError:
                     continue
+        stop = time.time()
+        print(" Time spent TDM18: %12.2f" %(stop-start))
+
         
         #  Aab
+        start = time.time()
         for na in range(1,self.n_orb+1):
             for nb in range(1,self.n_orb+1):
                 try:
                     self.ops['Aab'][(na,nb-1),(na,nb)] = build_caa_os(self.n_orb, (na,nb-1),(na,nb),self.basis,'aab')
                 except KeyError:
                     continue
+        stop = time.time()
+        print(" Time spent TDM19: %12.2f" %(stop-start))
+
 
         #  Bba
+        start = time.time()
         for na in range(1,self.n_orb+1):
             for nb in range(1,self.n_orb+1):
                 try:
                     self.ops['Bba'][(na-1,nb),(na,nb)] = build_caa_os(self.n_orb, (na-1,nb),(na,nb),self.basis,'bba')
                 except KeyError:
                     continue
+        stop = time.time()
+        print(" Time spent TDM20: %12.2f" %(stop-start))
+
 
         #  Aba
+        start = time.time()
         for na in range(1,self.n_orb+1):
             for nb in range(1,self.n_orb+1):
                 try:
                     self.ops['Aba'][(na,nb-1),(na,nb)] = build_caa_os(self.n_orb, (na,nb-1),(na,nb),self.basis,'aba')
                 except KeyError:
                     continue
+        stop = time.time()
+        print(" Time spent TDM21: %12.2f" %(stop-start))
+
 
         #  Bab
+        start = time.time()
         for na in range(1,self.n_orb+1):
             for nb in range(1,self.n_orb+1):
                 try:
                     self.ops['Bab'][(na-1,nb),(na,nb)] = build_caa_os(self.n_orb, (na-1,nb),(na,nb),self.basis,'bab')
                 except KeyError:
                     continue
+        stop = time.time()
+        print(" Time spent TDM22: %12.2f" %(stop-start))
+
         
 
         print(" Swapping axes to get contiguous data")
+        start = time.time()
         for o in self.ops:
             for f in self.ops[o]:
                 self.ops[o][f] = np.ascontiguousarray(self.ops[o][f])
                 #self.ops[o][f] = np.ascontiguousarray(np.swapaxes(self.ops[o][f],0,1))
-
         stop = time.time()
-        print(" Time spent building TDMs %12.2f" %(stop-start))
+        print(" Time spent making data contiguous: %12.2f" %(stop-start))
+
+
+        stop_tot = time.time()
+        print(" Time spent building TDMs Total %12.2f" %(stop_tot-start_tot))
 #        #  Ab
 #        for na in range(1,self.n_orb+1):
 #            for nb in range(1,self.n_orb+1):
