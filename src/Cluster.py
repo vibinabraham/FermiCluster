@@ -555,7 +555,14 @@ class Cluster(object):
                 except KeyError:
                     continue
         
-        stop = time.time() 
+
+        print(" Swapping axes to get contiguous data")
+        for o in self.ops:
+            for f in self.ops[o]:
+                self.ops[o][f] = np.ascontiguousarray(self.ops[o][f])
+                #self.ops[o][f] = np.ascontiguousarray(np.swapaxes(self.ops[o][f],0,1))
+
+        stop = time.time()
         print(" Time spent building TDMs %12.2f" %(stop-start))
 #        #  Ab
 #        for na in range(1,self.n_orb+1):
