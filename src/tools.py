@@ -14,7 +14,7 @@ from ClusteredState import *
 from Cluster import *
 
 
-def cmf(clustered_ham, ci_vector, h, g, max_iter=20, thresh=1e-8, max_nroots=1000,dm_guess=None,diis=True,diis_start=1,max_diis=6):
+def cmf(clustered_ham, ci_vector, h, g, max_iter=20, thresh=1e-8, max_nroots=1000,dm_guess=None,diis=False,diis_start=1,max_diis=6):
     """ Do CMF for a tensor product state 
        
         This modifies the data in clustered_ham.clusters, both the basis, and the operators

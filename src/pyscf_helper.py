@@ -448,11 +448,18 @@ def get_eff_for_casci(n_start,n_stop,h,g):
     return const, eff
 # }}}
 
-def ordering_diatomics(mol,C):
+def ordering_diatomics(mol,C,basis_set):
 # {{{
     ##DZ basis diatomics reordering with frozen 1s
 
-    orb_type = ['s','pz','dz','px','dxz','py','dyz','dx2-y2','dxy']
+    if basis_set == '6-31g':
+        orb_type = ['s','pz','px','py']
+    elif basis_set == 'ccpvdz':
+        orb_type = ['s','pz','dz','px','dxz','py','dyz','dx2-y2','dxy']
+    else:
+        print("clustering not general yet")
+        exit()
+
     ref = np.zeros(C.shape[1]) 
 
     ## Find dimension of each space
@@ -496,3 +503,4 @@ def ordering_diatomics(mol,C):
 
     return new_idx
 # }}}
+
