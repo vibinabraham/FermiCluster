@@ -1239,13 +1239,15 @@ def build_aa_ss(no,bra_space,ket_space,basis,spin_case):
         # v(IJs) <IJ|pq|KL> v(KLt)   = v(IJs) tdm(IKpq) v(KJt) = A(stpq)
         #tmp = np.einsum('ikpq,kjt->ipqjt',tdm_1spin,v2)
         #tdm = np.einsum('ijs,ipqjt->stpq',v1,tmp)
-        tdm = np.einsum('IJm,IKpq,KJn->mnpq',v1,tdm_1spin,v2)
+        #tdm = np.einsum('IJm,IKpq,KJn->mnpq',v1,tdm_1spin,v2)
+        tdm = oe.contract('IJm,IKpq,KJn->mnpq',v1,tdm_1spin,v2)
         
     elif spin_case == "b":
         # v(IJs) <IJ|pq|KL> v(KLt)   = v(IJs) tdm(JLpq) v(ILt) = A(stpq)
         #tmp = np.einsum('jlpq,ilt->jpqit',tdm_1spin,v2)
         #tdm = np.einsum('ijs,jpqit->stpq',v1,tmp) 
-        tdm = np.einsum('IJm,JLpq,ILn->mnpq',v1,tdm_1spin,v2)
+        #tdm = np.einsum('IJm,JLpq,ILn->mnpq',v1,tdm_1spin,v2)
+        tdm = oe.contract('IJm,JLpq,ILn->mnpq',v1,tdm_1spin,v2)
 
     
     v2.shape = (ket_a_max*ket_b_max,nv2)
