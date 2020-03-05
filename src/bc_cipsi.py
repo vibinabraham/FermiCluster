@@ -15,7 +15,7 @@ from tools import *
 
 def bc_cipsi_tucker(ci_vector, clustered_ham, 
         thresh_cipsi=1e-4, thresh_ci_clip=1e-5, thresh_cipsi_conv=1e-8, max_cipsi_iter=30, 
-        thresh_tucker_conv = 1e-6, max_tucker_iter=20, tucker_state_clip=None,hshift=1e-8,asci_clip=0,nproc=None):
+        thresh_tucker_conv = 1e-6, max_tucker_iter=20, tucker_state_clip=None,hshift=1e-8,thresh_asci=0,nproc=None):
     """
     Run iterations of TP-CIPSI to make the tucker decomposition self-consistent
     """
@@ -31,7 +31,7 @@ def bc_cipsi_tucker(ci_vector, clustered_ham,
         start = time.time()
         
         ci_vector, pt_vector, e0, e2 = bc_cipsi(ci_vector_ref.copy(), clustered_ham, 
-                thresh_cipsi=thresh_cipsi, thresh_ci_clip=thresh_ci_clip, thresh_conv=thresh_cipsi_conv, max_iter=max_cipsi_iter,asci_clip=asci_clip,
+                thresh_cipsi=thresh_cipsi, thresh_ci_clip=thresh_ci_clip, thresh_conv=thresh_cipsi_conv, max_iter=max_cipsi_iter,thresh_asci=thresh_asci,
                 nproc=nproc)
         
         end = time.time()
@@ -112,7 +112,7 @@ def bc_cipsi_tucker(ci_vector, clustered_ham,
 
 #def bc_cipsi_1rdm(ci_vector, clustered_ham, h, g,
 #        thresh_cipsi=1e-4, thresh_ci_clip=1e-5, thresh_cipsi_conv=1e-8, max_cipsi_iter=30, 
-#        thresh_rdm_conv = 1e-6, max_rdm_iter=20,hshift=1e-8,asci_clip=0):
+#        thresh_rdm_conv = 1e-6, max_rdm_iter=20,hshift=1e-8,thresh_asci=0):
 #    """
 #    Run iterations of TP-CIPSI to make the spin-averaged 1rdm potential self-consistent
 #    """
@@ -124,7 +124,7 @@ def bc_cipsi_tucker(ci_vector, clustered_ham,
 #    ci_vector_ref = ci_vector.copy()
 #    for rdm_iter in range(max_rdm_iter):
 #        ci_vector, pt_vector, e0, e2 = bc_cipsi(ci_vector_ref.copy(), clustered_ham, 
-#                thresh_cipsi=thresh_cipsi, thresh_ci_clip=thresh_ci_clip, thresh_conv=thresh_cipsi_conv, max_iter=max_cipsi_iter,asci_clip=asci_clip)
+#                thresh_cipsi=thresh_cipsi, thresh_ci_clip=thresh_ci_clip, thresh_conv=thresh_cipsi_conv, max_iter=max_cipsi_iter,thresh_asci=thresh_asci)
 #        
 #        print(" CIPSI: E0 = %12.8f E2 = %12.8f CI_DIM: %i" %(e0, e2, len(ci_vector)))
 #      
@@ -175,14 +175,13 @@ def bc_cipsi_tucker(ci_vector, clustered_ham,
 ## }}}
 
 
-def bc_cipsi(ci_vector, clustered_ham, thresh_cipsi=1e-4, thresh_ci_clip=1e-5, thresh_conv=1e-8, max_iter=30, n_roots=1,asci_clip=0,nproc=None):
+def bc_cipsi(ci_vector, clustered_ham, thresh_cipsi=1e-4, thresh_ci_clip=1e-5, thresh_conv=1e-8, max_iter=30, n_roots=1,thresh_asci=0,nproc=None):
 
     print(" Compute diagonal elements",flush=True)
     # compute local states energies
     precompute_cluster_basis_energies(clustered_ham)
     print(" done.",flush=True)
-    
-
+  
     pt_vector = ci_vector.copy()
     Hd_vector = ClusteredState(ci_vector.clusters)
     e_prev = 0
@@ -198,7 +197,7 @@ def bc_cipsi(ci_vector, clustered_ham, thresh_cipsi=1e-4, thresh_ci_clip=1e-5, t
         else:
             H = build_full_hamiltonian_parallel1(clustered_ham, ci_vector, nproc=nproc)
         stop = time.time()
-        print(" Time spent building Hamiltonian matrix: ", stop-start)
+        print(" Time spent building Hamiltonian matrix: %12.2f" %(stop-start))
         print(" Diagonalize Hamiltonian Matrix:",flush=True)
         vguess = ci_vector.get_vector()
         if H.shape[0] > 100 and abs(np.sum(vguess)) >0:
@@ -239,38 +238,30 @@ def bc_cipsi(ci_vector, clustered_ham, thresh_cipsi=1e-4, thresh_ci_clip=1e-5, t
                 ci_vector.zero()
                 ci_vector.set_vector(v0)
 
-        if asci_clip > 0:
-            asci_vector = ci_vector.copy()
-            print(" ASCI vector  thresh = ", asci_clip)
-            print(" Old CI Dim          : ", len(asci_vector))
-            kept_indices = asci_vector.clip(asci_clip)
-            asci_vector.normalize()
-            print(" ASCI Dim for matvec : ", len(asci_vector))
-            #asci_vector.print_configs()
+        asci_vector = ci_vector.copy()
+        print(" Choose subspace from which to search for new configs. Thresh: ", thresh_asci)
+        print(" CI Dim          : ", len(asci_vector))
+        kept_indices = asci_vector.clip(thresh_asci*thresh_asci)
+        print(" Search Dim      : ", len(asci_vector))
+        #asci_vector.normalize()
 
         print(" Compute Matrix Vector Product:", flush=True)
         start = time.time()
-        if asci_clip > 0:
-            if nproc==1:
-                pt_vector = matvec1(clustered_ham, asci_vector)
-            else:
-                pt_vector = matvec1_parallel2(clustered_ham, asci_vector, nproc=nproc)
-
+        if nproc==1:
+            pt_vector = matvec1(clustered_ham, asci_vector)
         else:
-            if nproc==1:
-                pt_vector = matvec1(clustered_ham, ci_vector)
-            else:
-                pt_vector = matvec1_parallel2(clustered_ham, ci_vector, nproc=nproc)
-        
+            pt_vector = matvec1_parallel2(clustered_ham, asci_vector, nproc=nproc)
         stop = time.time()
-        print(" Time spent in matvec: ", stop-start)
+        print(" Time spent in matvec: %12.2f" %( stop-start))
         
         pt_vector.prune_empty_fock_spaces()
-        #pt_vector.print()
 
 
         var = pt_vector.norm() - e0*e0
-        print(" Variance: %12.8f" % var,flush=True)
+        print(" Variance:          %12.8f" % var,flush=True)
+        tmp = ci_vector.dot(pt_vector)
+        var = pt_vector.norm() - tmp*tmp
+        print(" Variance Subspace: %12.8f" % var,flush=True)
 
 
         print(" Remove CI space from pt_vector vector")
@@ -290,8 +281,6 @@ def bc_cipsi(ci_vector, clustered_ham, thresh_cipsi=1e-4, thresh_ci_clip=1e-5, t
         print(" Dimension of CI space: ", len(ci_vector))
         print(" Dimension of PT space: ", len(pt_vector))
         print(" Compute Denominator",flush=True)
-        #next_ci_vector = cp.deepcopy(ci_vector)
-        # compute diagonal for PT2
 
         start = time.time()
         pt_vector.prune_empty_fock_spaces()
@@ -307,7 +296,7 @@ def bc_cipsi(ci_vector, clustered_ham, thresh_cipsi=1e-4, thresh_ci_clip=1e-5, t
         #pr.disable()
         #pr.print_stats(sort='time')
         end = time.time()
-        print(" Time spent in demonimator: ", end - start, flush=True)
+        print(" Time spent in demonimator: %12.2f" %( end - start), flush=True)
 
         denom = 1/(e0 - Hd)
         pt_vector_v = pt_vector.get_vector()
@@ -332,13 +321,13 @@ def bc_cipsi(ci_vector, clustered_ham, thresh_cipsi=1e-4, thresh_ci_clip=1e-5, t
                         ci_vector.add_fockspace(fockspace)
                         ci_vector[fockspace][config] = 0
         end = time.time()
-        print(" Time spent in finding new CI space: ", end - start, flush=True)
+        print(" Time spent in finding new CI space: %12.2f" %(end - start), flush=True)
 
         delta_e = e0 - e_prev
         e_prev = e0
         if len(ci_vector) <= old_dim and abs(delta_e) < thresh_conv:
             print(" Converged")
-            if asci_clip > 0:
+            if thresh_asci > 0:
                 print("\n Compute Final PT vector and correction with full variational space")
                 start = time.time()
                 if nproc==1:
@@ -346,11 +335,14 @@ def bc_cipsi(ci_vector, clustered_ham, thresh_cipsi=1e-4, thresh_ci_clip=1e-5, t
                 else:
                     pt_vector = matvec1_parallel2(clustered_ham, ci_vector, nproc=nproc)
                 stop = time.time()
-                print(" Time spent in matvec: ", stop-start, flush=True)
+                print(" Time spent in matvec: %12.2f" %(stop-start), flush=True)
                 pt_vector.prune_empty_fock_spaces()
 
                 var = pt_vector.norm() - e0*e0
-                print(" Variance: %12.8f" % var,flush=True)
+                print(" Variance:          %12.8f" % var,flush=True)
+                tmp = ci_vector.dot(pt_vector)
+                var = pt_vector.norm() - tmp*tmp
+                print(" Variance Subspace: %12.8f" % var,flush=True)
 
 
                 print(" Remove CI space from pt_vector vector")
@@ -387,7 +379,7 @@ def bc_cipsi(ci_vector, clustered_ham, thresh_cipsi=1e-4, thresh_ci_clip=1e-5, t
                 #pr.disable()
                 #pr.print_stats(sort='time')
                 end = time.time()
-                print(" Time spent in demonimator: ", end - start, flush=True)
+                print(" Time spent in demonimator: %12.2f" %(end - start), flush=True)
 
                 denom = 1/(e0 - Hd)
                 pt_vector_v = pt_vector.get_vector()

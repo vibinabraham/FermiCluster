@@ -73,7 +73,7 @@ def run(nproc=None):
         ehci, hci_dim = run_hci_pyscf(h,g,cas_nel,ecore=ecore,select_cutoff=1e-4,ci_cutoff=1e-4)
     if do_tci:
         ci_vector, pt_vector, etci, etci2 = run_tpsci(h,g,blocks,init_fspace,ecore=ecore,
-            thresh_ci_clip=1e-6,thresh_cipsi=1e-5,max_tucker_iter=20,hshift=1e-8, nproc=nproc)
+            thresh_ci_clip=1e-6,thresh_cipsi=1e-5,max_tucker_iter=20,hshift=1e-8, nproc=nproc, thresh_asci=0)
         ci_vector.print_configs()
         tci_dim = len(ci_vector)
 
