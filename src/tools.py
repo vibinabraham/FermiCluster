@@ -524,7 +524,7 @@ def matvec1_parallel2(h_in,v,term_thresh=1e-12, nproc=None):
    
    
 
-    print(" Using Pathos library for parallelization. Number of workers: ", pool.ncpus)
+    print(" Using Pathos library for parallelization. Number of workers: ", pool.ncpus, flush=True )
     # define batches
     conf_batches = []
     batch_size = math.ceil(len(v)/pool.ncpus)
