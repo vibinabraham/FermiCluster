@@ -13,9 +13,10 @@ from tpsci import *
 from pyscf_helper import *
 import pyscf
 ttt = time.time()
+from numpy.linalg import norm
 
-def lanczos(A,vi,max_iter=20):
-    
+def lanczos_old(A,vi,max_iter=20):
+    # {{{
     wi = A@vi 
     ai = (vi.T @ wi)
     wi = wi - vi*ai 
@@ -45,12 +46,15 @@ def lanczos(A,vi,max_iter=20):
             wj = wj - aj*vj
         else:
             wj = wj - aj*vj - bj*vi
+
+        for l in range(j):
+            wj = wj - a[l]*vecs[l] 
         bk = np.linalg.norm(wj)
         vk = wj / bk 
         
         for vv in vecs:
             s = vv.dot(vk)
-            vk -= s* vv 
+            vk -= s* vv
         vk = vk / np.linalg.norm(vk) 
         vecs.append(vk)
        
@@ -59,6 +63,13 @@ def lanczos(A,vi,max_iter=20):
         T[j,j] = aj
         T[j,j-1] = bj
         T[j-1,j] = bj
+
+        V = np.array(vecs).T
+        T = V.T @ A @ V
+        #print("T: ")
+        #np.set_printoptions(suppress=True)
+        #print(T)
+        #print("T: ")
         e,x = np.linalg.eig(T)
         idx = e.argsort()
         e = e[idx]
@@ -69,12 +80,78 @@ def lanczos(A,vi,max_iter=20):
         vj = vk
         vi = vj
         bi = bj
+# }}}
 
+def lanczos(A,x,max_iter=52, thresh=1e-8):
+    # {{{
+    dim = A.shape[0]
+    q = x/norm(x)
+    
+    Q = np.zeros((dim,0))
+    q.shape = (dim,1)
+    Q = np.hstack((Q,q))
+    q.shape = (dim)
+    
+    AQ = np.zeros((dim,0))
+    
+    r = A@q
+    
+    # add to AQ
+    r.shape = (dim,1)
+    AQ = np.hstack((AQ,r))
+    r.shape = (dim)
+
+    ai = r.dot(q)
+    r = r -  ai*q
+    bi = norm(r)
+    print(" Norm of residual: %12.8f" %bi)
+
+    for j in range(1,max_iter):
+        v = 1*q
+        q = r/bi
+        q.shape = (dim,1)
+        Q = np.hstack((Q,q))
+        q.shape = (dim)
+
+        sig = A@q
+        sig.shape = (dim,1)
+        AQ = np.hstack((AQ,sig))
+        sig.shape = (dim)
+        
+        r = sig-bi*v
+        aj = r.dot(q)
+
+        r = r - aj*q
+        bj = norm(r)
+        #print(" Norm of residual: %12.8f" %bj)
+
+        if bj < thresh:
+            return Q
+        else:
+            bi = 1*bj
+            ai = 1*aj
+        
+
+
+        T = Q.T @ A @ Q
+        #print("T: ")
+        #np.set_printoptions(suppress=True)
+        #print(T)
+        e,w = np.linalg.eig(T)
+        idx = e.argsort()
+        e = e[idx]
+        w = w[:,idx]
+
+        vgs = Q@w[:,0]
+        res =  AQ@w[:,0] - e[0] * Q@w[:,0] 
+        print(" Current electronic energy: %12.8f  ||Res|| %12.8f" %(e[0],norm(res)))
+
+# }}}
 
 np.random.seed(2)
-A = np.random.random((100,100)) - .5
+A = np.random.random((1000,1000)) - .5
 A = A+A.T
-v = np.random.random((100))
+v = np.random.random((1000))
 v = v /np.linalg.norm(v) 
 lanczos(A,v)
 e,v = np.linalg.eig(A)
