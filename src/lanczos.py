@@ -175,6 +175,11 @@ if do_cmf:
     cmf(clustered_ham, ci_vector, h, g, max_iter=1)
     #cmf(clustered_ham, ci_vector, h, g, max_iter=50,max_nroots=50,dm_guess=(dm_aa,dm_bb),diis=True)
 
+
+
+
+
+exit()
 prune1 = 1e-16
 
 vi = ci_vector 
