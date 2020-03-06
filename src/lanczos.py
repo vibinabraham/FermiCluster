@@ -106,6 +106,7 @@ if 0:
 def sparse_lanczos(clustered_ham, x, max_iter=10, thresh=1e-8, vector_prune=1e-16, sigma_prune=1e-16):
     q = x.copy()
     q.normalize()
+    q.prune_empty_fock_spaces()
     Q = [q.copy()] # list of subspace vectors
    
     #q.clip(prune)
@@ -130,8 +131,8 @@ def sparse_lanczos(clustered_ham, x, max_iter=10, thresh=1e-8, vector_prune=1e-1
         q.normalize()
         
         q.clip(vector_prune)
-        q.prune_empty_fock_spaces()
         q.normalize()
+        q.prune_empty_fock_spaces()
         
         #should we orthogonalize?
         # 
@@ -142,8 +143,8 @@ def sparse_lanczos(clustered_ham, x, max_iter=10, thresh=1e-8, vector_prune=1e-1
                 q.add(qi, scalar=(-1*si))
         q.normalize()
         q.clip(vector_prune)
-        q.prune_empty_fock_spaces()
         q.normalize()
+        q.prune_empty_fock_spaces()
 
         
         Q.append(q)
