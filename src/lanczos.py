@@ -16,7 +16,7 @@ ttt = time.time()
 from numpy.linalg import norm
 
 
-def lanczos(A,x,max_iter=52, thresh=1e-8):
+def test_lanczos(A,x,max_iter=52, thresh=1e-8):
     # {{{
     dim = A.shape[0]
     q = x/norm(x)
@@ -89,7 +89,7 @@ if 0:
     A = A+A.T
     v = np.random.random((100))
     v = v /np.linalg.norm(v) 
-    lanczos(A,v)
+    test_lanczos(A,v)
     e,v = np.linalg.eig(A)
     idx = e.argsort()
     e = e[idx]
@@ -102,84 +102,8 @@ if 0:
 
 
 
-pyscf.lib.num_threads(1)  #with degenerate states and multiple processors there can be issues
-np.set_printoptions(suppress=True, precision=3, linewidth=1500)
-n_cluster_states = 1000
 
-from pyscf import gto, scf, mcscf, ao2mo
-
-r0 = 1.5
-
-molecule= '''
-N       0.00       0.00       0.00
-N       0.00       0.00       {}'''.format(r0)
-
-charge = 0
-spin  = 0
-basis_set = '6-31g'
-
-###     TPSCI BASIS INPUT
-orb_basis = 'boys'
-cas = True
-cas_nstart = 2
-cas_nstop = 10
-cas_nel = 10
-
-###     TPSCI CLUSTER INPUT
-#blocks = [[0,1],[2,3],[4,5],[6,7]]
-#init_fspace = ((2, 2), (1, 1), (1, 1), (1, 1))
-blocks = [[0,1,2,3],[4,5],[6,7]]
-init_fspace = ((3, 3), (1, 1), (1, 1))
-
-
-
-#Integrals from pyscf
-pmol = PyscfHelper()
-pmol.init(molecule,charge,spin,basis_set,orb_basis,
-            cas=cas,cas_nstart=cas_nstart,cas_nstop=cas_nstop, cas_nel=cas_nel)
-
-h = pmol.h
-g = pmol.g
-ecore = pmol.ecore
-efci, fci_dim = run_fci_pyscf(h,g,cas_nel,ecore=ecore)
-
-#cluster using hcore
-idx = e1_order(h,cut_off = 1e-4)
-h,g = reorder_integrals(idx,h,g)
-
-
-do_fci = 1
-do_hci = 1
-do_tci = 1
-
-clusters = []
-for ci,c in enumerate(blocks):
-    clusters.append(Cluster(ci,c))
-
-ci_vector = ClusteredState(clusters)
-ci_vector.init(init_fspace)
-
-
-print(" Clusters:")
-[print(ci) for ci in clusters]
-
-clustered_ham = ClusteredOperator(clusters)
-print(" Add 1-body terms")
-clustered_ham.add_1b_terms(h)
-print(" Add 2-body terms")
-clustered_ham.add_2b_terms(g)
-#clustered_ham.combine_common_terms(iprint=1)
-
-
-do_cmf = 1
-if do_cmf:
-    # Get CMF reference
-    cmf(clustered_ham, ci_vector, h, g, max_iter=1)
-    #cmf(clustered_ham, ci_vector, h, g, max_iter=50,max_nroots=50,dm_guess=(dm_aa,dm_bb),diis=True)
-
-
-
-def sparse_lanczos(H,x, max_iter=10, thresh=1e-8, prune=1e-16):
+def sparse_lanczos(H,x, max_iter=10, thresh=1e-8, vector_prune=1e-16, sigma_prune=1e-16):
     q = x.copy()
     q.normalize()
     Q = [q.copy()] # list of subspace vectors
@@ -187,8 +111,9 @@ def sparse_lanczos(H,x, max_iter=10, thresh=1e-8, prune=1e-16):
     #q.clip(prune)
     #q.normalize()
     sig = matvec1_parallel2(clustered_ham, q)
+    sig.clip(sigma_prune)
     sig.prune_empty_fock_spaces()
-   
+    
     AQ = [sig] # list of sigma vectors
 
     r = sig.copy()
@@ -204,7 +129,7 @@ def sparse_lanczos(H,x, max_iter=10, thresh=1e-8, prune=1e-16):
         q = r.copy()
         q.normalize()
         
-        q.clip(prune)
+        q.clip(vector_prune)
         q.normalize()
         
         Q.append(q)
@@ -213,6 +138,7 @@ def sparse_lanczos(H,x, max_iter=10, thresh=1e-8, prune=1e-16):
             print(" Length of vector: ", len(qi))
 
         sig = matvec1_parallel2(clustered_ham, q)
+        sig.clip(sigma_prune)
         sig.prune_empty_fock_spaces()
 
         AQ.append(sig)
@@ -272,12 +198,92 @@ def sparse_lanczos(H,x, max_iter=10, thresh=1e-8, prune=1e-16):
 
 
 
-sparse_lanczos(clustered_ham, ci_vector, prune=1e-2)
+if __name__ == "__main__":
 
-
-
-
-print(" FCI     total energy:           %12.8f " %(efci))
-print(" FCI     electronic energy:      %12.8f " %(efci-ecore))
+    pyscf.lib.num_threads(1)  #with degenerate states and multiple processors there can be issues
+    np.set_printoptions(suppress=True, precision=3, linewidth=1500)
+    n_cluster_states = 1000
     
-
+    from pyscf import gto, scf, mcscf, ao2mo
+    
+    r0 = 1.5
+    
+    molecule= '''
+    N       0.00       0.00       0.00
+    N       0.00       0.00       {}'''.format(r0)
+    
+    charge = 0
+    spin  = 0
+    basis_set = '6-31g'
+    
+    ###     TPSCI BASIS INPUT
+    orb_basis = 'boys'
+    cas = True
+    cas_nstart = 2
+    cas_nstop = 10
+    cas_nel = 10
+    
+    ###     TPSCI CLUSTER INPUT
+    #blocks = [[0,1],[2,3],[4,5],[6,7]]
+    #init_fspace = ((2, 2), (1, 1), (1, 1), (1, 1))
+    blocks = [[0,1,2,3],[4,5],[6,7]]
+    init_fspace = ((3, 3), (1, 1), (1, 1))
+    
+    
+    
+    #Integrals from pyscf
+    pmol = PyscfHelper()
+    pmol.init(molecule,charge,spin,basis_set,orb_basis,
+                cas=cas,cas_nstart=cas_nstart,cas_nstop=cas_nstop, cas_nel=cas_nel)
+    
+    h = pmol.h
+    g = pmol.g
+    ecore = pmol.ecore
+    efci, fci_dim = run_fci_pyscf(h,g,cas_nel,ecore=ecore)
+    
+    #cluster using hcore
+    idx = e1_order(h,cut_off = 1e-4)
+    h,g = reorder_integrals(idx,h,g)
+    
+    
+    do_fci = 1
+    do_hci = 1
+    do_tci = 1
+    
+    clusters = []
+    for ci,c in enumerate(blocks):
+        clusters.append(Cluster(ci,c))
+    
+    ci_vector = ClusteredState(clusters)
+    ci_vector.init(init_fspace)
+    
+    
+    print(" Clusters:")
+    [print(ci) for ci in clusters]
+    
+    clustered_ham = ClusteredOperator(clusters)
+    print(" Add 1-body terms")
+    clustered_ham.add_1b_terms(h)
+    print(" Add 2-body terms")
+    clustered_ham.add_2b_terms(g)
+    #clustered_ham.combine_common_terms(iprint=1)
+    
+    
+    do_cmf = 1
+    if do_cmf:
+        # Get CMF reference
+        cmf(clustered_ham, ci_vector, h, g, max_iter=1)
+        #cmf(clustered_ham, ci_vector, h, g, max_iter=50,max_nroots=50,dm_guess=(dm_aa,dm_bb),diis=True)
+    
+    
+    
+    
+    sparse_lanczos(clustered_ham, ci_vector, vector_prune=1e-2, sigma_prune=1e-8)
+    
+    
+    
+    
+    print(" FCI     total energy:           %12.8f " %(efci))
+    print(" FCI     electronic energy:      %12.8f " %(efci-ecore))
+        
+    
