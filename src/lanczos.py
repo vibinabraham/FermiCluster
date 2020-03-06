@@ -82,20 +82,22 @@ def lanczos(A,x,max_iter=52, thresh=1e-8):
 
 # }}}
 
-np.random.seed(2)
-A = np.random.random((100,100)) - .5
-A = A+A.T
-v = np.random.random((100))
-v = v /np.linalg.norm(v) 
-lanczos(A,v)
-e,v = np.linalg.eig(A)
-idx = e.argsort()
-e = e[idx]
-v = v[:,idx]
-e = e[0:10]
-print(" exact soln")
-for ei in e:
-    print(" %12.8f " %ei)
+
+if 0:
+    np.random.seed(2)
+    A = np.random.random((100,100)) - .5
+    A = A+A.T
+    v = np.random.random((100))
+    v = v /np.linalg.norm(v) 
+    lanczos(A,v)
+    e,v = np.linalg.eig(A)
+    idx = e.argsort()
+    e = e[idx]
+    v = v[:,idx]
+    e = e[0:10]
+    print(" exact soln")
+    for ei in e:
+        print(" %12.8f " %ei)
 
 
 
@@ -177,73 +179,105 @@ if do_cmf:
 
 
 
+def sparse_lanczos(H,x, max_iter=10, thresh=1e-8, prune=1e-16):
+    q = x.copy()
+    q.normalize()
+    Q = [q.copy()] # list of subspace vectors
+   
+    #q.clip(prune)
+    #q.normalize()
+    sig = matvec1_parallel2(clustered_ham, q)
+    sig.prune_empty_fock_spaces()
+   
+    AQ = [sig] # list of sigma vectors
 
-
-exit()
-prune1 = 1e-16
-
-vi = ci_vector 
-wi = matvec1_parallel2(clustered_ham, vi)
-wi.prune_empty_fock_spaces()
-ai = vi.dot2(wi)
-tmp = vi.copy()
-tmp.scale(-1*ai)
-wi.add(tmp)
-bj = wi.norm()
-print(" Residual Norm: %12.8f Residual Dimension: %-8i" % (bj,len(wi)))
-wi.clip(prune1)
-print(" Residual Norm: %12.8f Residual Dimension: %-8i" % (wi.norm(),len(wi)))
-vj = wi
-vj.normalize()
-
-vecs = [vi]
-max_iter = 6
-T = np.array([[ai]])
-for j in range(1,max_iter):
-    wj = matvec1_parallel2(clustered_ham, vj)
-    wj.prune_empty_fock_spaces()
-    aj = vj.dot2(wj)
+    r = sig.copy()
     
-    T = np.hstack((T,np.zeros([T.shape[0],1])))
-    T = np.vstack((T,np.zeros([1,T.shape[1]])))
-    T[j,j] = aj
-    T[j,j-1] = bj
-    T[j-1,j] = bj
-    print(T)
+    ai = q.dot2(r)
+    r.add(q, scalar=(-1*ai))
+    bi = r.norm()
 
-    e,x = np.linalg.eig(T)
-    idx = e.argsort()
-    e = e[idx]
-    x = x[:,idx]
-
-    print(" Current electronic energy: %12.8f " %(e[0]))
-    print(" Current total energy:      %12.8f " %(e[0]+ecore))
+    print(" Norm of residual: %12.8f" %bi)
     
-    tmp = vj.copy()
-    tmp.scale(-1*aj)
-    wj.add(tmp)
-    bk = wj.norm()
-    print(" Residual Norm: %12.8f Residual Dimension: %-8i" % (bk,len(wj)))
-    wj.clip(prune1)
-    print(" Residual Norm: %12.8f Residual Dimension: %-8i" % (wj.norm(),len(wj)))
-    vk = wj
-    vk.normalize()
-    for vv in vecs:
-        ovlp = vk.dot2(vv)
-        tmp = vv.copy()
-        tmp.scale(-1*ovlp)
-        vk.add(tmp)
-    vk.normalize()
-    vecs.append(vk)
-    
-    print(" Check orthog")
-    for vv in vecs:
-        print(" Overlap: %12.8f" %vk.dot2(vv))
-    vk.normalize()
-    vj = vk
-    bj = bk
+    for j in range(1,max_iter):
+        v = q.copy()
+        q = r.copy()
+        q.normalize()
+        
+        q.clip(prune)
+        q.normalize()
+        
+        Q.append(q)
+
+        for qi in Q:
+            print(" Length of vector: ", len(qi))
+
+        sig = matvec1_parallel2(clustered_ham, q)
+        sig.prune_empty_fock_spaces()
+
+        AQ.append(sig)
+
+        r = sig.copy()
+        r.add(v, scalar=(-1*bi) )
+
+        aj = q.dot2(r)
+
+        r.add(q, scalar=(-1*aj) )
+
+        bj = r.norm()
+        
+
+        Tdim = len(Q)
+        assert(len(Q) == len(AQ))
+
+        T = np.zeros((Tdim,Tdim))
+        for ii in range(Tdim):
+            for jj in range(ii,Tdim):
+                T[ii,jj] = Q[ii].dot2(AQ[jj])
+                T[jj,ii] = T[ii,jj]
+        
+        S = np.zeros((Tdim,Tdim))
+        for ii in range(Tdim):
+            for jj in range(ii,Tdim):
+                S[ii,jj] = Q[ii].dot2(Q[jj])
+                S[jj,ii] = S[ii,jj]
+
+        #print(S)
+        se,sv = np.linalg.eig(S)
+        print(" Smallest eigenvalue of S: %12.8f" %min(se))
+        X = np.linalg.inv(scipy.linalg.sqrtm(S))
+        Torth = X.T @ T @ X
+        e,w = np.linalg.eig(Torth)
+        idx = e.argsort()
+        e = e[idx]
+        w = w[:,idx]
+
+   
+        res = x.copy()
+        res.zero()
+        res.clip(1)
+        res.prune_empty_fock_spaces()
+
+        for ii in range(Tdim):
+            res.add(AQ[ii], scalar=w[ii,0])
+            res.add(Q[ii], scalar=(-1 * e[0] * w[ii,0]))
+        print(" Current electronic energy: %12.8f  ||Res|| %12.8f" %(e[0],res.norm()))
+        
+        if bj < thresh:
+            return Q
+        else:
+            bi = 1*bj
+            ai = 1*aj
 
 
-print(" FCI     total energy:      %12.8f " %(efci))
+
+
+sparse_lanczos(clustered_ham, ci_vector, prune=1e-2)
+
+
+
+
+print(" FCI     total energy:           %12.8f " %(efci))
+print(" FCI     electronic energy:      %12.8f " %(efci-ecore))
     
 

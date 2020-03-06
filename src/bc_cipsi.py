@@ -275,10 +275,10 @@ def bc_cipsi(ci_vector, clustered_ham,
         pt_vector.prune_empty_fock_spaces()
 
 
-        var = pt_vector.norm() - e0*e0
+        var = pt_vector.dot(pt_vector) - e0*e0
         print(" Variance:          %12.8f" % var,flush=True)
         tmp = ci_vector.dot(pt_vector)
-        var = pt_vector.norm() - tmp*tmp
+        var = pt_vector.dot(pt_vector) - tmp*tmp
         print(" Variance Subspace: %12.8f" % var,flush=True)
 
 
@@ -356,10 +356,10 @@ def bc_cipsi(ci_vector, clustered_ham,
                 print(" Time spent in matvec: %12.2f" %(stop-start), flush=True)
                 pt_vector.prune_empty_fock_spaces()
 
-                var = pt_vector.norm() - e0*e0
+                var = pt_vector.dot(pt_vector) - e0*e0
                 print(" Variance:          %12.8f" % var,flush=True)
                 tmp = ci_vector.dot(pt_vector)
-                var = pt_vector.norm() - tmp*tmp
+                var = pt_vector.dot(pt_vector) - tmp*tmp
                 print(" Variance Subspace: %12.8f" % var,flush=True)
 
 

@@ -285,18 +285,20 @@ class ClusteredState(OrderedDict):
             self[fock][conf] *= x
         return 
 
-    def add(self,other):
+    def add(self,other,scalar=1):
         """
         add clusteredstate vector coefficients to self
+        multiplying other by optional scalar a
+        self = a * other
         """
         for fockspace,configs in other.items():
             if fockspace not in self.fblocks():
                 self.add_fockspace(fockspace)
             for config,coeff in configs.items():
                 if config in self.data[fockspace]:
-                    self.data[fockspace][config] += coeff
+                    self.data[fockspace][config] += scalar * coeff
                 else:
-                    self.data[fockspace][config] = coeff
+                    self.data[fockspace][config] = scalar * coeff
         return 
 
     def dot(self,other):
@@ -351,7 +353,7 @@ class ClusteredState(OrderedDict):
         norm = 0
         for fockspace,config,coeff in self:
             norm += coeff*coeff
-        return norm
+        return np.sqrt(norm)
 
     def normalize(self):
         """
@@ -359,7 +361,7 @@ class ClusteredState(OrderedDict):
         """
         norm = self.norm()
         for fockspace,config,coeff in self:
-            self[fockspace][config] = coeff/np.sqrt(norm)
+            self[fockspace][config] = coeff/norm
         return
 
     def print(self):
