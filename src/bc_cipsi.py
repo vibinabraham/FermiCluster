@@ -13,9 +13,10 @@ from ClusteredOperator import *
 from ClusteredState import *
 from tools import *
 
-def bc_cipsi_tucker(ci_vector, clustered_ham, 
+def bc_cipsi_tucker(ci_vector, clustered_ham, selection="cipsi",
         thresh_cipsi=1e-4, thresh_ci_clip=1e-5, thresh_cipsi_conv=1e-8, max_cipsi_iter=30, 
-        thresh_tucker_conv = 1e-6, max_tucker_iter=20, tucker_state_clip=None,hshift=1e-8,thresh_asci=0,nproc=None):
+        thresh_tucker_conv = 1e-6, max_tucker_iter=20, tucker_state_clip=None,hshift=1e-8,
+        thresh_asci=0,nproc=None):
     """
     Run iterations of TP-CIPSI to make the tucker decomposition self-consistent
     """
@@ -175,8 +176,9 @@ def bc_cipsi_tucker(ci_vector, clustered_ham,
 ## }}}
 
 
-def bc_cipsi(ci_vector, clustered_ham, thresh_cipsi=1e-4, thresh_ci_clip=1e-5, thresh_conv=1e-8, max_iter=30, n_roots=1,thresh_asci=0,nproc=None):
-
+def bc_cipsi(ci_vector, clustered_ham,  selection="cipsi", 
+    thresh_cipsi=1e-4, thresh_ci_clip=1e-5, thresh_conv=1e-8, max_iter=30, n_roots=1,thresh_asci=0,nproc=None):
+# {{{
     print(" Compute diagonal elements",flush=True)
     # compute local states energies
     precompute_cluster_basis_energies(clustered_ham)
@@ -403,7 +405,115 @@ def bc_cipsi(ci_vector, clustered_ham, thresh_cipsi=1e-4, thresh_ci_clip=1e-5, t
     #        exit()
     return ci_vector, pt_vector, e0, e0+e2
 
+# }}}
 
+
+def hb_tpsci(ci_vector, clustered_ham, thresh_cipsi=1e-4, thresh_ci_clip=1e-5, thresh_conv=1e-8, max_iter=30, n_roots=1,thresh_asci=0,nproc=None):
+# {{{
+    print(" Compute diagonal elements",flush=True)
+    # compute local states energies
+    precompute_cluster_basis_energies(clustered_ham)
+    print(" done.",flush=True)
+  
+    pt_vector = ci_vector.copy()
+    Hd_vector = ClusteredState(ci_vector.clusters)
+    e_prev = 0
+    for it in range(max_iter):
+        print()
+        print(" ===================================================================")
+        print("     Selected CI Iteration: %4i epsilon: %12.8f" %(it,thresh_cipsi))
+        print(" ===================================================================")
+        print(" Build full Hamiltonian",flush=True)
+        start = time.time()
+        if nproc==1:
+            H = build_full_hamiltonian(clustered_ham, ci_vector)
+        else:
+            H = build_full_hamiltonian_parallel1(clustered_ham, ci_vector, nproc=nproc)
+        stop = time.time()
+        print(" Time spent building Hamiltonian matrix: %12.2f" %(stop-start))
+        print(" Diagonalize Hamiltonian Matrix:",flush=True)
+        vguess = ci_vector.get_vector()
+        if H.shape[0] > 100 and abs(np.sum(vguess)) >0:
+            e,v = scipy.sparse.linalg.eigsh(H,n_roots,v0=vguess,which='SA')
+        else:
+            e,v = np.linalg.eigh(H)
+        idx = e.argsort()
+        e = e[idx]
+        v = v[:,idx]
+        v0 = v[:,0]
+        e0 = e[0]
+        print(" Ground state of CI:                 %12.8f  CI Dim: %4i "%(e[0].real,len(ci_vector)))
+
+        ci_vector.zero()
+        ci_vector.set_vector(v0)
+
+        old_dim = len(ci_vector)
+
+        if thresh_ci_clip > 0:
+            print(" Clip CI Vector: thresh = ", thresh_ci_clip)
+            print(" Old CI Dim: ", len(ci_vector))
+            kept_indices = ci_vector.clip(np.sqrt(thresh_ci_clip))
+            ci_vector.normalize()
+            print(" New CI Dim: ", len(ci_vector))
+            if len(ci_vector) < old_dim:
+                H = H[:,kept_indices][kept_indices,:]
+                print(" Diagonalize Clipped Hamiltonian Matrix:",flush=True)
+                vguess = ci_vector.get_vector()
+                e,v = scipy.sparse.linalg.eigsh(H,n_roots,v0=vguess,which='SA')
+                #e,v = np.linalg.eigh(H)
+                idx = e.argsort()
+                e = e[idx]
+                v = v[:,idx]
+                v0 = v[:,0]
+                e0 = e[0]
+                print(" Ground state of CI:                 %12.8f  CI Dim: %4i "%(e[0].real,len(ci_vector)))
+
+                ci_vector.zero()
+                ci_vector.set_vector(v0)
+            
+        print(" Perform Heat-Bath selection to find new configurations:",flush=True)
+        start=time.time()
+        pt_vector = heat_bath_search(clustered_ham, ci_vector, thresh_cipsi=thresh_cipsi, nproc=nproc)
+        stop=time.time()
+        print(" Number of new configurations found         : ", len(pt_vector))
+        print(" Time spent in heat bath search: %12.2f" %(stop-start),flush=True)
+
+        print(" Remove CI space from results")
+        for fockspace,configs in pt_vector.items():
+            if fockspace in ci_vector.fblocks():
+                for config,coeff in list(configs.items()):
+                    if config in ci_vector[fockspace]:
+                        del pt_vector[fockspace][config]
+        print(" Number of new configurations found (pruned): ", len(pt_vector))
+
+
+        for fockspace,configs in ci_vector.items():
+            if fockspace in pt_vector:
+                for config,coeff in configs.items():
+                    assert(config not in pt_vector[fockspace])
+
+        print(" Norm of CI vector = %12.8f" %ci_vector.norm())
+
+        print(" Add new states to CI space", flush=True)
+        print(" Dimension of CI space     : ", len(ci_vector))
+        start = time.time()
+        ci_vector.add(pt_vector)
+        end = time.time()
+        print(" Dimension of next CI space: ", len(ci_vector))
+        print(" Time spent in finding new CI space: %12.2f" %(end - start), flush=True)
+
+        start = time.time()
+
+        delta_e = e0 - e_prev
+        e_prev = e0
+        if len(ci_vector) <= old_dim and abs(delta_e) < thresh_conv:
+            print(" Converged")
+            break
+        print(" Next iteration CI space dimension", len(ci_vector))
+    
+    return ci_vector, e0
+
+# }}}
 
 
 
