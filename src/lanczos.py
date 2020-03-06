@@ -15,72 +15,6 @@ import pyscf
 ttt = time.time()
 from numpy.linalg import norm
 
-def lanczos_old(A,vi,max_iter=20):
-    # {{{
-    wi = A@vi 
-    ai = (vi.T @ wi)
-    wi = wi - vi*ai 
-    bj = np.linalg.norm(wi)
-    print(" Residual Norm: %12.8f " %bj)
-   
-    T = np.array([[ai]])
-
-    print(T.shape)
-    vj = wi/bj 
-
-    vecs = [vi]
-    
-    for vv in vecs:
-        s = vv.dot(vj)
-        vj -=  s* vv 
-    vj /=  np.linalg.norm(vj) 
-    vecs.append(vj)
-   
-   
-    for j in range(max_iter):
-        wj = A@vj 
-        aj = (wj.T @ vj)
-
-        
-        if j == 0:
-            wj = wj - aj*vj
-        else:
-            wj = wj - aj*vj - bj*vi
-
-        for l in range(j):
-            wj = wj - a[l]*vecs[l] 
-        bk = np.linalg.norm(wj)
-        vk = wj / bk 
-        
-        for vv in vecs:
-            s = vv.dot(vk)
-            vk -= s* vv
-        vk = vk / np.linalg.norm(vk) 
-        vecs.append(vk)
-       
-        T = np.hstack((T,np.zeros([T.shape[0],1])))
-        T = np.vstack((T,np.zeros([1,T.shape[1]])))
-        T[j,j] = aj
-        T[j,j-1] = bj
-        T[j-1,j] = bj
-
-        V = np.array(vecs).T
-        T = V.T @ A @ V
-        #print("T: ")
-        #np.set_printoptions(suppress=True)
-        #print(T)
-        #print("T: ")
-        e,x = np.linalg.eig(T)
-        idx = e.argsort()
-        e = e[idx]
-        x = x[:,idx]
-        print(" Current electronic energy: %12.8f  ||Res|| %12.8f" %(e[0],bk))
-        
-        bj = bk
-        vj = vk
-        vi = vj
-        bi = bj
-# }}}
 
 def lanczos(A,x,max_iter=52, thresh=1e-8):
     # {{{
@@ -149,9 +83,9 @@ def lanczos(A,x,max_iter=52, thresh=1e-8):
 # }}}
 
 np.random.seed(2)
-A = np.random.random((1000,1000)) - .5
+A = np.random.random((100,100)) - .5
 A = A+A.T
-v = np.random.random((1000))
+v = np.random.random((100))
 v = v /np.linalg.norm(v) 
 lanczos(A,v)
 e,v = np.linalg.eig(A)
@@ -162,7 +96,9 @@ e = e[0:10]
 print(" exact soln")
 for ei in e:
     print(" %12.8f " %ei)
-exit()
+
+
+
 
 pyscf.lib.num_threads(1)  #with degenerate states and multiple processors there can be issues
 np.set_printoptions(suppress=True, precision=3, linewidth=1500)
