@@ -308,7 +308,7 @@ class ClusteredState(OrderedDict):
         loop is over self, so use the dot function belonging to the shortest vector
         """
         dot = 0
-        for fockspace,configs in other.items():
+        for fockspace,configs in self.items():
             try:
                 fock2 = other[fockspace]
                 for config,coeff in configs.items():
