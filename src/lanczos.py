@@ -130,6 +130,7 @@ def sparse_lanczos(clustered_ham, x, max_iter=10, thresh=1e-8, vector_prune=1e-1
         q.normalize()
         
         q.clip(vector_prune)
+        q.prune_empty_fock_spaces()
         q.normalize()
         
         #should we orthogonalize?
