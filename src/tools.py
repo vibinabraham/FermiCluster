@@ -672,6 +672,7 @@ def heat_bath_search(h_in,v,thresh_cipsi=None, nproc=None):
                     new_configs[cact] = range(mats[cacti].shape[0])
                 for sp_idx, spi in enumerate(itertools.product(*new_configs)):
                     #print(" New config: %12.8f" %tmp[sp_idx], spi)
+                    #if abs(tmp[sp_idx]) > sqrt_thresh_cipsi/10.0:
                     if abs(tmp[sp_idx]) > sqrt_thresh_cipsi:
                         #configs_l[spi] = tmp[sp_idx] # since we are only finding configs, we don't care about coeff
                         #configs_tmp.append([configs_l[spi],tmp[sp_idx]]) 
@@ -680,6 +681,13 @@ def heat_bath_search(h_in,v,thresh_cipsi=None, nproc=None):
                         else:
                             configs_l[spi] += tmp[sp_idx] 
 
+            #for config,coeff in list(configs_l.items()):
+            #    if abs(coeff) < sqrt_thresh_cipsi:
+            #        del configs_l[config]
+        for fockspace,configs in sigma_out.items():
+            for config,coeff in list(configs.items()):
+                if abs(coeff) < sqrt_thresh_cipsi:
+                    del sigma_out[fockspace][config]
         return sigma_out
     
     import multiprocessing as mp
