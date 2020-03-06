@@ -100,7 +100,9 @@ def run(nproc=None):
         
         edps = build_hamiltonian_diagonal(clustered_ham,ci_vector)
         ci_vector_ref = ci_vector.copy()
-        ci_vector, etci = hb_tpsci(ci_vector_ref.copy(), clustered_ham, thresh_cipsi=1e-9, thresh_ci_clip=1e-10)
+        ci_vector, pt_vector, etci, etci2, t_conv = bc_cipsi_tucker(ci_vector_ref.copy(), clustered_ham, selection='heatbath', 
+        #ci_vector, pt_vector, etci, etci2, t_conv = bc_cipsi_tucker(ci_vector_ref.copy(), clustered_ham, selection='cipsi', 
+                thresh_cipsi=1e-9, thresh_ci_clip=1e-9, max_tucker_iter=3)
         etci += ecore
 
 
@@ -110,7 +112,7 @@ def run(nproc=None):
     print(" TCI:        %12.9f Dim:%6d"%(etci,len(ci_vector)))
     print(" HCI:        %12.9f Dim:%6d"%(ehci,hci_dim))
     print(" FCI:        %12.9f Dim:%6d"%(efci,fci_dim))
-    assert(abs(etci --108.855745210)< 1e-7)
+    assert(abs(etci --108.855604298)< 1e-7)
     #assert(abs(tci_dim - 67)<1e-15)
     assert(abs(efci   --108.85574521)< 1e-7)
 

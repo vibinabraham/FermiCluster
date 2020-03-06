@@ -29,8 +29,6 @@ def bc_cipsi_tucker(ci_vector, clustered_ham, selection="cipsi",
     e_prev = 0
     e_last = 0
     ci_vector_ref = ci_vector.copy()
-    print(max_tucker_iter)
-    exit()
     for brdm_iter in range(max_tucker_iter):
    
         if selection == "cipsi":
@@ -55,7 +53,7 @@ def bc_cipsi_tucker(ci_vector, clustered_ham, selection="cipsi",
                     thresh_cipsi=thresh_cipsi, thresh_ci_clip=thresh_ci_clip, thresh_conv=thresh_cipsi_conv, max_iter=max_cipsi_iter,thresh_asci=thresh_asci,
                     nproc=nproc)
             end = time.time()
-            pt_vector = ClusteredState()
+            pt_vector = ClusteredState(ci_vector.clusters)
             e_curr = e0
             e2 = 0
             print(" HB-TPSCI: E0 = %12.8f CI_DIM: %-12i Time spent %-12.2f" %(e0, len(ci_vector), end-start))
@@ -194,7 +192,7 @@ def bc_cipsi_tucker(ci_vector, clustered_ham, selection="cipsi",
 ## }}}
 
 
-def bc_cipsi(ci_vector, clustered_ham,  selection="cipsi", 
+def bc_cipsi(ci_vector, clustered_ham,  
     thresh_cipsi=1e-4, thresh_ci_clip=1e-5, thresh_conv=1e-8, max_iter=30, n_roots=1,thresh_asci=0,nproc=None):
 # {{{
     print(" Compute diagonal elements",flush=True)
@@ -239,7 +237,7 @@ def bc_cipsi(ci_vector, clustered_ham,  selection="cipsi",
         if thresh_ci_clip > 0:
             print(" Clip CI Vector: thresh = ", thresh_ci_clip)
             print(" Old CI Dim: ", len(ci_vector))
-            kept_indices = ci_vector.clip(thresh_ci_clip)
+            kept_indices = ci_vector.clip(np.sqrt(thresh_ci_clip))
             ci_vector.normalize()
             print(" New CI Dim: ", len(ci_vector))
             if len(ci_vector) < old_dim:
@@ -488,7 +486,6 @@ def hb_tpsci(ci_vector, clustered_ham, thresh_cipsi=1e-4, thresh_ci_clip=1e-5, t
 
                 ci_vector.zero()
                 ci_vector.set_vector(v0)
-            
         print(" Perform Heat-Bath selection to find new configurations:",flush=True)
         start=time.time()
         pt_vector = heat_bath_search(clustered_ham, ci_vector, thresh_cipsi=thresh_cipsi, nproc=nproc)
@@ -515,6 +512,7 @@ def hb_tpsci(ci_vector, clustered_ham, thresh_cipsi=1e-4, thresh_ci_clip=1e-5, t
         print(" Add new states to CI space", flush=True)
         print(" Dimension of CI space     : ", len(ci_vector))
         start = time.time()
+        pt_vector.zero()
         ci_vector.add(pt_vector)
         end = time.time()
         print(" Dimension of next CI space: ", len(ci_vector))
