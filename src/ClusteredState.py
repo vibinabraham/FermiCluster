@@ -308,13 +308,14 @@ class ClusteredState(OrderedDict):
         loop is over self, so use the dot function belonging to the shortest vector
         """
         dot = 0
-        for fockspace,config,coeff in self:
+        for fockspace,configs in other.items():
             try:
                 fock2 = other[fockspace]
-                try: 
-                    dot += coeff * fock2[config]
-                except KeyError:
-                    continue
+                for config,coeff in configs.items():
+                    try: 
+                        dot += coeff * fock2[config]
+                    except KeyError:
+                        continue
             except KeyError:
                 continue
         return dot
