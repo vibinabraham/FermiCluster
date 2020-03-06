@@ -350,6 +350,9 @@ class ClusteredState(OrderedDict):
         norm = self.norm()
         for fockspace,config,coeff in self:
             self[fockspace][config] = coeff/norm
+        for fockspace,configs in self.items():
+            for config,coeff in configs.items():
+                self[fockspace][config] = coeff/norm
         return
 
     def print(self):
