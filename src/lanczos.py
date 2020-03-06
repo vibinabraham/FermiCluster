@@ -131,8 +131,11 @@ def sparse_lanczos(clustered_ham, x, max_iter=10, thresh=1e-8, vector_prune=1e-1
         q.normalize()
         
         q.clip(vector_prune)
-        q.normalize()
+        if len(q) == 0:
+            print(" You clipped too much!")
+            exit()
         q.prune_empty_fock_spaces()
+        q.normalize()
         
         #should we orthogonalize?
         # 
@@ -143,15 +146,18 @@ def sparse_lanczos(clustered_ham, x, max_iter=10, thresh=1e-8, vector_prune=1e-1
                 q.add(qi, scalar=(-1*si))
         q.normalize()
         q.clip(vector_prune)
+
         q.normalize()
         q.prune_empty_fock_spaces()
 
         
         Q.append(q)
-
+        
+        print(" Size of vectors in Krylov space:")
         for qi in Q:
-            print(" Length of vector: ", len(qi))
-
+            print(" Length of vector: ", len(qi),flush=True)
+        
+        #q.print_configs()
         sig = matvec1_parallel2(clustered_ham, q)
         sig.clip(sigma_prune)
         sig.prune_empty_fock_spaces()
@@ -182,8 +188,8 @@ def sparse_lanczos(clustered_ham, x, max_iter=10, thresh=1e-8, vector_prune=1e-1
             for jj in range(ii,Tdim):
                 S[ii,jj] = Q[ii].dot(Q[jj])
                 S[jj,ii] = S[ii,jj]
-
-        #print(S)
+       
+        print(S)
         se,sv = np.linalg.eig(S)
         print(" Smallest eigenvalue of S: %12.8f" %min(se))
         X = np.linalg.inv(scipy.linalg.sqrtm(S))
