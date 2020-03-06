@@ -277,6 +277,14 @@ class ClusteredState(OrderedDict):
         return
     # }}}
 
+    def scale(self,x):
+        """
+        multiply vector coefficients by scalar 
+        """
+        for fock,conf,coeff in self:
+            self[fock][conf] *= x
+        return 
+
     def add(self,other):
         """
         add clusteredstate vector coefficients to self
@@ -299,12 +307,29 @@ class ClusteredState(OrderedDict):
         """
         dot = 0
         for fockspace,config,coeff in self:
-        
             try:
                 coeff2 = other[fockspace][config]
             except KeyError:
                 pass
             dot += coeff * coeff2
+        return dot
+    
+    def dot2(self,other):
+        """
+        Compute dot product of state with other
+
+        loop is over self, so use the dot function belonging to the shortest vector
+        """
+        dot = 0
+        for fockspace,config,coeff in self:
+            try:
+                fock2 = other[fockspace]
+                try: 
+                    dot += coeff * fock2[config]
+                except KeyError:
+                    continue
+            except KeyError:
+                continue
         return dot
     
     def add_basis(self,other):
