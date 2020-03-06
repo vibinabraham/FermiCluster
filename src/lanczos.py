@@ -103,7 +103,7 @@ if 0:
 
 
 
-def sparse_lanczos(H,x, max_iter=10, thresh=1e-8, vector_prune=1e-16, sigma_prune=1e-16):
+def sparse_lanczos(clustered_ham, x, max_iter=10, thresh=1e-8, vector_prune=1e-16, sigma_prune=1e-16):
     q = x.copy()
     q.normalize()
     Q = [q.copy()] # list of subspace vectors
@@ -118,7 +118,7 @@ def sparse_lanczos(H,x, max_iter=10, thresh=1e-8, vector_prune=1e-16, sigma_prun
 
     r = sig.copy()
     
-    ai = q.dot2(r)
+    ai = q.dot(r)
     r.add(q, scalar=(-1*ai))
     bi = r.norm()
 
@@ -131,6 +131,19 @@ def sparse_lanczos(H,x, max_iter=10, thresh=1e-8, vector_prune=1e-16, sigma_prun
         
         q.clip(vector_prune)
         q.normalize()
+        
+        #should we orthogonalize?
+        # 
+        #   clipping after orthogonalization slows the onset of linear dependencies
+        if 1:
+            for qi in Q:
+                si = q.dot(qi)
+                q.add(qi, scalar=(-1*si))
+        q.normalize()
+        q.clip(vector_prune)
+        q.prune_empty_fock_spaces()
+        q.normalize()
+
         
         Q.append(q)
 
@@ -146,7 +159,7 @@ def sparse_lanczos(H,x, max_iter=10, thresh=1e-8, vector_prune=1e-16, sigma_prun
         r = sig.copy()
         r.add(v, scalar=(-1*bi) )
 
-        aj = q.dot2(r)
+        aj = q.dot(r)
 
         r.add(q, scalar=(-1*aj) )
 
@@ -159,13 +172,13 @@ def sparse_lanczos(H,x, max_iter=10, thresh=1e-8, vector_prune=1e-16, sigma_prun
         T = np.zeros((Tdim,Tdim))
         for ii in range(Tdim):
             for jj in range(ii,Tdim):
-                T[ii,jj] = Q[ii].dot2(AQ[jj])
+                T[ii,jj] = Q[ii].dot(AQ[jj])
                 T[jj,ii] = T[ii,jj]
         
         S = np.zeros((Tdim,Tdim))
         for ii in range(Tdim):
             for jj in range(ii,Tdim):
-                S[ii,jj] = Q[ii].dot2(Q[jj])
+                S[ii,jj] = Q[ii].dot(Q[jj])
                 S[jj,ii] = S[ii,jj]
 
         #print(S)
