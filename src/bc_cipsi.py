@@ -22,33 +22,51 @@ def bc_cipsi_tucker(ci_vector, clustered_ham, selection="cipsi",
     """
 # {{{
 
+    
     t_conv = False
     if tucker_state_clip == None:
         tucker_state_clip = thresh_cipsi/10.0
     e_prev = 0
     e_last = 0
     ci_vector_ref = ci_vector.copy()
+    print(max_tucker_iter)
+    exit()
     for brdm_iter in range(max_tucker_iter):
-        start = time.time()
+   
+        if selection == "cipsi":
+            start = time.time()
+            ci_vector, pt_vector, e0, e2 = bc_cipsi(ci_vector_ref.copy(), clustered_ham, 
+                    thresh_cipsi=thresh_cipsi, thresh_ci_clip=thresh_ci_clip, thresh_conv=thresh_cipsi_conv, max_iter=max_cipsi_iter,thresh_asci=thresh_asci,
+                    nproc=nproc)
+            end = time.time()
+            e_curr = e2
+            print(" CIPSI: E0 = %12.8f E2 = %12.8f CI_DIM: %-12i Time spent %-12.2f" %(e0, e2, len(ci_vector), end-start))
+            
+            pt_vector.add(ci_vector)
+            print(" Reduce size of 1st order wavefunction")
+            print(" Before:",len(pt_vector))
+            pt_vector.clip(tucker_state_clip)
+            pt_vector.normalize()
+            print(" After:",len(pt_vector))
+            ci_vector = pt_vector 
+        elif selection == "heatbath":
+            start = time.time()
+            ci_vector, e0 = hb_tpsci(ci_vector_ref.copy(), clustered_ham, 
+                    thresh_cipsi=thresh_cipsi, thresh_ci_clip=thresh_ci_clip, thresh_conv=thresh_cipsi_conv, max_iter=max_cipsi_iter,thresh_asci=thresh_asci,
+                    nproc=nproc)
+            end = time.time()
+            pt_vector = ClusteredState()
+            e_curr = e0
+            e2 = 0
+            print(" HB-TPSCI: E0 = %12.8f CI_DIM: %-12i Time spent %-12.2f" %(e0, len(ci_vector), end-start))
+
         
-        ci_vector, pt_vector, e0, e2 = bc_cipsi(ci_vector_ref.copy(), clustered_ham, 
-                thresh_cipsi=thresh_cipsi, thresh_ci_clip=thresh_ci_clip, thresh_conv=thresh_cipsi_conv, max_iter=max_cipsi_iter,thresh_asci=thresh_asci,
-                nproc=nproc)
-        
-        end = time.time()
-        print(" CIPSI: E0 = %12.8f E2 = %12.8f CI_DIM: %-12i Time spent %-12.2f" %(e0, e2, len(ci_vector), end-start))
       
-        if abs(e_prev-e2) < thresh_tucker_conv:
+        if abs(e_prev-e_curr) < thresh_tucker_conv:
             print(" Converged BRDMs")
             t_conv = True
             break
-        e_prev = e2
-        pt_vector.add(ci_vector)
-        print(" Reduce size of 1st order wavefunction")
-        print(" Before:",len(pt_vector))
-        pt_vector.clip(tucker_state_clip)
-        pt_vector.normalize()
-        print(" After:",len(pt_vector))
+        e_prev = e_curr
         for ci in clustered_ham.clusters:
             print()
             print(" --------------------------------------------------------")
@@ -57,7 +75,7 @@ def bc_cipsi_tucker(ci_vector, clustered_ham, selection="cipsi",
             print(" Compute BRDM",flush=True)
             print(" Hshift = ",hshift)
             start = time.time()
-            rdms = build_brdm(pt_vector, ci.idx)
+            rdms = build_brdm(ci_vector, ci.idx)
             end = time.time()
             print(" done.",flush=True)
             print(" Time spent building BRDMs: %12.2f" %(end-start))
