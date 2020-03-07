@@ -211,12 +211,27 @@ def sparse_lanczos(clustered_ham, x, max_iter=10, thresh=1e-8, vector_prune=1e-1
         print(" Current electronic energy: %12.8f  ||Res|| %12.8f" %(e[0],res.norm()))
         
         if bj < thresh:
-            return Q
+            vgs = x.copy()
+            vgs.zero()
+            vgs.clip(1)
+            vgs.prune_empty_fock_spaces()
+            for ii in range(Tdim):
+                vgs.add(AQ[ii], scalar=w[ii,0])
+            return vgs, e[0]
+
         else:
             bi = 1*bj
             ai = 1*aj
 
-
+        
+    print(" Warning: Didn't converge.",flush=True)
+    vgs = x.copy()
+    vgs.zero()
+    vgs.clip(1)
+    vgs.prune_empty_fock_spaces()
+    for ii in range(Tdim):
+        vgs.add(AQ[ii], scalar=w[ii,0])
+    return vgs, e[0]
 
 
 if __name__ == "__main__":
@@ -296,10 +311,17 @@ if __name__ == "__main__":
         cmf(clustered_ham, ci_vector, h, g, max_iter=1)
         #cmf(clustered_ham, ci_vector, h, g, max_iter=50,max_nroots=50,dm_guess=(dm_aa,dm_bb),diis=True)
     
-    
-    
-    
-    sparse_lanczos(clustered_ham, ci_vector, vector_prune=1e-2, sigma_prune=1e-8)
+    v = ci_vector.copy()    
+   
+    for i in range(4):
+        v,e = sparse_lanczos(clustered_ham, v, vector_prune=1e-1, sigma_prune=1e-8, max_iter=10)
+        v.clip(1e-1)
+        v.normalize()
+   
+    for i in range(2):
+        v,e = sparse_lanczos(clustered_ham, v, vector_prune=1e-2, sigma_prune=1e-8)
+        v.clip(1e-2)
+        v.normalize()
     
     
     
