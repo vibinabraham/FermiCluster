@@ -531,6 +531,65 @@ def hb_tpsci(ci_vector, clustered_ham, thresh_cipsi=1e-4, thresh_ci_clip=1e-5, t
 
 # }}}
 
+def hosvd(ci_vector, clustered_ham, hshift=1e-8):
+    """
+    Peform HOSVD aka Tucker Decomposition of ClusteredState
+    """
+    for ci in clustered_ham.clusters:
+        print()
+        print(" --------------------------------------------------------")
+        print(" Density matrix: Cluster ", ci)
+        print()
+        print(" Compute BRDM",flush=True)
+        print(" Hshift = ",hshift)
+        start = time.time()
+        rdms = build_brdm(ci_vector, ci.idx)
+        end = time.time()
+        print(" done.",flush=True)
+        print(" Time spent building BRDMs: %12.2f" %(end-start))
+        #rdms = build_brdm(ci_vector, ci.idx)
+        norm = 0
+        entropy = 0
+        rotations = {}
+        for fspace,rdm in rdms.items():
+           
+            fspace_norm = 0
+            fspace_entropy = 0
+            print(" Diagonalize RDM for Cluster %2i in Fock space:"%ci.idx, fspace,flush=True)
+            n,U = np.linalg.eigh(rdm)
+            idx = n.argsort()[::-1]
+            n = n[idx]
+            U = U[:,idx]
+
+            if hshift != None:
+                """Adding cluster hamiltonian to RDM before diagonalization to make null space unique. """
+                Hci = ci.Hci[fspace]
+                n,U = np.linalg.eigh(rdm + hshift*Hci)
+                n = np.diag(U.T @ rdm @ U)
+                idx = n.argsort()[::-1]
+                n = n[idx]
+                U = U[:,idx]
+            
+            norm += sum(n)
+            fspace_norm = sum(n)
+            for ni_idx,ni in enumerate(n):
+                if abs(ni/norm) > 1e-12:
+                    fspace_entropy -= ni*np.log(ni/norm)/norm
+                    entropy -=  ni*np.log(ni)
+                    print("   Rotated State %4i:    %12.8f"%(ni_idx,ni), flush=True)
+            print("   ----")
+            print("   Entanglement entropy:  %12.8f" %fspace_entropy, flush=True) 
+            print("   Norm:                  %12.8f" %fspace_norm, flush=True) 
+            rotations[fspace] = U
+        print(" Final entropy:.... %12.8f"%entropy)
+        print(" Final norm:....... %12.8f"%norm)
+        print(" --------------------------------------------------------", flush=True)
+    
+        start = time.time()
+        ci.rotate_basis(rotations)
+        end = time.time()
+        print(" Time spent rotating cluster basis: %12.2f" %(end-start))
+    return
 
 
 

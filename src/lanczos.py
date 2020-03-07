@@ -83,27 +83,12 @@ def test_lanczos(A,x,max_iter=52, thresh=1e-8):
 # }}}
 
 
-if 0:
-    np.random.seed(2)
-    A = np.random.random((100,100)) - .5
-    A = A+A.T
-    v = np.random.random((100))
-    v = v /np.linalg.norm(v) 
-    test_lanczos(A,v)
-    e,v = np.linalg.eig(A)
-    idx = e.argsort()
-    e = e[idx]
-    v = v[:,idx]
-    e = e[0:10]
-    print(" exact soln")
-    for ei in e:
-        print(" %12.8f " %ei)
 
 
 
 
 
-def sparse_lanczos(clustered_ham, x, max_iter=10, thresh=1e-8, vector_prune=1e-16, sigma_prune=1e-16):
+def sparse_lanczos(clustered_ham, x, max_iter=10, thresh=1e-3, vector_prune=1e-16, sigma_prune=1e-16):
     q = x.copy()
     q.normalize()
     q.prune_empty_fock_spaces()
@@ -189,7 +174,7 @@ def sparse_lanczos(clustered_ham, x, max_iter=10, thresh=1e-8, vector_prune=1e-1
                 S[ii,jj] = Q[ii].dot(Q[jj])
                 S[jj,ii] = S[ii,jj]
        
-        print(S)
+        #print(S)
         se,sv = np.linalg.eig(S)
         print(" Smallest eigenvalue of S: %12.8f" %min(se))
         X = np.linalg.inv(scipy.linalg.sqrtm(S))
@@ -205,18 +190,36 @@ def sparse_lanczos(clustered_ham, x, max_iter=10, thresh=1e-8, vector_prune=1e-1
         res.clip(1)
         res.prune_empty_fock_spaces()
 
+        #   residual and vector needs to involve metric
+        #   
+        #   
+        #   
+        #   X*T*X*w = e*w
+        #   X*Q'*A*Q*X*w = e*w
+        #   
+        #   
+        #   
+        #   v = Q*X*w
+        # r = A*v - e*v
+        #   = A*Q*X*w - e*Q*X*w
+        Xw = X@w
         for ii in range(Tdim):
-            res.add(AQ[ii], scalar=w[ii,0])
-            res.add(Q[ii], scalar=(-1 * e[0] * w[ii,0]))
-        print(" Current electronic energy: %12.8f  ||Res|| %12.8f" %(e[0],res.norm()))
+            res.add(AQ[ii], scalar=Xw[ii,0])
+        for ii in range(Tdim):
+            res.add(Q[ii], scalar=(-1 * e[0] * Xw[ii,0]))
+
+        err = res.norm()
+        print(" Current electronic energy: %12.8f  ||Res|| %12.8f" %(e[0],err))
         
-        if bj < thresh:
+        if err < thresh:
+            print(" Converged!")
+            print("*Current electronic energy: %12.8f  ||Res|| %12.8f" %(e[0],err))
             vgs = x.copy()
             vgs.zero()
             vgs.clip(1)
             vgs.prune_empty_fock_spaces()
             for ii in range(Tdim):
-                vgs.add(AQ[ii], scalar=w[ii,0])
+                vgs.add(AQ[ii], scalar=Xw[ii,0])
             return vgs, e[0]
 
         else:
@@ -230,11 +233,29 @@ def sparse_lanczos(clustered_ham, x, max_iter=10, thresh=1e-8, vector_prune=1e-1
     vgs.clip(1)
     vgs.prune_empty_fock_spaces()
     for ii in range(Tdim):
-        vgs.add(AQ[ii], scalar=w[ii,0])
+        vgs.add(AQ[ii], scalar=Xw[ii,0])
     return vgs, e[0]
 
 
 if __name__ == "__main__":
+
+
+    if 0:
+        np.random.seed(2)
+        A = np.random.random((100,100)) - .5
+        A = A+A.T
+        v = np.random.random((100))
+        v = v /np.linalg.norm(v) 
+        test_lanczos(A,v)
+        e,v = np.linalg.eig(A)
+        idx = e.argsort()
+        e = e[idx]
+        v = v[:,idx]
+        e = e[0:10]
+        print(" exact soln")
+        for ei in e:
+            print(" %12.8f " %ei)
+        exit()
 
     pyscf.lib.num_threads(1)  #with degenerate states and multiple processors there can be issues
     np.set_printoptions(suppress=True, precision=3, linewidth=1500)
@@ -312,16 +333,37 @@ if __name__ == "__main__":
         #cmf(clustered_ham, ci_vector, h, g, max_iter=50,max_nroots=50,dm_guess=(dm_aa,dm_bb),diis=True)
     
     v = ci_vector.copy()    
-   
-    for i in range(4):
-        v,e = sparse_lanczos(clustered_ham, v, vector_prune=1e-1, sigma_prune=1e-8, max_iter=10)
-        v.clip(1e-1)
-        v.normalize()
-   
+     
+#    for i in range(2):
+#        v,e = sparse_lanczos(clustered_ham, v, vector_prune=1e-1, sigma_prune=1e-8, max_iter=10)
+#        v.clip(1e-2)
+#        v.normalize()
+# 
+#    hosvd(v, clustered_ham)
+     
+    v = ci_vector.copy()    
+     
     for i in range(2):
-        v,e = sparse_lanczos(clustered_ham, v, vector_prune=1e-2, sigma_prune=1e-8)
-        v.clip(1e-2)
+        v,e = sparse_lanczos(clustered_ham, v, vector_prune=1e-1, sigma_prune=1e-12, max_iter=10, thresh=1e-2)
+        #v.clip(1e-3)
         v.normalize()
+    
+    for i in range(2):
+        v,e = sparse_lanczos(clustered_ham, v, vector_prune=1e-2, sigma_prune=1e-12, max_iter=10, thresh=1e-2)
+        #v.clip(1e-3)
+        v.normalize()
+    
+#    v = ci_vector.copy()    
+#    hosvd(v, clustered_ham)
+#    for i in range(4):
+#        v,e = sparse_lanczos(clustered_ham, v, vector_prune=1e-2, sigma_prune=1e-12, max_iter=20)
+#        #v.clip(1e-3)
+#        v.normalize()
+    
+    #for i in range(2):
+    #    v,e = sparse_lanczos(clustered_ham, v, vector_prune=1e-2, sigma_prune=1e-8)
+    #    v.clip(1e-3)
+    #    v.normalize()
     
     
     
