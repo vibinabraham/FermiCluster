@@ -118,8 +118,12 @@ def sparse_lanczos(clustered_ham, x, max_iter=10, thresh=1e-3, vector_prune=1e-1
         v = q.copy()
         q = r.copy()
         q.normalize()
-        
+       
+        dim1 = len(q)
         q.clip(vector_prune)
+        dim2 = len(q) 
+        print(" Clipped trial vector: %8i -> %-8i" %(dim1,dim2))
+
         if len(q) == 0:
             print(" You clipped too much!")
             exit()
@@ -134,7 +138,10 @@ def sparse_lanczos(clustered_ham, x, max_iter=10, thresh=1e-3, vector_prune=1e-1
                 si = q.dot(qi)
                 q.add(qi, scalar=(-1*si))
         q.normalize()
+        dim1 = len(q)
         q.clip(vector_prune)
+        dim2 = len(q) 
+        print(" Clipped trial vector: %8i -> %-8i" %(dim1,dim2))
 
         q.normalize()
         q.prune_empty_fock_spaces()
