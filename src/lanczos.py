@@ -89,6 +89,10 @@ def test_lanczos(A,x,max_iter=52, thresh=1e-8):
 
 
 def sparse_lanczos(clustered_ham, x, max_iter=10, thresh=1e-3, vector_prune=1e-16, sigma_prune=1e-16):
+    print(" --------------- Do SparseLanczos ------------------")
+    print(" max_iter: ", max_iter)
+    print(" prune   : ", vector_prune)
+    print(" thresh  : ", thresh)
     q = x.copy()
     q.normalize()
     q.prune_empty_fock_spaces()
@@ -108,7 +112,7 @@ def sparse_lanczos(clustered_ham, x, max_iter=10, thresh=1e-3, vector_prune=1e-1
     r.add(q, scalar=(-1*ai))
     bi = r.norm()
 
-    print(" Norm of residual: %12.8f" %bi)
+    print(" Current electronic energy: %12.8f  ||Res|| %12.8f" %(ai,bi))
     
     for j in range(1,max_iter):
         v = q.copy()
