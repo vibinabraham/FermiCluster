@@ -93,6 +93,7 @@ def sparse_lanczos(clustered_ham, x, max_iter=10, thresh=1e-3, vector_prune=1e-1
     print(" max_iter: ", max_iter)
     print(" prune   : ", vector_prune)
     print(" thresh  : ", thresh)
+    print(" Length of starting vector: ", len(x))
     q = x.copy()
     q.normalize()
     q.prune_empty_fock_spaces()
