@@ -88,12 +88,14 @@ def test_lanczos(A,x,max_iter=52, thresh=1e-8):
 
 
 
-def sparse_lanczos(clustered_ham, x, max_iter=10, thresh=1e-3, vector_prune=1e-16, sigma_prune=1e-16):
+def sparse_lanczos(clustered_ham, x, max_iter=10, r_thresh=1e-3, e_thresh=1e-4, vector_prune=1e-16, sigma_prune=1e-16):
     print(" --------------- Do SparseLanczos ------------------")
-    print(" max_iter: ", max_iter)
-    print(" prune   : ", vector_prune)
-    print(" thresh  : ", thresh)
+    print(" max_iter  : ", max_iter)
+    print(" prune     : ", vector_prune)
+    print(" r_thresh  : ", r_thresh)
+    print(" e_thresh  : ", e_thresh)
     print(" Length of starting vector: ", len(x))
+    e_prev = 0
     q = x.copy()
     q.normalize()
     q.prune_empty_fock_spaces()
@@ -223,7 +225,8 @@ def sparse_lanczos(clustered_ham, x, max_iter=10, thresh=1e-3, vector_prune=1e-1
         err = res.norm()
         print(" Current electronic energy: %12.8f  ||Res|| %12.8f" %(e[0],err))
         
-        if err < thresh:
+        e_curr = e[0]
+        if err < r_thresh or abs(e_curr-e_prev) < e_thresh:
             print(" Converged!")
             print("*Current electronic energy: %12.8f  ||Res|| %12.8f" %(e[0],err))
             vgs = x.copy()
@@ -238,6 +241,7 @@ def sparse_lanczos(clustered_ham, x, max_iter=10, thresh=1e-3, vector_prune=1e-1
         else:
             bi = 1*bj
             ai = 1*aj
+            e_prev = e_curr
 
         
     print(" Warning: Didn't converge.",flush=True)
@@ -358,12 +362,12 @@ if __name__ == "__main__":
     v = ci_vector.copy()    
      
     for i in range(2):
-        v,e = sparse_lanczos(clustered_ham, v, vector_prune=1e-1, sigma_prune=1e-12, max_iter=10, thresh=1e-2)
-        #v.clip(1e-3)
-        v.normalize()
-    
-    for i in range(2):
-        v,e = sparse_lanczos(clustered_ham, v, vector_prune=1e-2, sigma_prune=1e-12, max_iter=10, thresh=1e-2)
+        v,e = sparse_lanczos(clustered_ham, v, vector_prune=1e-1, sigma_prune=1e-12, max_iter=10, e_thresh=1e-3, r_thresh=1e-2)
+        #v.clip(1e-3)                                                                                          
+        v.normalize()                                                                                          
+                                                                                                               
+    for i in range(2):                                                                                         
+        v,e = sparse_lanczos(clustered_ham, v, vector_prune=1e-2, sigma_prune=1e-12, max_iter=10, e_thresh=1e-3, r_thresh=1e-2)
         #v.clip(1e-3)
         v.normalize()
     
