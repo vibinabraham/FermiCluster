@@ -232,6 +232,7 @@ def sparse_lanczos(clustered_ham, x, max_iter=10, thresh=1e-3, vector_prune=1e-1
             vgs.prune_empty_fock_spaces()
             for ii in range(Tdim):
                 vgs.add(AQ[ii], scalar=Xw[ii,0])
+            vgs.normalize()
             return vgs, e[0]
 
         else:
@@ -246,6 +247,7 @@ def sparse_lanczos(clustered_ham, x, max_iter=10, thresh=1e-3, vector_prune=1e-1
     vgs.prune_empty_fock_spaces()
     for ii in range(Tdim):
         vgs.add(AQ[ii], scalar=Xw[ii,0])
+    vgs.normalize()
     return vgs, e[0]
 
 
