@@ -1792,3 +1792,150 @@ def compute_pt2_correction(ci_vector, clustered_ham, e0, nproc=1):
     return e2,pt_vector
 # }}}
 
+def run_hierarchical_sci(h,g,blocks,init_fspace,dimer_threshold,ecore):
+# {{{
+    fclusters = []
+    findex_list = {}
+    for ci,c in enumerate(blocks):
+        fclusters.append(Cluster(ci,c))
+        #findex_list[c] = {}
+
+    n_blocks = len(blocks)
+
+    for ca in range(0,n_blocks):
+        for cb in range(ca+1,n_blocks):
+            f_idx = [ca,cb]
+            s_blocks = [blocks[ca],blocks[cb]]
+            s_fspace = ((init_fspace[ca]),(init_fspace[cb]))
+            print("Blocks:",ca,cb)
+            print(s_blocks)
+            print(s_fspace)
+
+            idx = [j for sub in s_blocks for j in sub]
+            # h2
+            h2 = h[:,idx] 
+            h2 = h2[idx,:] 
+            print(h2)
+            g2 = g[:,:,:,idx] 
+            g2 = g2[:,:,idx,:] 
+            g2 = g2[:,idx,:,:] 
+            g2 = g2[idx,:,:,:] 
+
+            #do not want clusters to be wierdly indexed.
+            print(len(s_blocks[0]))
+            print(len(s_blocks[1]))
+            s_blocks = [range(0,len(s_blocks[0])),range(len(s_blocks[0]),len(s_blocks[0])+len(s_blocks[1]))]
+
+            s_clusters = []
+            for ci,c in enumerate(s_blocks):
+                s_clusters.append(Cluster(ci,c))
+
+            #Cluster States initial guess
+            ci_vector = ClusteredState(s_clusters)
+            ci_vector.init((s_fspace))
+            ci_vector.print_configs()
+            print(" Clusters:")
+            [print(ci) for ci in s_clusters]
+
+            #Clustered Hamiltonian
+            clustered_ham = ClusteredOperator(s_clusters)
+            print(" Add 1-body terms")
+            clustered_ham.add_1b_terms(h2)
+            print(" Add 2-body terms")
+            clustered_ham.add_2b_terms(g2)
+
+            do_cmf = 0
+            if do_cmf:
+                # Get CMF reference
+                cmf(clustered_ham, ci_vector, h2, g2, max_iter=10,max_nroots=50)
+            else:
+                # Get vaccum reference
+                for ci_idx, ci in enumerate(s_clusters):
+                    print()
+                    print(" Form basis by diagonalize local Hamiltonian for cluster: ",ci_idx)
+                    ci.form_eigbasis_from_ints(h2,g2,max_roots=50)
+                    print(" Build these local operators")
+                    print(" Build mats for cluster ",ci.idx)
+                    ci.build_op_matrices()
+
+            ci_vector.expand_to_full_space()
+            H = build_full_hamiltonian(clustered_ham, ci_vector)
+            vguess = ci_vector.get_vector()
+            #e,v = scipy.sparse.linalg.eigsh(H,1,v0=vguess,which='SA')
+            e,v = scipy.sparse.linalg.eigsh(H,1,which='SA')
+            idx = e.argsort()
+            e = e[idx]
+            v = v[:,idx]
+            v0 = v[:,0]
+            e0 = e[0]
+            print(" Ground state of CI:                 %12.8f  CI Dim: %4i "%(e[0].real,len(ci_vector)))
+            ci_vector.zero()
+            ci_vector.set_vector(v0)
+            ci_vector.print_configs()
+
+            for fspace, configs in ci_vector.data.items():
+                for ci_idx, ci in enumerate(s_clusters):
+                    print("fspace",fspace[ci_idx])
+                    print("ci basis old\n",ci.basis[fspace[ci_idx]])
+                    vec = ci.basis[fspace[ci_idx]]
+                    #print(configs.items())
+                    idx = []
+                    for configi,coeffi in configs.items():
+                        #print(configi[ci_idx],coeffi)
+                        if abs(coeffi) > dimer_threshold:
+                            if configi[ci_idx] not in idx:
+                                idx.append(configi[ci_idx])
+                    print("IDX of Cluster")
+                    print(ci_idx,f_idx[ci_idx])
+                    print(idx)
+                    try:
+                        findex_list[f_idx[ci_idx],fspace[ci_idx]] = sorted(list(set(findex_list[f_idx[ci_idx],fspace[ci_idx]]) | set(idx)))
+                        #ci.cs_idx[fspace[ci_idx]] =  sorted(list(set(ci.cs_idx[fspace[ci_idx]]) | set(idx)))
+                    except:
+                        #print(findex_list[ci_idx][fspace[ci_idx]])
+                        findex_list[f_idx[ci_idx],fspace[ci_idx]] = sorted(idx)
+                        #ci.cs_idx[fspace[ci_idx]] =  sorted(idx) 
+
+                    ### TODO 
+                    # first : have to save these indices in fcluster obtect and not the s_cluster. so need to change that,
+                    # second: have to move the rest of the code in the block to outside pair loop. loop over fspace
+                    #           look at indices kept for fspace and vec also is in fspace. and then prune it.
+
+                    print(vec.shape)
+                    print(findex_list[f_idx[ci_idx],fspace[ci_idx]])
+                    vec = vec[:,findex_list[f_idx[ci_idx],fspace[ci_idx]]]
+                    #vec = vec[:,idx]
+                    print("ci basis new\n")
+                    print(vec)
+                    fclusters[f_idx[ci_idx]].basis[fspace[ci_idx]] = vec
+                    #print(ci.basis[fspace[ci_idx]])
+                    print("Fock indices")
+                    print(findex_list)
+
+    for ci_idx, ci in enumerate(fclusters):
+        ci.build_op_matrices()
+        #print(findex_list[ci_idx])
+    print("     *====================================================================.")
+    print("     |         Tensor Product Selected Configuration Interaction          |")
+    print("     *====================================================================*")
+
+    #Cluster States initial guess
+    ci_vector = ClusteredState(fclusters)
+    ci_vector.init((init_fspace))
+    print(" Clusters:")
+    [print(ci) for ci in fclusters]
+
+
+    #Clustered Hamiltonian
+    clustered_ham = ClusteredOperator(fclusters)
+    print(" Add 1-body terms")
+    clustered_ham.add_1b_terms(h)
+    print(" Add 2-body terms")
+    clustered_ham.add_2b_terms(g)
+
+    ci_vector, pt_vector, etci, etci2,l  = bc_cipsi_tucker(ci_vector.copy(), clustered_ham,thresh_cipsi=1e-6, thresh_ci_clip=5e-4,asci_clip=0)
+    #ci_vector, pt_vector, etci, etci2  = bc_cipsi(ci_vector.copy(), clustered_ham,thresh_cipsi=1e-10, thresh_ci_clip=5e-6,asci_clip=0.01)
+
+    print(" TPSCI:          %12.8f      Dim:%6d" % (etci+ecore, len(ci_vector)))
+    print(" TPSCI(2):       %12.8f      Dim:%6d" % (etci2+ecore,len(pt_vector)))
+# }}}
