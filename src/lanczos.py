@@ -88,7 +88,7 @@ def test_lanczos(A,x,max_iter=52, thresh=1e-8):
 
 
 
-def sparse_lanczos(clustered_ham, x, max_iter=10, r_thresh=1e-3, e_thresh=1e-4, vector_prune=1e-16, sigma_prune=1e-16):
+def sparse_lanczos(clustered_ham, x, max_iter=10, r_thresh=1e-3, e_thresh=1e-4, vector_prune=1e-16, sigma_prune=1e-16, orthogonalize=True):
     print(" --------------- Do SparseLanczos ------------------")
     print(" max_iter  : ", max_iter)
     print(" prune     : ", vector_prune)
@@ -136,7 +136,7 @@ def sparse_lanczos(clustered_ham, x, max_iter=10, r_thresh=1e-3, e_thresh=1e-4, 
         #should we orthogonalize?
         # 
         #   clipping after orthogonalization slows the onset of linear dependencies
-        if 1:
+        if orthogonalize:
             for qi in Q:
                 si = q.dot(qi)
                 q.add(qi, scalar=(-1*si))
