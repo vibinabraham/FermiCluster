@@ -176,6 +176,8 @@ if __name__ == "__main__":
     #init_fspace = ((2, 2), (1, 1), (1, 1), (1, 1))
     blocks = [[0,1],[2,3],[4,5],[6,7]]
     init_fspace = ((2, 2), (1, 1), (1, 1), (1, 1))
+    blocks = [[0,1],[2,7],[3,6],[4,5]]
+    init_fspace = ((2, 2), (1, 1), (1, 1), (1, 1))
     
     
     
@@ -194,7 +196,9 @@ if __name__ == "__main__":
     dm_aa = pmol.dm_aa
     dm_bb = pmol.dm_bb
     
-    
+    efci, fci_dim = run_fci_pyscf(h,g,cas_nel,ecore=ecore)
+    print(" FCI: %12.8f (elec)" %(efci-ecore)) 
+    print(" FCI: %12.8f (total)" %efci) 
     do_fci = 1
     do_hci = 1
     do_tci = 1
@@ -212,24 +216,34 @@ if __name__ == "__main__":
     
     clustered_ham = ClusteredOperator(clusters)
     print(" Add 1-body terms")
-    #clustered_ham.add_1b_terms(h)
-    clustered_ham.add_1b_terms(cp.deepcopy(h))
+    clustered_ham.add_1b_terms(h)
+    #clustered_ham.add_1b_terms(cp.deepcopy(h))
     print(" Add 2-body terms")
-    #clustered_ham.add_2b_terms(g)
-    clustered_ham.add_2b_terms(cp.deepcopy(g))
+    clustered_ham.add_2b_terms(g)
+    #clustered_ham.add_2b_terms(cp.deepcopy(g))
     #clustered_ham.combine_common_terms(iprint=1)
     
     
     do_cmf = 1
     if do_cmf:
         # Get CMF reference
-        cmf(clustered_ham, ci_vector, cp.deepcopy(h), cp.deepcopy(g), max_iter=1)
-        #cmf(clustered_ham, ci_vector, h, g, max_iter=1, max_nroots=2)
-        #cmf(clustered_ham, ci_vector, h, g, max_iter=1,max_nroots=50,dm_guess=(dm_aa,dm_bb),diis=True)
+        #cmf(clustered_ham, ci_vector, cp.deepcopy(h), cp.deepcopy(g), max_iter=4)
+        #cmf(clustered_ham, ci_vector, h, g, max_iter=2)
+        #cmf(clustered_ham, ci_vector, h, g, max_iter=50,max_nroots=50,dm_guess=(dm_aa,dm_bb),diis=True)
+        cmf(clustered_ham, ci_vector, h, g, max_iter=50,max_nroots=1,dm_guess=(dm_aa,dm_bb),diis=True)
+    else:
+        print(" Build cluster basis and operators")
+        for ci_idx, ci in enumerate(clusters):
+            ci.form_eigbasis_from_ints(h,g,max_roots=1)
+        
+            print(" Build new operators for cluster ",ci.idx)
+            ci.build_op_matrices()
   
     edps = build_hamiltonian_diagonal(clustered_ham,ci_vector)
     print(" Energy of reference TPS: %12.8f (elec)"%(edps))
     print(" Energy of reference TPS: %12.8f (total)"%(edps+ecore))
+    ci_vector, pt_vector, e0, e2 = bc_cipsi(ci_vector.copy(), clustered_ham, 
+            thresh_cipsi=1e-7, thresh_ci_clip=1e-8 )
    
     print(" ---------------- Combine -------------------")
     c12 = join_bases(clusters[0], clusters[1]) 
@@ -239,7 +253,6 @@ if __name__ == "__main__":
     clusters = new_clusters 
     for ci in range(len(clusters)):
         clusters[ci].idx = ci
-    
     init_fspace = ((3, 3), (1, 1), (1, 1))
     
 
@@ -257,13 +270,21 @@ if __name__ == "__main__":
     clustered_ham.add_2b_terms(cp.deepcopy(g))
     #clustered_ham.combine_common_terms(iprint=1)
     
+    do_cmf = 0
+    if do_cmf:
+        # Get CMF reference
+        cmf(clustered_ham, ci_vector, h, g, max_iter=10)
+        #cmf(clustered_ham, ci_vector, h, g, max_iter=2)
+        #cmf(clustered_ham, ci_vector, h, g, max_iter=50,max_nroots=5,dm_guess=(dm_aa,dm_bb),diis=True)
 
     print(" Build cluster operators")
-    for ci_idx, ci in enumerate(clusters):
-        assert(ci_idx == ci.idx)
-        ci.build_op_matrices()
+    [ci.build_op_matrices() for ci in clusters]
     
     edps2 = build_hamiltonian_diagonal(clustered_ham,ci_vector)
     print(" Energy of reference TPS: %12.8f (elec)"%(edps2))
     print(" Energy of reference TPS: %12.8f (total)"%(edps2+ecore))
-    assert(abs(edps-edps2) < 1e-8)
+    
+    ci_vector, pt_vector, e0, e2 = bc_cipsi(ci_vector.copy(), clustered_ham, 
+            thresh_cipsi=1e-7, thresh_ci_clip=1e-8 )
+    
+    #assert(abs(edps-edps2) < 1e-8)
