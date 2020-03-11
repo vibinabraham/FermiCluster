@@ -133,11 +133,13 @@ def join_bases(ci,cj):
     print(" Dimer dimension: ", dimer_dim)
     print(cij)
 
-    for f in cij.basis:
-        print(f)
-        #print_mat(cij.basis[f].T @ cij.basis[f])
-        print_mat(cij.basis[f])
-    exit()
+    #for f in cij.basis:
+    #    print(f)
+    #    #print_mat(cij.basis[f].T @ cij.basis[f])
+    #    print_mat(cij.basis[f])
+
+    return cij
+
 
 if __name__ == "__main__":
 
