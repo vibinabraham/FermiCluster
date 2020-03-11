@@ -41,6 +41,7 @@ def calc_linear_index(config, no):
     return lin_index
 
 def join_bases(ci,cj):
+# {{{
     print(" Join the basis vectors for clusters: %4i and %-4i " %(ci.idx,cj.idx))
     tmp = []
     tmp.extend(ci.orb_list)
@@ -130,8 +131,11 @@ def join_bases(ci,cj):
             else:
                 cij.basis[fij] = Vij
             dimer_dim += vij.shape[1]
-    print(" Dimer dimension: ", dimer_dim)
-    print(cij)
+    print(" Joined clusters:")
+    print(" ", ci)
+    print(" ", cj)
+    print(" to form:")
+    print(" ", cij)
 
     #for f in cij.basis:
     #    print(f)
@@ -139,7 +143,7 @@ def join_bases(ci,cj):
     #    print_mat(cij.basis[f])
 
     return cij
-
+# }}}
 
 if __name__ == "__main__":
 
@@ -207,9 +211,9 @@ if __name__ == "__main__":
     
     clustered_ham = ClusteredOperator(clusters)
     print(" Add 1-body terms")
-    clustered_ham.add_1b_terms(h)
+    clustered_ham.add_1b_terms(cp.deepcopy(h))
     print(" Add 2-body terms")
-    clustered_ham.add_2b_terms(g)
+    clustered_ham.add_2b_terms(cp.deepcopy(g))
     #clustered_ham.combine_common_terms(iprint=1)
     
     
@@ -218,6 +222,42 @@ if __name__ == "__main__":
         # Get CMF reference
         cmf(clustered_ham, ci_vector, h, g, max_iter=1)
         #cmf(clustered_ham, ci_vector, h, g, max_iter=50,max_nroots=50,dm_guess=(dm_aa,dm_bb),diis=True)
+  
+    edps = build_hamiltonian_diagonal(clustered_ham,ci_vector)
+    print(" Energy of reference TPS: %12.8f"%(edps+ecore))
     
-    join_bases(clusters[0], clusters[1]) 
+    print(" ---------------- Combine -------------------")
+    c12 = join_bases(clusters[0], clusters[1]) 
+    new_clusters = [c12]
+    new_clusters.extend(clusters[2:])
+    [print(i) for i in new_clusters]
+    clusters = new_clusters 
+    for ci in range(len(clusters)):
+        clusters[ci].idx = ci
     
+    init_fspace = ((3, 3), (1, 1), (1, 1))
+    
+
+    ci_vector = ClusteredState(clusters)
+    ci_vector.init(init_fspace)
+    
+    
+    print(" Clusters:")
+    [print(ci) for ci in clusters]
+    
+    clustered_ham = ClusteredOperator(clusters)
+    print(" Add 1-body terms")
+    clustered_ham.add_1b_terms(cp.deepcopy(h))
+    print(" Add 2-body terms")
+    clustered_ham.add_2b_terms(cp.deepcopy(g))
+    #clustered_ham.combine_common_terms(iprint=1)
+    
+
+    print(" Build cluster operators")
+    for ci_idx, ci in enumerate(clusters):
+        assert(ci_idx == ci.idx)
+        ci.build_op_matrices()
+      
+    
+    edps = build_hamiltonian_diagonal(clustered_ham,ci_vector)
+    print(" Energy of reference TPS: %12.8f"%(edps+ecore))
