@@ -165,7 +165,7 @@ if __name__ == "__main__":
     basis_set = '6-31g'
     
     ###     TPSCI BASIS INPUT
-    orb_basis = 'boys'
+    orb_basis = 'scf'
     cas = True
     cas_nstart = 2
     cas_nstop = 10
@@ -183,15 +183,16 @@ if __name__ == "__main__":
     pmol = PyscfHelper()
     pmol.init(molecule,charge,spin,basis_set,orb_basis,
                 cas=cas,cas_nstart=cas_nstart,cas_nstop=cas_nstop, cas_nel=cas_nel)
-    
     h = pmol.h
     g = pmol.g
     ecore = pmol.ecore
-    efci, fci_dim = run_fci_pyscf(h,g,cas_nel,ecore=ecore)
-    
-    #cluster using hcore
-    idx = e1_order(h,cut_off = 1e-4)
-    h,g = reorder_integrals(idx,h,g)
+    print("Ecore:%16.8f"%ecore)
+    C = pmol.C
+    K = pmol.K
+    mol = pmol.mol
+    mo_energy = pmol.mf.mo_energy
+    dm_aa = pmol.dm_aa
+    dm_bb = pmol.dm_bb
     
     
     do_fci = 1
@@ -211,8 +212,10 @@ if __name__ == "__main__":
     
     clustered_ham = ClusteredOperator(clusters)
     print(" Add 1-body terms")
+    #clustered_ham.add_1b_terms(h)
     clustered_ham.add_1b_terms(cp.deepcopy(h))
     print(" Add 2-body terms")
+    #clustered_ham.add_2b_terms(g)
     clustered_ham.add_2b_terms(cp.deepcopy(g))
     #clustered_ham.combine_common_terms(iprint=1)
     
@@ -220,12 +223,14 @@ if __name__ == "__main__":
     do_cmf = 1
     if do_cmf:
         # Get CMF reference
-        cmf(clustered_ham, ci_vector, h, g, max_iter=1)
-        #cmf(clustered_ham, ci_vector, h, g, max_iter=50,max_nroots=50,dm_guess=(dm_aa,dm_bb),diis=True)
+        cmf(clustered_ham, ci_vector, cp.deepcopy(h), cp.deepcopy(g), max_iter=1)
+        #cmf(clustered_ham, ci_vector, h, g, max_iter=1, max_nroots=2)
+        #cmf(clustered_ham, ci_vector, h, g, max_iter=1,max_nroots=50,dm_guess=(dm_aa,dm_bb),diis=True)
   
     edps = build_hamiltonian_diagonal(clustered_ham,ci_vector)
-    print(" Energy of reference TPS: %12.8f"%(edps+ecore))
-    
+    print(" Energy of reference TPS: %12.8f (elec)"%(edps))
+    print(" Energy of reference TPS: %12.8f (total)"%(edps+ecore))
+   
     print(" ---------------- Combine -------------------")
     c12 = join_bases(clusters[0], clusters[1]) 
     new_clusters = [c12]
@@ -259,5 +264,6 @@ if __name__ == "__main__":
         ci.build_op_matrices()
     
     edps2 = build_hamiltonian_diagonal(clustered_ham,ci_vector)
-    print(" Energy of reference TPS: %12.8f"%(edps+ecore))
-    assert(abs(edps-edps2) > 1e-8)
+    print(" Energy of reference TPS: %12.8f (elec)"%(edps2))
+    print(" Energy of reference TPS: %12.8f (total)"%(edps2+ecore))
+    assert(abs(edps-edps2) < 1e-8)
