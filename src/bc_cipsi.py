@@ -259,7 +259,7 @@ def bc_cipsi(ci_vector, clustered_ham,
         asci_vector = ci_vector.copy()
         print(" Choose subspace from which to search for new configs. Thresh: ", thresh_asci)
         print(" CI Dim          : ", len(asci_vector))
-        kept_indices = asci_vector.clip(thresh_asci*thresh_asci)
+        kept_indices = asci_vector.clip(thresh_asci)
         print(" Search Dim      : ", len(asci_vector))
         #asci_vector.normalize()
 
