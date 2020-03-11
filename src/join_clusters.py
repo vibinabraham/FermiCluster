@@ -230,7 +230,7 @@ if __name__ == "__main__":
         #cmf(clustered_ham, ci_vector, cp.deepcopy(h), cp.deepcopy(g), max_iter=4)
         #cmf(clustered_ham, ci_vector, h, g, max_iter=2)
         #cmf(clustered_ham, ci_vector, h, g, max_iter=50,max_nroots=50,dm_guess=(dm_aa,dm_bb),diis=True)
-        cmf(clustered_ham, ci_vector, h, g, max_iter=50,max_nroots=1,dm_guess=(dm_aa,dm_bb),diis=True)
+        cmf(clustered_ham, ci_vector, h, g, max_iter=50,max_nroots=2,dm_guess=(dm_aa,dm_bb),diis=True)
     else:
         print(" Build cluster basis and operators")
         for ci_idx, ci in enumerate(clusters):
@@ -242,9 +242,19 @@ if __name__ == "__main__":
     edps = build_hamiltonian_diagonal(clustered_ham,ci_vector)
     print(" Energy of reference TPS: %12.8f (elec)"%(edps))
     print(" Energy of reference TPS: %12.8f (total)"%(edps+ecore))
-    ci_vector, pt_vector, e0, e2 = bc_cipsi(ci_vector.copy(), clustered_ham, 
-            thresh_cipsi=1e-7, thresh_ci_clip=1e-8 )
-   
+  
+    ci_vector.expand_to_full_space()
+    H = build_full_hamiltonian_parallel1(clustered_ham, ci_vector)
+    print(" Diagonalize Hamiltonian Matrix:",flush=True)
+    e,v = np.linalg.eigh(H)
+    idx = e.argsort()
+    e = e[idx]
+    v = v[:,idx]
+    v0 = v[:,0]
+    e0 = e[0]
+    print(" Ground state of CI:                 %12.8f  CI Dim: %4i "%(e[0].real,len(ci_vector)))
+
+
     print(" ---------------- Combine -------------------")
     c12 = join_bases(clusters[0], clusters[1]) 
     new_clusters = [c12]
@@ -284,7 +294,16 @@ if __name__ == "__main__":
     print(" Energy of reference TPS: %12.8f (elec)"%(edps2))
     print(" Energy of reference TPS: %12.8f (total)"%(edps2+ecore))
     
-    ci_vector, pt_vector, e0, e2 = bc_cipsi(ci_vector.copy(), clustered_ham, 
-            thresh_cipsi=1e-7, thresh_ci_clip=1e-8 )
+    ci_vector.expand_to_full_space()
+    H = build_full_hamiltonian_parallel1(clustered_ham, ci_vector)
+    print(" Diagonalize Hamiltonian Matrix:",flush=True)
+    e,v = np.linalg.eigh(H)
+    idx = e.argsort()
+    e = e[idx]
+    v = v[:,idx]
+    v0 = v[:,0]
+    e0 = e[0]
+    print(" Ground state of CI:                 %12.8f  CI Dim: %4i "%(e[0].real,len(ci_vector)))
+
     
-    #assert(abs(edps-edps2) < 1e-8)
+    assert(abs(e0-e0_new) < 1e-8)
