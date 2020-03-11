@@ -257,7 +257,7 @@ if __name__ == "__main__":
     for ci_idx, ci in enumerate(clusters):
         assert(ci_idx == ci.idx)
         ci.build_op_matrices()
-      
     
-    edps = build_hamiltonian_diagonal(clustered_ham,ci_vector)
+    edps2 = build_hamiltonian_diagonal(clustered_ham,ci_vector)
     print(" Energy of reference TPS: %12.8f"%(edps+ecore))
+    assert(abs(edps-edps2) > 1e-8)
