@@ -122,8 +122,8 @@ def join_bases(ci,cj):
                             #print(Vij[Ib + Ia*Nijb,:])
                             #print(iab,jab,jab+iab*Nja*Njb, Nia*Nib*Nja*Njb, vij.shape)
                             #print(vij[iab + jab*Nia*Nib,:]) 
-                            #print()
-                            Vij[Ib + Ia*Nijb,:] = vij[iab + jab*Nia*Nib,:]
+                            Vij[Ib + Ia*Nijb,:] = vij[jab + iab*Nja*Njb,:]
+                            #Vij[Ib + Ia*Nijb,:] = vij[iab + jab*Nia*Nib,:]
 
             fij = (fi[0]+fj[0], fi[1]+fj[1])
             if fij in cij.basis.keys():
