@@ -18,9 +18,6 @@ from numpy.linalg import norm
 
 from ci_string import *
 
-def get_dimer_index(ket1, ket2):    
-    ket = ci_string(ket1.no+ket2.no, ket1.ne+ket2.ne)
-    print(ket)
 
 def calc_linear_index(config, no):
     """

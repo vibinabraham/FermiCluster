@@ -1726,30 +1726,29 @@ def do_2body_search(blocks, init_fspace, h, g, max_cluster_size=4, max_iter_cmf=
     return new_blocks, new_init_fspace
 # }}}
 
-def compute_pt2_correction(ci_vector, clustered_ham, e0, nproc=1):
+def compute_pt2_correction(ci_vector, clustered_ham, e0, nproc=None):
     # {{{
     print(" Compute Matrix Vector Product:", flush=True)
     start = time.time()
-    if nproc==1:
-        pt_vector = matvec1(clustered_ham, ci_vector)
-    else:
-        pt_vector = matvec1_parallel1(clustered_ham, ci_vector, nproc=nproc)
+    pt_vector = matvec1_parallel2(clustered_ham, ci_vector, nproc=nproc)
     stop = time.time()
     print(" Time spent in matvec: ", stop-start)
     
     pt_vector.prune_empty_fock_spaces()
     
     
+    var = pt_vector.dot(pt_vector) - e0*e0
+    print(" Variance:          %12.8f" % var,flush=True)
     tmp = ci_vector.dot(pt_vector)
-    var = pt_vector.norm() - tmp*tmp 
-    print(" Variance: %12.8f" % var,flush=True)
-    
+    var = pt_vector.dot(pt_vector) - tmp*tmp
+    print(" Variance Subspace: %12.8f" % var,flush=True)
+        
     
     print(" Remove CI space from pt_vector vector")
-    for fockspace,configs in pt_vector.items():
-        if fockspace in ci_vector.fblocks():
+    for fockspace,configs in ci_vector.items():
+        if fockspace in pt_vector.fblocks():
             for config,coeff in list(configs.items()):
-                if config in ci_vector[fockspace]:
+                if config in pt_vector[fockspace]:
                     del pt_vector[fockspace][config]
     
     
@@ -1770,11 +1769,11 @@ def compute_pt2_correction(ci_vector, clustered_ham, e0, nproc=1):
     #import cProfile
     #pr = cProfile.Profile()
     #pr.enable()
+    print(" Precompute Cluster basis energies")
+    precompute_cluster_basis_energies(clustered_ham)
        
-    if nproc==1:
-        Hd = build_hamiltonian_diagonal(clustered_ham, pt_vector)
-    else:
-        Hd = build_hamiltonian_diagonal_parallel1(clustered_ham, pt_vector, nproc=nproc)
+    Hd = build_hamiltonian_diagonal_parallel1(clustered_ham, pt_vector, nproc=nproc)
+    
     #pr.disable()
     #pr.print_stats(sort='time')
     end = time.time()
