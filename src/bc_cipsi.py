@@ -530,9 +530,8 @@ def hosvd(ci_vector, clustered_ham, hshift=1e-8, trim=None ):
             print("   ----")
             print("   Entanglement entropy:  %12.8f" %fspace_entropy, flush=True) 
             print("   Norm:                  %12.8f" %fspace_norm, flush=True) 
-            #rotations[fspace] = U[:,0:nkeep]
             assert(fspace not in rotations)
-            rotations[fspace] = U
+            rotations[fspace] = U[:,0:nkeep]
         print(" Final entropy:.... %12.8f"%entropy)
         print(" Final norm:....... %12.8f"%norm)
         print(" --------------------------------------------------------", flush=True)

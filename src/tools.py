@@ -1938,3 +1938,44 @@ def run_hierarchical_sci(h,g,blocks,init_fspace,dimer_threshold,ecore):
     print(" TPSCI:          %12.8f      Dim:%6d" % (etci+ecore, len(ci_vector)))
     print(" TPSCI(2):       %12.8f      Dim:%6d" % (etci2+ecore,len(pt_vector)))
 # }}}
+
+def join(clusters_in,i,j, h, g):
+    """
+    Return new list of clusters with i and j joined
+    Input: 
+    clusters: list of initialized clusters
+    i,j: indices of clusters to be joined
+
+    Return:
+    new list of clusters
+    new ClusteredOperator hamiltonian
+    """
+# {{{
+    clusters = cp.deepcopy(clusters_in)
+    c12 = join_bases(clusters[i], clusters[j]) 
+    new_clusters = [c12]
+    for k in range(len(clusters)):
+        if k != i and k != j:
+            new_clusters.append(clusters[k])
+    [print(i) for i in new_clusters]
+    clusters = new_clusters 
+    for ci in range(len(clusters)):
+        clusters[ci].idx = ci
+    
+
+    print(" Clusters:")
+    [print(ci) for ci in clusters]
+    
+    clustered_ham = ClusteredOperator(clusters)
+    print(" Add 1-body terms")
+    clustered_ham.add_1b_terms(cp.deepcopy(h))
+    print(" Add 2-body terms")
+    clustered_ham.add_2b_terms(cp.deepcopy(g))
+    #clustered_ham.combine_common_terms(iprint=1)
+    
+    print(" Build cluster operators")
+    [ci.build_op_matrices() for ci in clusters]
+    
+    return clusters, clustered_ham
+# }}}
+
