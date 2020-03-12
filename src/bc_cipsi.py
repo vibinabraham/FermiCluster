@@ -13,6 +13,7 @@ from ClusteredOperator import *
 from ClusteredState import *
 from tools import *
 
+
 def bc_cipsi_tucker(ci_vector, clustered_ham, selection="cipsi",
         thresh_cipsi=1e-4, thresh_ci_clip=1e-5, thresh_cipsi_conv=1e-8, max_cipsi_iter=30, 
         thresh_tucker_conv = 1e-6, max_tucker_iter=20, tucker_state_clip=None,hshift=1e-8,
@@ -126,70 +127,6 @@ def bc_cipsi_tucker(ci_vector, clustered_ham, selection="cipsi",
             break
     return ci_vector, pt_vector, e0, e2, t_conv
 # }}}
-
-#def bc_cipsi_1rdm(ci_vector, clustered_ham, h, g,
-#        thresh_cipsi=1e-4, thresh_ci_clip=1e-5, thresh_cipsi_conv=1e-8, max_cipsi_iter=30, 
-#        thresh_rdm_conv = 1e-6, max_rdm_iter=20,hshift=1e-8,thresh_asci=0):
-#    """
-#    Run iterations of TP-CIPSI to make the spin-averaged 1rdm potential self-consistent
-#    """
-## {{{
-#
-#    t_conv = False
-#    e_prev = 0
-#    e_last = 0
-#    ci_vector_ref = ci_vector.copy()
-#    for rdm_iter in range(max_rdm_iter):
-#        ci_vector, pt_vector, e0, e2 = bc_cipsi(ci_vector_ref.copy(), clustered_ham, 
-#                thresh_cipsi=thresh_cipsi, thresh_ci_clip=thresh_ci_clip, thresh_conv=thresh_cipsi_conv, max_iter=max_cipsi_iter,thresh_asci=thresh_asci)
-#        
-#        print(" CIPSI: E0 = %12.8f E2 = %12.8f CI_DIM: %i" %(e0, e2, len(ci_vector)))
-#      
-#        if abs(e_prev-e2) < thresh_rdm_conv:
-#            print(" Converged 1RDM")
-#            t_conv = True
-#            break
-#        e_prev = e2
-#        pt_vector.add(ci_vector)
-#        print(" Reduce size of 1st order wavefunction")
-#        print(" Before:",len(pt_vector))
-#        pt_vector.normalize()
-#        print(" After:",len(pt_vector))
-#        print()
-#        print(" Compute 1RDM",flush=True)
-#        
-#        # form 1rdm from current state
-#        rdm_a, rdm_b = tools.build_1rdm(ci_vector)
-#
-#        print(" done.",flush=True)
-#            
-#        print(" Build cluster basis")
-#        for ci_idx, ci in enumerate(clustered_ham.clusters):
-#            assert(ci_idx == ci.idx)
-#            #print(" Extract local operator for cluster",ci.idx)
-#            #opi = clustered_ham.extract_local_operator(ci_idx)
-#            print()
-#            print()
-#            print(" Form basis by diagonalize local Hamiltonian for cluster: ",ci_idx)
-#            #ci.form_eigbasis_from_local_operator(opi,max_roots=1000)
-#            
-#            #ci.form_eigbasis_from_ints(h,g,max_roots=1000)
-#            ci.form_eigbasis_from_ints(h,g,max_roots=1000, rdm1_a=rdm_a, rdm1_b=rdm_b)
-#        
-#        
-#        #clustered_ham.add_ops_to_clusters()
-#        print(" Build these local operators")
-#        for c in clustered_ham.clusters:
-#            print(" Build mats for cluster ",c.idx)
-#            c.build_op_matrices()
-#
-#        delta_e = e0 - e_last
-#        e_last = e0
-#        if abs(delta_e) < 1e-8:
-#            print(" Converged 1RDM iterations")
-#            break
-#    return ci_vector, pt_vector, e0, e2, t_conv
-## }}}
 
 
 def bc_cipsi(ci_vector, clustered_ham,  
@@ -531,10 +468,11 @@ def hb_tpsci(ci_vector, clustered_ham, thresh_cipsi=1e-4, thresh_ci_clip=1e-5, t
 
 # }}}
 
-def hosvd(ci_vector, clustered_ham, hshift=1e-8):
+def hosvd(ci_vector, clustered_ham, hshift=1e-8, trim=None ):
     """
     Peform HOSVD aka Tucker Decomposition of ClusteredState
     """
+# {{{
     for ci in clustered_ham.clusters:
         print()
         print(" --------------------------------------------------------")
@@ -556,31 +494,44 @@ def hosvd(ci_vector, clustered_ham, hshift=1e-8):
             fspace_norm = 0
             fspace_entropy = 0
             print(" Diagonalize RDM for Cluster %2i in Fock space:"%ci.idx, fspace,flush=True)
-            n,U = np.linalg.eigh(rdm)
+            n,U = scipy.linalg.eig(rdm)
+            #n,U = np.linalg.eigh(rdm)
             idx = n.argsort()[::-1]
             n = n[idx]
             U = U[:,idx]
 
             if hshift != None:
                 """Adding cluster hamiltonian to RDM before diagonalization to make null space unique. """
+                print(" Shift RDM by H:", hshift)
                 Hci = ci.Hci[fspace]
-                n,U = np.linalg.eigh(rdm + hshift*Hci)
+                n,U = np.linalg.eig(rdm + hshift*Hci)
                 n = np.diag(U.T @ rdm @ U)
                 idx = n.argsort()[::-1]
                 n = n[idx]
                 U = U[:,idx]
-            
+   
+            nkeep = len(n)
+            if trim != None:
+                nkeep = 0
+                for ni_idx,ni in enumerate(n):
+                    if ni > trim:
+                        nkeep += 1
+
             norm += sum(n)
             fspace_norm = sum(n)
             for ni_idx,ni in enumerate(n):
                 if abs(ni/norm) > 1e-12:
                     fspace_entropy -= ni*np.log(ni/norm)/norm
                     entropy -=  ni*np.log(ni)
-                    print("   Rotated State %4i:    %12.8f"%(ni_idx,ni), flush=True)
+                    if ni_idx >= nkeep:
+                        print("   Rotated State %4i:    %12.8f*"%(ni_idx,ni), flush=True)
+                    else:
+                        print("   Rotated State %4i:    %12.8f"%(ni_idx,ni), flush=True)
             print("   ----")
             print("   Entanglement entropy:  %12.8f" %fspace_entropy, flush=True) 
             print("   Norm:                  %12.8f" %fspace_norm, flush=True) 
-            rotations[fspace] = U
+            assert(fspace not in rotations)
+            rotations[fspace] = U[:,0:nkeep]
         print(" Final entropy:.... %12.8f"%entropy)
         print(" Final norm:....... %12.8f"%norm)
         print(" --------------------------------------------------------", flush=True)
@@ -590,7 +541,7 @@ def hosvd(ci_vector, clustered_ham, hshift=1e-8):
         end = time.time()
         print(" Time spent rotating cluster basis: %12.2f" %(end-start))
     return
-
+# }}}
 
 
 

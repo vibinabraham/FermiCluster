@@ -239,10 +239,11 @@ class ClusteredState(OrderedDict):
     
         for c in self.clusters:
             nsi = []
-            for nai in range(c.n_orb+1):
-                for nbi in range(c.n_orb+1):
-                    nsi.append((nai,nbi))
+            for fockspace in c.basis:
+                nsi.append(fockspace)
             ns.append(nsi)
+        
+    
         for newfock in itertools.product(*ns):
             nacurr = 0
             nbcurr = 0
@@ -252,13 +253,16 @@ class ClusteredState(OrderedDict):
             if nacurr == na and nbcurr == nb:
                 self.add_fockspace(newfock) 
     
-    
+   
+
         print("\n Make each Fock-Block the full space")
         # create full space for each fock block defined
         for fblock,configs in self.items():
             dims = []
             for c in self.clusters:
                 # get number of vectors for current fock space
+                #print(c,fblock[c.idx])
+                #print(fblock[c.idx], c.basis[fblock[c.idx]].shape)
                 dims.append(range(c.basis[fblock[c.idx]].shape[1]))
             for newconfig_idx, newconfig in enumerate(itertools.product(*dims)):
                 self[fblock][newconfig] = 0 

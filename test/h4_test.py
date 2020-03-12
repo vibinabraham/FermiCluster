@@ -67,8 +67,7 @@ def test_1():
         ehci, hci_dim = run_hci_pyscf(h,g,4,ecore=ecore)#,select_cutoff=2e-3,ci_cutoff=2e-3)
     if do_tci:
         ci_vector, pt_vector, etci, etci2 = run_tpsci(h,g,blocks,init_fspace,ecore=ecore,
-            thresh_ci_clip=1e-7,thresh_cipsi=1e-6,hshift=1e-8,max_tucker_iter=20)
-        ci_vector.print_configs()
+            thresh_ci_clip=1e-8,thresh_cipsi=1e-6,hshift=1e-8,max_tucker_iter=20)
         tci_dim = len(ci_vector)
 
     print(" TCI:        %12.9f Dim:%6d"%(etci-ecore,tci_dim))

@@ -112,16 +112,12 @@ def run(nproc=None):
     print(" TCI:        %12.9f Dim:%6d"%(etci,len(ci_vector)))
     print(" HCI:        %12.9f Dim:%6d"%(ehci,hci_dim))
     print(" FCI:        %12.9f Dim:%6d"%(efci,fci_dim))
-    assert(abs(etci --108.855604298)< 1e-7)
+    assert(abs(etci --108.855745199)< 1e-7)
     #assert(abs(tci_dim - 67)<1e-15)
     assert(abs(efci   --108.85574521)< 1e-7)
 
 def test_1():
     run(nproc=None)
 
-def test_2():
-    run(nproc=1)
-
 if __name__== "__main__":
     test_1() 
-    #test_2() 
