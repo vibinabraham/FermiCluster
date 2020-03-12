@@ -115,6 +115,8 @@ def test_cmf():
 
     ci_vector, pt_vector, e0, e2, t_conv = bc_cipsi_tucker(ci_vector.copy(), clustered_ham, thresh_cipsi=1e-5,
             thresh_ci_clip=1e-4, max_tucker_iter = 20)
+    
+    assert(abs(e2--4.51146536)<1e-8)
 # }}}
 
 
@@ -220,7 +222,7 @@ def test_truncate_basis():
             thresh_ci_clip=1e-4, max_tucker_iter = 20)
    
 
-    assert(np.isclose(e0,-4.51144784,atol=1e-7))
+    assert(np.isclose(e0,-4.51128501,atol=1e-7))
     # }}}
 
 
