@@ -1147,11 +1147,13 @@ def build_ccaa_os(no,bra_space,ket_space,basis,spin_case):
     # v(IJm) Da(IKps) Db(JLqr) v(KLn) = D(mnpqrs)
     if spin_case == 'abba':
         sig = (-1)**(2*(NAK+1))
-        tdm = sig*  oe.contract('ijm,ikps,jlqr,kln->mnpqrs',v1,Da,Db,v2)
+        tdm = sig*  np.einsum('ijm,ikps,jlqr,kln->mnpqrs',v1,Da,Db,v2, optimize=True)
+        #tdm = sig*  oe.contract('ijm,ikps,jlqr,kln->mnpqrs',v1,Da,Db,v2)
 
     if spin_case == 'baab':
         sig = (-1)**(2*(NAK+1))
-        tdm = sig * oe.contract('ijm,ikqr,jlps,kln->mnpqrs',v1,Da,Db,v2)
+        tdm = sig * np.einsum('ijm,ikqr,jlps,kln->mnpqrs',v1,Da,Db,v2, optimize=True)
+        #tdm = sig * oe.contract('ijm,ikqr,jlps,kln->mnpqrs',v1,Da,Db,v2, optimize=True)
 
     v2.shape = (ket_a_max*ket_b_max,nv2)
     v1.shape = (bra_a_max*bra_b_max,nv1)
