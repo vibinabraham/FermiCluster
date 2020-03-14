@@ -901,10 +901,10 @@ def build_ccaa_ss(no,bra_space,ket_space,basis,spin_case):
     
     if spin_case == "a":
         # v(IJt) <IJ|pqrs|KL> v(KLu)  = v(IJt) <I|pqrs|K> v(KJu) = A(tupqrs)
-        tdm = oe.contract('ijt,ikpqrs,kju->tupqrs',v1,tdm_1spin,v2)
+        tdm = np.einsum('ijt,ikpqrs,kju->tupqrs',v1,tdm_1spin,v2, optimize=True)
     elif spin_case == "b":
         # v(IJt) <IJ|pqrs|KL> v(KLu)   = v(IJt) tdm(JLpqrs) v(ILu) = A(tupqrs)
-        tdm = oe.contract('ijt,jlpqrs,ilu->tupqrs',v1,tdm_1spin,v2)
+        tdm = np.einsum('ijt,jlpqrs,ilu->tupqrs',v1,tdm_1spin,v2, optimize=True)
 
  
     v2.shape = (ket_a_max*ket_b_max,nv2)
