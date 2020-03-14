@@ -46,8 +46,8 @@ def bc_cipsi_tucker(ci_vector, clustered_ham, selection="cipsi",
             print(" Before:",len(pt_vector))
             pt_vector.clip(tucker_state_clip)
             pt_vector.normalize()
+            out_vector = pt_vector
             print(" After:",len(pt_vector))
-            ci_vector = pt_vector 
         elif selection == "heatbath":
             start = time.time()
             ci_vector, e0 = hb_tpsci(ci_vector_ref.copy(), clustered_ham, 
@@ -55,10 +55,13 @@ def bc_cipsi_tucker(ci_vector, clustered_ham, selection="cipsi",
                     nproc=nproc)
             end = time.time()
             pt_vector = ClusteredState(ci_vector.clusters)
+            out_vector = ci_vector
             e_curr = e0
             e2 = 0
             print(" HB-TPSCI: E0 = %12.8f CI_DIM: %-12i Time spent %-12.2f" %(e0, len(ci_vector), end-start))
-
+        else:
+            print(" ERROR: wrong selection keyword")
+            exit()
         
       
         if abs(e_prev-e_curr) < thresh_tucker_conv:
@@ -66,60 +69,10 @@ def bc_cipsi_tucker(ci_vector, clustered_ham, selection="cipsi",
             t_conv = True
             break
         e_prev = e_curr
-        for ci in clustered_ham.clusters:
-            print()
-            print(" --------------------------------------------------------")
-            print(" Density matrix: Cluster ", ci)
-            print()
-            print(" Compute BRDM",flush=True)
-            print(" Hshift = ",hshift)
-            start = time.time()
-            rdms = build_brdm(ci_vector, ci.idx)
-            end = time.time()
-            print(" done.",flush=True)
-            print(" Time spent building BRDMs: %12.2f" %(end-start))
-            #rdms = build_brdm(ci_vector, ci.idx)
-            norm = 0
-            entropy = 0
-            rotations = {}
-            for fspace,rdm in rdms.items():
-               
-                fspace_norm = 0
-                fspace_entropy = 0
-                print(" Diagonalize RDM for Cluster %2i in Fock space:"%ci.idx, fspace,flush=True)
-                n,U = np.linalg.eigh(rdm)
-                idx = n.argsort()[::-1]
-                n = n[idx]
-                U = U[:,idx]
-
-                if hshift != None:
-                    """Adding cluster hamiltonian to RDM before diagonalization to make null space unique. """
-                    Hci = ci.Hci[fspace]
-                    n,U = np.linalg.eigh(rdm + hshift*Hci)
-                    n = np.diag(U.T @ rdm @ U)
-                    idx = n.argsort()[::-1]
-                    n = n[idx]
-                    U = U[:,idx]
-                
-                norm += sum(n)
-                fspace_norm = sum(n)
-                for ni_idx,ni in enumerate(n):
-                    if abs(ni/norm) > 1e-12:
-                        fspace_entropy -= ni*np.log(ni/norm)/norm
-                        entropy -=  ni*np.log(ni)
-                        print("   Rotated State %4i:    %12.8f"%(ni_idx,ni), flush=True)
-                print("   ----")
-                print("   Entanglement entropy:  %12.8f" %fspace_entropy, flush=True) 
-                print("   Norm:                  %12.8f" %fspace_norm, flush=True) 
-                rotations[fspace] = U
-            print(" Final entropy:.... %12.8f"%entropy)
-            print(" Final norm:....... %12.8f"%norm)
-            print(" --------------------------------------------------------", flush=True)
         
-            start = time.time()
-            ci.rotate_basis(rotations)
-            end = time.time()
-            print(" Time spent rotating cluster basis: %12.2f" %(end-start))
+        hosvd(out_vector, clustered_ham, hshift=hshift)
+        
+
         delta_e = e0 - e_last
         e_last = e0
         if abs(delta_e) < 1e-8:
@@ -211,13 +164,17 @@ def bc_cipsi(ci_vector, clustered_ham,
         
         pt_vector.prune_empty_fock_spaces()
 
-
-        var = pt_vector.dot(pt_vector) - e0*e0
-        print(" Variance:          %12.8f" % var,flush=True)
-        tmp = ci_vector.dot(pt_vector)
-        var = pt_vector.dot(pt_vector) - tmp*tmp
-        print(" Variance Subspace: %12.8f" % var,flush=True)
-
+    
+        if len(asci_vector) <= len(ci_vector):
+            tmp = asci_vector.dot(pt_vector)
+            var = pt_vector.dot(pt_vector) - tmp*tmp
+            print(" Variance Subspace: %12.8f" % var,flush=True)
+        elif len(asci_vector) == len(ci_vector):
+            var = pt_vector.dot(pt_vector) - e0*e0
+            print(" Variance:          %12.8f" % var,flush=True)
+        else:
+            print('wtf?')
+            exit()
 
         print(" Remove CI space from pt_vector vector")
         for fockspace,configs in pt_vector.items():
@@ -282,70 +239,70 @@ def bc_cipsi(ci_vector, clustered_ham,
         e_prev = e0
         if len(ci_vector) <= old_dim and abs(delta_e) < thresh_conv:
             print(" Converged")
-            if thresh_asci > 0:
-                print("\n Compute Final PT vector and correction with full variational space")
-                start = time.time()
-                if nproc==1:
-                    pt_vector = matvec1(clustered_ham, ci_vector)
-                else:
-                    pt_vector = matvec1_parallel2(clustered_ham, ci_vector, nproc=nproc)
-                stop = time.time()
-                print(" Time spent in matvec: %12.2f" %(stop-start), flush=True)
-                pt_vector.prune_empty_fock_spaces()
-
-                var = pt_vector.dot(pt_vector) - e0*e0
-                print(" Variance:          %12.8f" % var,flush=True)
-                tmp = ci_vector.dot(pt_vector)
-                var = pt_vector.dot(pt_vector) - tmp*tmp
-                print(" Variance Subspace: %12.8f" % var,flush=True)
-
-
-                print(" Remove CI space from pt_vector vector")
-                for fockspace,configs in pt_vector.items():
-                    if fockspace in ci_vector.fblocks():
-                        for config,coeff in list(configs.items()):
-                            if config in ci_vector[fockspace]:
-                                del pt_vector[fockspace][config]
-
-
-                for fockspace,configs in ci_vector.items():
-                    if fockspace in pt_vector:
-                        for config,coeff in configs.items():
-                            assert(config not in pt_vector[fockspace])
-
-                print(" Norm of CI vector = %12.8f" %ci_vector.norm())
-                print(" Dimension of CI space: ", len(ci_vector))
-                print(" Dimension of PT space: ", len(pt_vector))
-                print(" Compute Denominator",flush=True)
-                #next_ci_vector = cp.deepcopy(ci_vector)
-                # compute diagonal for PT2
-
-                start = time.time()
-                pt_vector.prune_empty_fock_spaces()
-                    
-                #import cProfile
-                #pr = cProfile.Profile()
-                #pr.enable()
-                    
-                if nproc==1:
-                    Hd = update_hamiltonian_diagonal(clustered_ham, pt_vector, Hd_vector)
-                else:
-                    Hd = build_hamiltonian_diagonal_parallel1(clustered_ham, pt_vector, nproc=nproc)
-                #pr.disable()
-                #pr.print_stats(sort='time')
-                end = time.time()
-                print(" Time spent in demonimator: %12.2f" %(end - start), flush=True)
-
-                denom = 1/(e0 - Hd)
-                pt_vector_v = pt_vector.get_vector()
-                pt_vector_v.shape = (pt_vector_v.shape[0])
-
-                e2 = np.multiply(denom,pt_vector_v)
-                pt_vector.set_vector(e2)
-                e2 = np.dot(pt_vector_v,e2)
-
-                print(" PT2 Energy Correction = %12.8f" %e2, flush=True)
-                print(" PT2 Energy Total      = %12.8f" %(e0+e2), flush=True)
+#            if thresh_asci > 0:
+#                print("\n Compute Final PT vector and correction with full variational space")
+#                start = time.time()
+#                if nproc==1:
+#                    pt_vector = matvec1(clustered_ham, ci_vector)
+#                else:
+#                    pt_vector = matvec1_parallel2(clustered_ham, ci_vector, nproc=nproc)
+#                stop = time.time()
+#                print(" Time spent in matvec: %12.2f" %(stop-start), flush=True)
+#                pt_vector.prune_empty_fock_spaces()
+#
+#                var = pt_vector.dot(pt_vector) - e0*e0
+#                print(" Variance:          %12.8f" % var,flush=True)
+#                tmp = ci_vector.dot(pt_vector)
+#                var = pt_vector.dot(pt_vector) - tmp*tmp
+#                print(" Variance Subspace: %12.8f" % var,flush=True)
+#
+#
+#                print(" Remove CI space from pt_vector vector")
+#                for fockspace,configs in pt_vector.items():
+#                    if fockspace in ci_vector.fblocks():
+#                        for config,coeff in list(configs.items()):
+#                            if config in ci_vector[fockspace]:
+#                                del pt_vector[fockspace][config]
+#
+#
+#                for fockspace,configs in ci_vector.items():
+#                    if fockspace in pt_vector:
+#                        for config,coeff in configs.items():
+#                            assert(config not in pt_vector[fockspace])
+#
+#                print(" Norm of CI vector = %12.8f" %ci_vector.norm())
+#                print(" Dimension of CI space: ", len(ci_vector))
+#                print(" Dimension of PT space: ", len(pt_vector))
+#                print(" Compute Denominator",flush=True)
+#                #next_ci_vector = cp.deepcopy(ci_vector)
+#                # compute diagonal for PT2
+#
+#                start = time.time()
+#                pt_vector.prune_empty_fock_spaces()
+#                    
+#                #import cProfile
+#                #pr = cProfile.Profile()
+#                #pr.enable()
+#                    
+#                if nproc==1:
+#                    Hd = update_hamiltonian_diagonal(clustered_ham, pt_vector, Hd_vector)
+#                else:
+#                    Hd = build_hamiltonian_diagonal_parallel1(clustered_ham, pt_vector, nproc=nproc)
+#                #pr.disable()
+#                #pr.print_stats(sort='time')
+#                end = time.time()
+#                print(" Time spent in demonimator: %12.2f" %(end - start), flush=True)
+#
+#                denom = 1/(e0 - Hd)
+#                pt_vector_v = pt_vector.get_vector()
+#                pt_vector_v.shape = (pt_vector_v.shape[0])
+#
+#                e2 = np.multiply(denom,pt_vector_v)
+#                pt_vector.set_vector(e2)
+#                e2 = np.dot(pt_vector_v,e2)
+#
+#                print(" PT2 Energy Correction = %12.8f" %e2, flush=True)
+#                print(" PT2 Energy Total      = %12.8f" %(e0+e2), flush=True)
             break
         print(" Next iteration CI space dimension", len(ci_vector))
     #    print(" Do CMF:")
@@ -423,9 +380,18 @@ def hb_tpsci(ci_vector, clustered_ham, thresh_cipsi=1e-4, thresh_ci_clip=1e-5, t
 
                 ci_vector.zero()
                 ci_vector.set_vector(v0)
+        
+
+        print(" Choose subspace from which to search for new configs. Thresh: ", thresh_asci)
+        asci_vector = ci_vector.copy()
+        print(" CI Dim          : ", len(asci_vector))
+        kept_indices = asci_vector.clip(thresh_asci)
+        print(" Search Dim      : ", len(asci_vector))
+        #asci_vector.normalize()
+
         print(" Perform Heat-Bath selection to find new configurations:",flush=True)
         start=time.time()
-        pt_vector = heat_bath_search(clustered_ham, ci_vector, thresh_cipsi=thresh_cipsi, nproc=nproc)
+        pt_vector = heat_bath_search(clustered_ham, asci_vector, thresh_cipsi=thresh_cipsi, nproc=nproc)
         stop=time.time()
         print(" Number of new configurations found         : ", len(pt_vector))
         print(" Time spent in heat bath search: %12.2f" %(stop-start),flush=True)
@@ -480,6 +446,7 @@ def hosvd(ci_vector, clustered_ham, hshift=1e-8, trim=None ):
         print()
         print(" Compute BRDM",flush=True)
         print(" Hshift = ",hshift)
+        print(" Trim = ",trim)
         start = time.time()
         rdms = build_brdm(ci_vector, ci.idx)
         end = time.time()
@@ -494,8 +461,7 @@ def hosvd(ci_vector, clustered_ham, hshift=1e-8, trim=None ):
             fspace_norm = 0
             fspace_entropy = 0
             print(" Diagonalize RDM for Cluster %2i in Fock space:"%ci.idx, fspace,flush=True)
-            n,U = scipy.linalg.eig(rdm)
-            #n,U = np.linalg.eigh(rdm)
+            n,U = np.linalg.eigh(rdm)
             idx = n.argsort()[::-1]
             n = n[idx]
             U = U[:,idx]
@@ -504,7 +470,7 @@ def hosvd(ci_vector, clustered_ham, hshift=1e-8, trim=None ):
                 """Adding cluster hamiltonian to RDM before diagonalization to make null space unique. """
                 print(" Shift RDM by H:", hshift)
                 Hci = ci.Hci[fspace]
-                n,U = np.linalg.eig(rdm + hshift*Hci)
+                n,U = np.linalg.eigh(rdm + hshift*Hci)
                 n = np.diag(U.T @ rdm @ U)
                 idx = n.argsort()[::-1]
                 n = n[idx]
@@ -536,11 +502,83 @@ def hosvd(ci_vector, clustered_ham, hshift=1e-8, trim=None ):
         print(" Final norm:....... %12.8f"%norm)
         print(" --------------------------------------------------------", flush=True)
     
+        if trim != None:
+            for b in ci.basis:
+                if b not in rdms:
+                    rotations[b] = ci.basis[b][:,0:0]
         start = time.time()
         ci.rotate_basis(rotations)
         end = time.time()
         print(" Time spent rotating cluster basis: %12.2f" %(end-start))
     return
+# }}}
+
+def compute_pt2_correction(ci_vector, clustered_ham, e0, nproc=None):
+    # {{{
+    print()
+    print(" Compute EN PT2 correction")
+    print(" Compute Matrix Vector Product:", flush=True)
+    start = time.time()
+    pt_vector = matvec1_parallel2(clustered_ham, ci_vector, nproc=nproc)
+    stop = time.time()
+    print(" Time spent in matvec: ", stop-start)
+    
+    pt_vector.prune_empty_fock_spaces()
+    
+    
+    var = pt_vector.dot(pt_vector) - e0*e0
+    print(" Variance:          %12.8f" % var,flush=True)
+    tmp = ci_vector.dot(pt_vector)
+    var = pt_vector.dot(pt_vector) - tmp*tmp
+    print(" Variance Subspace: %12.8f" % var,flush=True)
+        
+    
+    print(" Remove CI space from pt_vector vector")
+    for fockspace,configs in ci_vector.items():
+        if fockspace in pt_vector.fblocks():
+            for config,coeff in list(configs.items()):
+                if config in pt_vector[fockspace]:
+                    del pt_vector[fockspace][config]
+    
+    
+    for fockspace,configs in ci_vector.items():
+        if fockspace in pt_vector:
+            for config,coeff in configs.items():
+                assert(config not in pt_vector[fockspace])
+    
+    print(" Norm of CI vector = %12.8f" %ci_vector.norm())
+    print(" Dimension of CI space: ", len(ci_vector))
+    print(" Dimension of PT space: ", len(pt_vector))
+    print(" Compute Denominator",flush=True)
+    #next_ci_vector = cp.deepcopy(ci_vector)
+    # compute diagonal for PT2
+    start = time.time()
+    pt_vector.prune_empty_fock_spaces()
+        
+    #import cProfile
+    #pr = cProfile.Profile()
+    #pr.enable()
+    print(" Precompute Cluster basis energies")
+    precompute_cluster_basis_energies(clustered_ham)
+       
+    Hd = build_hamiltonian_diagonal_parallel1(clustered_ham, pt_vector, nproc=nproc)
+    
+    #pr.disable()
+    #pr.print_stats(sort='time')
+    end = time.time()
+    print(" Time spent in demonimator: ", end - start)
+
+    denom = 1/(e0 - Hd)
+    pt_vector_v = pt_vector.get_vector()
+    pt_vector_v.shape = (pt_vector_v.shape[0])
+
+    e2 = np.multiply(denom,pt_vector_v)
+    pt_vector.set_vector(e2)
+    e2 = np.dot(pt_vector_v,e2)
+
+    print(" PT2 Energy Correction = %12.8f" %e2, flush=True)
+    print(" PT2 Energy Total      = %12.8f" %(e0+e2), flush=True)
+    return e2,pt_vector
 # }}}
 
 

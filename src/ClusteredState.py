@@ -33,6 +33,7 @@ class ClusteredState(OrderedDict):
         Initialize to ground state of specified
         fock_config (# of a/b electrons in each cluster)
         """
+        #print(fock_config, self.n_clusters)
         assert(len(fock_config)==self.n_clusters)
         self[fock_config] = OrderedDict()
        

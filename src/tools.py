@@ -1726,71 +1726,6 @@ def do_2body_search(blocks, init_fspace, h, g, max_cluster_size=4, max_iter_cmf=
     return new_blocks, new_init_fspace
 # }}}
 
-def compute_pt2_correction(ci_vector, clustered_ham, e0, nproc=None):
-    # {{{
-    print(" Compute Matrix Vector Product:", flush=True)
-    start = time.time()
-    pt_vector = matvec1_parallel2(clustered_ham, ci_vector, nproc=nproc)
-    stop = time.time()
-    print(" Time spent in matvec: ", stop-start)
-    
-    pt_vector.prune_empty_fock_spaces()
-    
-    
-    var = pt_vector.dot(pt_vector) - e0*e0
-    print(" Variance:          %12.8f" % var,flush=True)
-    tmp = ci_vector.dot(pt_vector)
-    var = pt_vector.dot(pt_vector) - tmp*tmp
-    print(" Variance Subspace: %12.8f" % var,flush=True)
-        
-    
-    print(" Remove CI space from pt_vector vector")
-    for fockspace,configs in ci_vector.items():
-        if fockspace in pt_vector.fblocks():
-            for config,coeff in list(configs.items()):
-                if config in pt_vector[fockspace]:
-                    del pt_vector[fockspace][config]
-    
-    
-    for fockspace,configs in ci_vector.items():
-        if fockspace in pt_vector:
-            for config,coeff in configs.items():
-                assert(config not in pt_vector[fockspace])
-    
-    print(" Norm of CI vector = %12.8f" %ci_vector.norm())
-    print(" Dimension of CI space: ", len(ci_vector))
-    print(" Dimension of PT space: ", len(pt_vector))
-    print(" Compute Denominator",flush=True)
-    #next_ci_vector = cp.deepcopy(ci_vector)
-    # compute diagonal for PT2
-    start = time.time()
-    pt_vector.prune_empty_fock_spaces()
-        
-    #import cProfile
-    #pr = cProfile.Profile()
-    #pr.enable()
-    print(" Precompute Cluster basis energies")
-    precompute_cluster_basis_energies(clustered_ham)
-       
-    Hd = build_hamiltonian_diagonal_parallel1(clustered_ham, pt_vector, nproc=nproc)
-    
-    #pr.disable()
-    #pr.print_stats(sort='time')
-    end = time.time()
-    print(" Time spent in demonimator: ", end - start)
-
-    denom = 1/(e0 - Hd)
-    pt_vector_v = pt_vector.get_vector()
-    pt_vector_v.shape = (pt_vector_v.shape[0])
-
-    e2 = np.multiply(denom,pt_vector_v)
-    pt_vector.set_vector(e2)
-    e2 = np.dot(pt_vector_v,e2)
-
-    print(" PT2 Energy Correction = %12.8f" %e2)
-    return e2,pt_vector
-# }}}
-
 def run_hierarchical_sci(h,g,blocks,init_fspace,dimer_threshold,ecore):
 # {{{
     fclusters = []
@@ -1973,8 +1908,16 @@ def join(clusters_in,i,j, h, g):
     clustered_ham.add_2b_terms(cp.deepcopy(g))
     #clustered_ham.combine_common_terms(iprint=1)
     
-    print(" Build cluster operators")
+    print(" Build cluster operators", flush=True)
     [ci.build_op_matrices() for ci in clusters]
+
+    dim = 1
+    for c in clusters:
+        dimc = 0
+        for f in c.basis:
+            dimc += c.basis[f].shape[1] 
+        dim *= dimc
+    print(" Output Total Dimension: ", dim)
     
     return clusters, clustered_ham
 # }}}
