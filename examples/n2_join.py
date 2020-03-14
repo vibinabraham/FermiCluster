@@ -140,8 +140,31 @@ ci_vector.normalize()
 hosvd(ci_vector, clustered_ham, trim=1e-6)
 
 
-clusters, clustered_ham = join(clusters,0,1,h,g)   # (0,1)(2)(3)
-clusters, clustered_ham = join(clusters,1,2,h,g)   # (2,3)(0,1)
+#clusters = join(clusters,0,1,h,g)   # (0,1)(2)(3)
+#clusters = join(clusters,1,2,h,g)   # (2,3)(0,1)
+clusters = join(clusters,0,1)   # (0,1)(2)(3)
+clusters = join(clusters,1,2)   # (2,3)(0,1)
+
+print(" Clusters:")
+[print(ci) for ci in clusters]
+
+clustered_ham = ClusteredOperator(clusters)
+print(" Add 1-body terms")
+clustered_ham.add_1b_terms(cp.deepcopy(h))
+print(" Add 2-body terms")
+clustered_ham.add_2b_terms(cp.deepcopy(g))
+#clustered_ham.combine_common_terms(iprint=1)
+
+print(" Build cluster operators", flush=True)
+[ci.build_op_matrices() for ci in clusters]
+
+dim = 1
+for c in clusters:
+    dimc = 0
+    for f in c.basis:
+        dimc += c.basis[f].shape[1] 
+    dim *= dimc
+print(" Output Total Dimension: ", dim)
 
 
 ci_vector_ref = ClusteredState(clusters)
