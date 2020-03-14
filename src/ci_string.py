@@ -864,6 +864,10 @@ def build_ccaa_ss(no,bra_space,ket_space,basis,spin_case):
         ket = cp.deepcopy(ket_b)
         bra = cp.deepcopy(bra_b)
     
+    v2.shape = (ket_a_max,ket_b_max,nv2)
+    v1.shape = (bra_a_max,bra_b_max,nv1)
+    
+    tdm = np.zeros((nv1,nv2,no,no,no,no))
     tdm_1spin = np.zeros((bra.max(),ket.max(),no,no,no,no))
     ket.reset()
     bra.reset()
@@ -893,18 +897,20 @@ def build_ccaa_ss(no,bra_space,ket_space,basis,spin_case):
                         L = bra.linear_index()
                         sign = bra.sign()
                         tdm_1spin[L,K,p,q,r,s] += sign
-
         ket.incr()
   
-    v2.shape = (ket_a_max,ket_b_max,nv2)
-    v1.shape = (bra_a_max,bra_b_max,nv1)
     
     if spin_case == "a":
+        pass
         # v(IJt) <IJ|pqrs|KL> v(KLu)  = v(IJt) <I|pqrs|K> v(KJu) = A(tupqrs)
-        tdm = np.einsum('ijt,ikpqrs,kju->tupqrs',v1,tdm_1spin,v2, optimize=True)
+        #tdm = np.einsum('ijt,ikpqrs,kju->tupqrs',v1,tdm_1spin,v2, optimize=True)
+        for j in range(bra_b_max):
+            tdm += np.einsum('it,ikpqrs,ku->tupqrs',v1[:,j,:],tdm_1spin,v2[:,j,:], optimize=True)
     elif spin_case == "b":
         # v(IJt) <IJ|pqrs|KL> v(KLu)   = v(IJt) tdm(JLpqrs) v(ILu) = A(tupqrs)
-        tdm = np.einsum('ijt,jlpqrs,ilu->tupqrs',v1,tdm_1spin,v2, optimize=True)
+        #tdm = np.einsum('ijt,jlpqrs,ilu->tupqrs',v1,tdm_1spin,v2, optimize=True)
+        for i in range(bra_a_max):
+            tdm += np.einsum('jt,jlpqrs,lu->tupqrs',v1[i,:,:],tdm_1spin,v2[i,:,:], optimize=True)
 
  
     v2.shape = (ket_a_max*ket_b_max,nv2)
