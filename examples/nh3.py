@@ -71,12 +71,62 @@ for ri in range(0,26):
     idx = e1_order(h,cut_off = 2e-1)
     h,g = reorder_integrals(idx,h,g)
     if do_tci:
-        ci_vector, pt_vector, etci, etci2 = run_tpsci(h,g,blocks,init_fspace,ecore=ecore,
-            thresh_ci_clip=1e-3,thresh_cipsi=1e-6,max_tucker_iter=4,max_cipsi_iter=10)
-        ci_vector.print_configs()
-        tci_dim = len(ci_vector)
-        ci_vector.clip(.5)
+        n_blocks = len(blocks)
+
+        clusters = []
+
+        for ci,c in enumerate(blocks):
+            clusters.append(Cluster(ci,c))
+
+        ci_vector = ClusteredState(clusters)
+        ci_vector.init(init_fspace)
+
+        print(" Clusters:")
+        [print(ci) for ci in clusters]
+
+        clustered_ham = ClusteredOperator(clusters)
+        print(" Add 1-body terms")
+        clustered_ham.add_1b_terms(h)
+        print(" Add 2-body terms")
+        clustered_ham.add_2b_terms(g)
+        #clustered_ham.combine_common_terms(iprint=1)
+
+        print(" Build cluster basis")
+        for ci_idx, ci in enumerate(clusters):
+            assert(ci_idx == ci.idx)
+            print(" Extract local operator for cluster",ci.idx)
+            opi = clustered_ham.extract_local_operator(ci_idx)
+            print()
+            print()
+            print(" Form basis by diagonalize local Hamiltonian for cluster: ",ci_idx)
+            ci.form_eigbasis_from_local_operator(opi,max_roots=1000)
+
+
+        #clustered_ham.add_ops_to_clusters()
+        print(" Build these local operators")
+        for c in clusters:
+            print(" Build mats for cluster ",c.idx)
+            c.build_op_matrices()
+
+        #ci_vector.expand_to_full_space()
+        #ci_vector.expand_each_fock_space()
+        #ci_vector.add_single_excitonic_states()
         #ci_vector.print_configs()
+
+        edps = build_hamiltonian_diagonal(clustered_ham,ci_vector)
+        print(edps)
+
+        ci_vector, pt_vector, etci, etci2, t_conv = bc_cipsi_tucker(ci_vector.copy(), clustered_ham,selection='cipsi',
+            thresh_cipsi=1e-6, thresh_ci_clip=1e-6, max_tucker_iter=4)
+        print(" DPS     :       %12.8f      Dim:%6d" % (edps+ecore,1))
+        etci = etci+ecore
+        etci2 = etci2+ecore
+
+        #ci_vector, pt_vector, etci, etci2 = run_tpsci(h,g,blocks,init_fspace,ecore=ecore,
+        #    thresh_ci_clip=1e-3,thresh_cipsi=1e-6,max_tucker_iter=4,max_cipsi_iter=10)
+        tci_dim = len(ci_vector)
+        ci_vector.clip(.005)
+        ci_vector.print_configs()
         #ci_vector.normalize()
         #ci_vector.print_configs()
         #print(edps+ecore)
@@ -90,4 +140,4 @@ for ri in range(0,26):
 
     print("  rad      FCI          Dim          HCI       Dim          TPSCI      Dim       TPSCI(2)")
     print(" %4.2f  %12.9f   %6d     %12.9f  %6d %12.9f %6d %12.9f"%(r0,efci,fci_dim,ehci,hci_dim,etci,tci_dim,etci2))
-
+    exit()
