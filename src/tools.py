@@ -1793,6 +1793,9 @@ def compute_pt2_correction(ci_vector, clustered_ham, e0, nproc=1):
 # }}}
 
 def run_hierarchical_sci(h,g,blocks,init_fspace,dimer_threshold,ecore):
+    """
+    compute a dimer calculation and figure out what states to retain for a larger calculation
+    """
 # {{{
     fclusters = []
     findex_list = {}
@@ -1938,4 +1941,427 @@ def run_hierarchical_sci(h,g,blocks,init_fspace,dimer_threshold,ecore):
 
     print(" TPSCI:          %12.8f      Dim:%6d" % (etci+ecore, len(ci_vector)))
     print(" TPSCI(2):       %12.8f      Dim:%6d" % (etci2+ecore,len(pt_vector)))
+# }}}
+
+def compute_rspt2_correction(ci_vector, clustered_ham, e0, nproc=1):
+    # {{{
+    print(" Compute Matrix Vector Product:", flush=True)
+    start = time.time()
+    if nproc==1:
+        #h0v(clustered_ham,ci_vector)
+        #exit()
+        pt_vector = matvec1(clustered_ham, ci_vector)
+    else:
+        pt_vector = matvec1_parallel1(clustered_ham, ci_vector, nproc=nproc)
+    stop = time.time()
+    print(" Time spent in matvec: ", stop-start)
+    
+    #pt_vector.prune_empty_fock_spaces()
+    
+    
+    tmp = ci_vector.dot(pt_vector)
+    var = pt_vector.norm() - tmp*tmp 
+    print(" Variance: %12.8f" % var,flush=True)
+    
+    
+    print("Dim of PT space %4d"%len(pt_vector))
+    print(" Remove CI space from pt_vector vector")
+    for fockspace,configs in pt_vector.items():
+        if fockspace in ci_vector.fblocks():
+            for config,coeff in list(configs.items()):
+                if config in ci_vector[fockspace]:
+                    del pt_vector[fockspace][config]
+    print("Dim of PT space %4d"%len(pt_vector))
+    
+    
+    for fockspace,configs in ci_vector.items():
+        if fockspace in pt_vector:
+            for config,coeff in configs.items():
+                assert(config not in pt_vector[fockspace])
+    
+    print(" Norm of CI vector = %12.8f" %ci_vector.norm())
+    print(" Dimension of CI space: ", len(ci_vector))
+    print(" Dimension of PT space: ", len(pt_vector))
+    print(" Compute Denominator",flush=True)
+    # compute diagonal for PT2
+    start = time.time()
+
+    #pt_vector.prune_empty_fock_spaces()
+        
+       
+    if nproc==1:
+        Hd = build_h0(clustered_ham, ci_vector, pt_vector)
+    else:
+        Hd = build_h0(clustered_ham, ci_vector, pt_vector)
+        #Hd = build_hamiltonian_diagonal_parallel1(clustered_ham, pt_vector, nproc=nproc)
+    #pr.disable()
+    #pr.print_stats(sort='time')
+    end = time.time()
+    print(" Time spent in demonimator: ", end - start)
+
+    denom = 1/(e0 - Hd)
+    pt_vector_v = pt_vector.get_vector()
+    pt_vector_v.shape = (pt_vector_v.shape[0])
+
+    e2 = np.multiply(denom,pt_vector_v)
+    pt_vector.set_vector(e2)
+    e2 = np.dot(pt_vector_v,e2)
+
+    print(" PT2 Energy Correction = %12.8f" %e2)
+    return e2,pt_vector
+# }}}
+
+
+def compute_lcc2_correction(ci_vector, clustered_ham, e0, nproc=1):
+    # {{{
+    print(" Compute Matrix Vector Product:", flush=True)
+    start = time.time()
+    if nproc==1:
+        #h0v(clustered_ham,ci_vector)
+        #exit()
+        pt_vector = matvec1(clustered_ham, ci_vector)
+    else:
+        pt_vector = matvec1_parallel1(clustered_ham, ci_vector, nproc=nproc)
+    stop = time.time()
+    print(" Time spent in matvec: ", stop-start)
+    
+    #pt_vector.prune_empty_fock_spaces()
+    
+    tmp = ci_vector.dot(pt_vector)
+    var = pt_vector.norm() - tmp*tmp 
+    print(" Variance: %12.8f" % var,flush=True)
+    
+    print("Dim of PT space %4d"%len(pt_vector))
+    print(" Remove CI space from pt_vector vector")
+    for fockspace,configs in pt_vector.items():
+        if fockspace in ci_vector.fblocks():
+            for config,coeff in list(configs.items()):
+                if config in ci_vector[fockspace]:
+                    del pt_vector[fockspace][config]
+    print("Dim of PT space %4d"%len(pt_vector))
+    
+    for fockspace,configs in ci_vector.items():
+        if fockspace in pt_vector:
+            for config,coeff in configs.items():
+                assert(config not in pt_vector[fockspace])
+    
+    print(" Norm of CI vector = %12.8f" %ci_vector.norm())
+    print(" Dimension of CI space: ", len(ci_vector))
+    print(" Dimension of PT space: ", len(pt_vector))
+    print(" Compute Denominator",flush=True)
+    # compute diagonal for PT2
+    start = time.time()
+
+    #pt_vector.prune_empty_fock_spaces()
+        
+       
+    if nproc==1:
+        Hd = build_h0(clustered_ham, ci_vector, pt_vector)
+        Hd2 = build_hamiltonian_diagonal(clustered_ham, pt_vector)
+    else:
+        Hd = build_h0(clustered_ham, ci_vector, pt_vector)
+        Hd2 = build_hamiltonian_diagonal_parallel1(clustered_ham, pt_vector, nproc=nproc)
+    #pr.disable()
+    #pr.print_stats(sort='time')
+    end = time.time()
+    print(" Time spent in demonimator: ", end - start)
+
+    denom = 1/(e0 - Hd)
+    pt_vector_v = pt_vector.get_vector()
+    pt_vector_v.shape = (pt_vector_v.shape[0])
+
+    e2 = np.multiply(denom,pt_vector_v)
+    pt_vector.set_vector(e2)
+    e2 = np.dot(pt_vector_v,e2)
+
+    print(" PT2 Energy Correction = %12.8f" %e2)
+
+    print("E DPS %16.8f"%e0)
+    #ci_vector.add(pt_vector)
+    H = build_full_hamiltonian(clustered_ham, pt_vector)
+    print(H)
+    #np.fill_diagonal(H,0)
+    #for i in range(0,H.shape[0]):
+    #    H[i,i] = Hd[i]
+    print(H)
+
+    denom.shape = (denom.shape[0],1)
+    v1 = pt_vector.get_vector()
+    for j in range(0,10):
+        print("v1",v1.shape)
+        v2 = H @ v1
+        #print("v2",v2.shape)
+        #print("denom",denom.shape)
+        v2 = np.multiply(denom,v2)
+        #print("afrer denom",v2.shape)
+        e3 = np.dot(pt_vector_v,v2)
+        print(e3.shape)
+        print("PT2",e2)
+        print("PT3",e3[0])
+        v1 = v2
+    pt_vector.set_vector(v2)
+
+    return e3[0],pt_vector
+# }}}
+
+
+def build_h0(clustered_ham,ci_vector,pt_vector):
+    """
+    Build hamiltonian diagonal in basis in ci_vector as difference of cluster energies as in RSPT
+    """
+# {{{
+    clusters = ci_vector.clusters
+    Hd = np.zeros((len(pt_vector)))
+    
+    shift = 0 
+    idx = 0
+    E0 = 0
+    for fockspace, configs in ci_vector.items():
+        for config, coeff in configs.items():
+            delta_fock= tuple([(0,0) for ci in range(len(clusters))])
+            terms = clustered_ham.terms[delta_fock]
+            print(coeff,config)
+            # for EN:
+            for term in terms:
+                E0 += term.matrix_element(fockspace,config,fockspace,config)
+                #print(term.active)
+            idx += 1
+    print("E0%16.8f"%E0)
+   
+    idx = 0
+    Hd = np.zeros((len(pt_vector)))
+    for ci_fspace, ci_configs in ci_vector.items():
+        for ci_config, ci_coeff in ci_configs.items():
+            for fockspace, configs in pt_vector.items():
+                print("FS",fockspace)
+                active = []
+                inactive = []
+                for ind,fs in enumerate(fockspace):
+                    if fs != ci_fspace[ind]:
+                        active.append(ind)
+                    else:
+                        inactive.append(ind)
+                            
+                delta_fock= tuple([(fockspace[ci][0]-ci_fspace[ci][0], fockspace[ci][1]-ci_fspace[ci][1]) for ci in range(len(clusters))])
+                print("active",active)
+                print("active",delta_fock)
+                #print(tuple(np.array(list(fockspace))[inactive]))
+
+                for config, coeff in configs.items():
+                    delta_fock= tuple([(0,0) for ci in range(len(clusters))])
+
+                    diff = tuple(x-y for x,y in zip(ci_config,config))
+                    print("CI",ci_config)
+                    for x in inactive:
+                        if diff[x] != 0 :
+                            active.append(x)
+                    print("PT",config)
+                    print("d ",diff)
+                    print("ACTIVE",active)
+
+                    Hd[idx] = E0
+                    for cidx in active:
+                        fspace = fockspace[cidx]
+                        conf = config[cidx]
+                        print(" Cluster: %4d  Fock Space:%s config:%4d Energies %16.8f"%(cidx,fspace,conf,clusters[cidx].energies[fspace][conf]))
+                        Hd[idx] += clusters[cidx].energies[fockspace[cidx]][config[cidx]]
+                        Hd[idx] -= clusters[cidx].energies[ci_fspace[cidx]][ci_config[cidx]]
+                        print("-Cluster: %4d  Fock Space:%s config:%4d Energies %16.8f"%(cidx,ci_fspace[cidx],ci_config[cidx],clusters[cidx].energies[ci_fspace[cidx]][ci_config[cidx]]))
+                    # for EN:
+                    #for term in terms:
+                    #    Hd[idx] += term.matrix_element(fockspace,config,fockspace,config)
+                    #    print(term.active)
+
+
+                    # for RS
+                    #Hd[idx] = E0 - term.active  
+                    print(coeff,config)
+                    idx += 1
+
+    return Hd
+
+    # }}}
+
+def cepa(clustered_ham,ci_vector,pt_vector,cepa_shift):
+# {{{
+    ts = 0
+
+    H00 = build_full_hamiltonian(clustered_ham,ci_vector,iprint=0)
+    #H00 = H[tb0.start:tb0.stop,tb0.start:tb0.stop]
+    
+    E0,V0 = np.linalg.eigh(H00)
+    E0 = E0[ts]
+  
+    Ec = 0.0
+
+    #cepa_shift = 'aqcc'
+    #cepa_shift = 'cisd'
+    #cepa_shift = 'acpf'
+    #cepa_shift = 'cepa0'
+    cepa_mit = 1
+    cepa_mit = 100
+    for cit in range(0,cepa_mit): 
+
+        #Hdd = cp.deepcopy(H[tb0.stop::,tb0.stop::])
+        Hdd = build_full_hamiltonian(clustered_ham,pt_vector,iprint=0)
+
+        shift = 0.0
+        if cepa_shift == 'acpf':
+            shift = Ec * 2.0 / n_blocks
+            #shift = Ec * 2.0 / n_sites
+        elif cepa_shift == 'aqcc':
+            shift = (1.0 - (n_blocks-3.0)*(n_blocks - 2.0)/(n_blocks * ( n_blocks-1.0) )) * Ec
+        elif cepa_shift == 'cisd':
+            shift = Ec
+        elif cepa_shift == 'cepa0':
+            shift = 0
+
+        Hdd += -np.eye(Hdd.shape[0])*(E0 + shift)
+        #Hdd += -np.eye(Hdd.shape[0])*(E0 + -0.220751700895 * 2.0 / 8.0)
+        
+        
+        #Hd0 = H[tb0.stop::,tb0.start:tb0.stop].dot(V0[:,ts])
+        H0d = build_block_hamiltonian(clustered_ham,ci_vector,pt_vector,iprint=0)
+        Hd0 = H0d.T
+        Hd0 = Hd0.dot(V0[:,ts])
+        
+        #Cd = -np.linalg.inv(Hdd-np.eye(Hdd.shape[0])*E0).dot(Hd0)
+        #Cd = np.linalg.inv(Hdd).dot(-Hd0)
+        
+        Cd = np.linalg.solve(Hdd, -Hd0)
+        
+        print(" CEPA(0) Norm  : %16.12f"%np.linalg.norm(Cd))
+        
+        V0 = V0[:,ts]
+        V0.shape = (V0.shape[0],1)
+        Cd.shape = (Cd.shape[0],1)
+        C = np.vstack((V0,Cd))
+        H00d = np.insert(H0d,0,E0,axis=1)
+        
+        #E = V0[:,ts].T.dot(H[tb0.start:tb0.stop,:]).dot(C)
+        E = V0[:,ts].T.dot(H00d).dot(C)
+        
+        cepa_last_vectors = C  
+        cepa_last_values  = E
+        
+        print(" CEPA(0) Energy: %16.12f"%E)
+        
+        if abs(E-E0 - Ec) < 1e-10:
+            print("Converged")
+            break
+        Ec = E - E0
+    return Ec[0]
+# }}}
+
+def build_block_hamiltonian(clustered_ham,ci_vector,pt_vector,iprint=0):
+    """
+    Build hamiltonian in basis of two different clustered states
+    """
+# {{{
+    clusters = ci_vector.clusters
+    H0d = np.zeros((len(ci_vector),len(pt_vector)))
+    
+    shift_l = 0 
+    for fock_li, fock_l in enumerate(ci_vector.data):
+        configs_l = ci_vector[fock_l]
+        if iprint > 0:
+            print(fock_l)
+       
+        for config_li, config_l in enumerate(configs_l):
+            idx_l = shift_l + config_li 
+            
+            shift_r = 0 
+            for fock_ri, fock_r in enumerate(pt_vector.data):
+                configs_r = pt_vector[fock_r]
+                delta_fock= tuple([(fock_l[ci][0]-fock_r[ci][0], fock_l[ci][1]-fock_r[ci][1]) for ci in range(len(clusters))])
+
+                for config_ri, config_r in enumerate(configs_r):        
+                    idx_r = shift_r + config_ri
+
+                    try:
+                        terms = clustered_ham.terms[delta_fock]
+                    except KeyError:
+                        shift_r += len(configs_r) 
+                        continue 
+
+                    #print(fock_l,fock_r,config_l,config_r)
+                    #print(idx_l,idx_r)
+                    for term in terms:
+                        me = term.matrix_element(fock_l,config_l,fock_r,config_r)
+                        H0d[idx_l,idx_r] += me
+                    
+
+                """
+                if fock_ri<fock_li:
+                    shift_r += len(configs_r) 
+                    continue
+                try:
+                    terms = clustered_ham.terms[delta_fock]
+                except KeyError:
+                    shift_r += len(configs_r) 
+                    continue 
+                
+                for config_ri, config_r in enumerate(configs_r):        
+                    idx_r = shift_r + config_ri
+                    if idx_r<idx_l:
+                        continue
+                    
+                    for term in terms:
+                        me = term.matrix_element(fock_l,config_l,fock_r,config_r)
+                        H[idx_l,idx_r] += me
+                        if idx_r>idx_l:
+                            H[idx_r,idx_l] += me
+                        #print(" %4i %4i = %12.8f"%(idx_l,idx_r,me),"  :  ",config_l,config_r, " :: ", term)
+                """
+                shift_r += len(configs_r) 
+        shift_l += len(configs_l)
+    return H0d
+# }}}
+
+def compute_cisd_correction(ci_vector, clustered_ham, nproc=1):
+    # {{{
+    print(" Compute Matrix Vector Product:", flush=True)
+    start = time.time()
+
+    H00 = build_full_hamiltonian(clustered_ham,ci_vector,iprint=0)
+    E0,V0 = np.linalg.eigh(H00)
+    E0 = E0[0]
+
+    if nproc==1:
+        pt_vector = matvec1(clustered_ham, ci_vector)
+    else:
+        pt_vector = matvec1_parallel1(clustered_ham, ci_vector, nproc=nproc)
+    stop = time.time()
+    print(" Time spent in matvec: ", stop-start)
+    
+    print(" Remove CI space from pt_vector vector")
+    for fockspace,configs in pt_vector.items():
+        if fockspace in ci_vector.fblocks():
+            for config,coeff in list(configs.items()):
+                if config in ci_vector[fockspace]:
+                    del pt_vector[fockspace][config]
+    
+    
+    for fockspace,configs in ci_vector.items():
+        if fockspace in pt_vector:
+            for config,coeff in configs.items():
+                assert(config not in pt_vector[fockspace])
+    
+    ci_vector.add(pt_vector)
+       
+    if nproc==1:
+        H = build_full_hamiltonian(clustered_ham, ci_vector)
+    else:
+        H = build_full_hamiltonian(clustered_ham, ci_vector)
+    e,v = scipy.sparse.linalg.eigsh(H,10,which='SA')
+    idx = e.argsort()
+    e = e[idx]
+    v = v[:,idx]
+    v = v[:,0]
+    e0 = e[0]
+    e = e[0]
+    Ec = e - E0
+
+    print(" CISD Energy Correction = %12.8f" %Ec)
+    return Ec
 # }}}
