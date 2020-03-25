@@ -13,6 +13,45 @@ from ClusteredOperator import *
 from ClusteredState import *
 from tools import *
 
+
+
+
+def system_setup(h, g, ecore, blocks, max_roots=1000):
+    n_blocks = len(blocks)
+
+    clusters = []
+
+    for ci,c in enumerate(blocks):
+        clusters.append(Cluster(ci,c))
+
+    print(" Clusters:")
+    [print(ci) for ci in clusters]
+
+    clustered_ham = ClusteredOperator(clusters)
+    print(" Add 1-body terms")
+    clustered_ham.add_1b_terms(h)
+    print(" Add 2-body terms")
+    clustered_ham.add_2b_terms(g)
+
+    print(" Build cluster basis")
+    for ci_idx, ci in enumerate(clusters):
+        assert(ci_idx == ci.idx)
+        #print(" Extract local operator for cluster",ci.idx)
+        #opi = clustered_ham.extract_local_operator(ci_idx)
+        #print()
+        print()
+        print(" Form basis by diagonalize local Hamiltonian for cluster: ",ci_idx)
+        #ci.form_eigbasis_from_local_operator(opi,max_roots=1000,s2_shift=s2_shift)
+        ci.form_eigbasis_from_ints(h,g,max_roots=max_roots, ecore=ecore)
+
+
+    print(" Build these local operators")
+    for c in clusters:
+        print(" Build mats for cluster ",c.idx,flush=True)
+        c.build_op_matrices()
+    
+    return clusters, clustered_ham
+
 def bc_cipsi_tucker(ci_vector, clustered_ham, selection="cipsi",
         thresh_cipsi=1e-4, thresh_ci_clip=1e-5, thresh_cipsi_conv=1e-8, max_cipsi_iter=30, 
         thresh_tucker_conv = 1e-6, max_tucker_iter=20, tucker_state_clip=None,hshift=1e-8,

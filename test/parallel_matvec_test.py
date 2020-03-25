@@ -68,10 +68,7 @@ def test_1():
     #efci, fci_dim = run_fci_pyscf(h,g,cas_nel,ecore=ecore)
     #print(" FCI energy: %12.8f" %efci)
 
-    clusters = []
-
-    for ci,c in enumerate(blocks):
-        clusters.append(Cluster(ci,c))
+    clusters, clustered_ham = system_setup(h, g, ecore, blocks)
 
     ci_vector = ClusteredState(clusters)
     if orb_basis == 'boys':
@@ -88,31 +85,6 @@ def test_1():
     #ci_vector.add_fockspace(((2,2),(3,3)))
     #ci_vector.add_fockspace(((3,3),(2,2)))
 
-    print(" Clusters:")
-    [print(ci) for ci in clusters]
-
-    clustered_ham = ClusteredOperator(clusters)
-    print(" Add 1-body terms")
-    clustered_ham.add_1b_terms(h)
-    print(" Add 2-body terms")
-    clustered_ham.add_2b_terms(g)
-
-    print(" Build cluster basis")
-    for ci_idx, ci in enumerate(clusters):
-        assert(ci_idx == ci.idx)
-        print(" Extract local operator for cluster",ci.idx)
-        opi = clustered_ham.extract_local_operator(ci_idx)
-        print()
-        print()
-        print(" Form basis by diagonalize local Hamiltonian for cluster: ",ci_idx)
-        ci.form_eigbasis_from_local_operator(opi,max_roots=1000)
-
-
-    #clustered_ham.add_ops_to_clusters()
-    print(" Build these local operators")
-    for c in clusters:
-        print(" Build mats for cluster ",c.idx)
-        c.build_op_matrices()
 
     #ci_vector.expand_to_full_space()
     ci_vector.expand_each_fock_space()
