@@ -52,6 +52,8 @@ def system_setup(h, g, ecore, blocks, max_roots=1000):
     
     return clusters, clustered_ham
 
+
+
 def bc_cipsi_tucker(ci_vector, clustered_ham, selection="cipsi",
         thresh_cipsi=1e-4, thresh_ci_clip=1e-5, thresh_cipsi_conv=1e-8, max_cipsi_iter=30, 
         thresh_tucker_conv = 1e-6, max_tucker_iter=20, tucker_state_clip=None,hshift=1e-8,
@@ -85,7 +87,6 @@ def bc_cipsi_tucker(ci_vector, clustered_ham, selection="cipsi",
             pt_vector.clip(tucker_state_clip)
             pt_vector.normalize()
             print(" After:",len(pt_vector))
-            ci_vector = pt_vector 
         elif selection == "heatbath":
             start = time.time()
             ci_vector, e0 = hb_tpsci(ci_vector_ref.copy(), clustered_ham, 
@@ -112,11 +113,10 @@ def bc_cipsi_tucker(ci_vector, clustered_ham, selection="cipsi",
             print(" Compute BRDM",flush=True)
             print(" Hshift = ",hshift)
             start = time.time()
-            rdms = build_brdm(ci_vector, ci.idx)
+            rdms = build_brdm(pt_vector, ci.idx)
             end = time.time()
             print(" done.",flush=True)
             print(" Time spent building BRDMs: %12.2f" %(end-start))
-            #rdms = build_brdm(ci_vector, ci.idx)
             norm = 0
             entropy = 0
             rotations = {}

@@ -82,21 +82,26 @@ def test_1():
             print(d1)
         print(" FCI:        %12.8f Dim:%6d"%(efci,fci_dim))
     if do_tci:
+    
+        clusters, clustered_ham = system_setup(h, g, ecore, blocks)
+        
+        ci_vector = ClusteredState(clusters)
+        ci_vector.init(init_fspace)
+
         # do this just to rotate vectors about
-        ci_vector, pt_vector, etci, etci2 = run_tpsci(h,g,blocks,init_fspace,ecore=ecore,
-                thresh_ci_clip=1e-7,thresh_cipsi=1e-6,hshift=1e-8,max_tucker_iter=3)
+
+        
+        ci_vector, pt_vector, etci, etci2, conv = bc_cipsi_tucker(ci_vector, clustered_ham, 
+                                                            selection       = "cipsi",
+                                                            thresh_cipsi    = 1e-6, 
+                                                            thresh_ci_clip  = 1e-7, 
+                                                            max_tucker_iter = 3)
         
         # Do exact
         if 1:
             print(" Build exact eigenstate")
-            clusters = ci_vector.clusters
-            clustered_ham = ClusteredOperator(clusters)
-            print(" Add 1-body terms")
-            clustered_ham.add_1b_terms(h)
-            print(" Add 2-body terms")
-            clustered_ham.add_2b_terms(g)
-            
             ci_vector.expand_to_full_space()
+            
             H = build_full_hamiltonian(clustered_ham, ci_vector)
             
             print(" Diagonalize Hamiltonian Matrix:",flush=True)

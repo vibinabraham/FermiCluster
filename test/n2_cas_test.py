@@ -65,25 +65,36 @@ def run(nproc=None):
 
     do_fci = 1
     do_hci = 1
-    do_tci = 1
 
     if do_fci:
         efci, fci_dim = run_fci_pyscf(h,g,cas_nel,ecore=ecore)
     if do_hci:
         ehci, hci_dim = run_hci_pyscf(h,g,cas_nel,ecore=ecore,select_cutoff=1e-4,ci_cutoff=1e-4)
-    if do_tci:
-        ci_vector, pt_vector, etci, etci2 = run_tpsci(h,g,blocks,init_fspace,ecore=ecore,
-            thresh_ci_clip=1e-6,thresh_cipsi=1e-5,max_tucker_iter=20,hshift=1e-8, nproc=nproc, thresh_asci=0)
-        ci_vector.print_configs()
-        tci_dim = len(ci_vector)
+    
+
+
+    clusters, clustered_ham = system_setup(h, g, ecore, blocks)
+    
+    ci_vector = ClusteredState(clusters)
+    ci_vector.init(init_fspace)
+
+    ci_vector, pt_vector, etci, etci2, conv = bc_cipsi_tucker(ci_vector, clustered_ham, 
+                                                        thresh_cipsi    = 1e-5, 
+                                                        thresh_ci_clip  = 1e-6, 
+                                                        max_tucker_iter = 20,
+                                                        nproc=nproc)
+    
+    tci_dim = len(ci_vector)
+
+    etci += ecore
+    etci2 += ecore
 
 
     print(" TCI:        %12.9f Dim:%6d"%(etci,tci_dim))
     print(" HCI:        %12.9f Dim:%6d"%(ehci,hci_dim))
     print(" FCI:        %12.9f Dim:%6d"%(efci,fci_dim))
-    assert(abs(etci --108.855580197)< 1e-7)
-    assert(abs(etci2 --108.85574517)< 1e-7)
-    #assert(abs(tci_dim - 67)<1e-15)
+    assert(abs(etci --108.855580011)< 1e-7)
+    assert(tci_dim == 43)
     assert(abs(efci   --108.85574521)< 1e-7)
 
 def test_1():
