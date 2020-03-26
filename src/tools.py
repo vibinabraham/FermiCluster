@@ -171,11 +171,14 @@ def matvec1(h,v,term_thresh=1e-12):
         # use this to debug
         sigma.expand_to_full_space()
 
-
+    # loop over fock space blocks in the input ClusteredState vector, r/l means right/left hand side 
     for fock_ri, fock_r in enumerate(v.fblocks()):
 
         for terms in h.terms:
+            # each item in terms will transition from the current fock config (fock_r) to a new fock config, fock_l 
             fock_l= tuple([(terms[ci][0]+fock_r[ci][0], terms[ci][1]+fock_r[ci][1]) for ci in range(len(clusters))])
+
+            # check to make sure this fock config doesn't have negative or too many electrons in any cluster
             good = True
             for c in clusters:
                 if min(fock_l[c.idx]) < 0 or max(fock_l[c.idx]) > c.n_orb:
@@ -184,13 +187,12 @@ def matvec1(h,v,term_thresh=1e-12):
             if good == False:
                 continue
             
-            #print(fock_l, "<--", fock_r)
             
             if fock_l not in sigma.data:
                 sigma.add_fockspace(fock_l)
 
             configs_l = sigma[fock_l] 
-            
+           
             for term in h.terms[terms]:
                 #print(" term: ", term)
                 state_sign = 1

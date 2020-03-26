@@ -92,7 +92,7 @@ def test_1():
     e_prev = 0
     thresh_conv = 1e-8
     ci_vector_ref = ci_vector.copy()
-    ci_vector, pt_vector, e0, e2 = bc_cipsi(ci_vector_ref.copy(), clustered_ham, thresh_cipsi=1e-4, thresh_ci_clip=1e-4)
+    ci_vector, pt_vector, e0, e2 = bc_cipsi(ci_vector_ref.copy(), clustered_ham, thresh_cipsi=1e-4, thresh_ci_clip=1e-6)
     print(" CIPSI: E0 = %12.8f E2 = %12.8f CI_DIM: %i" %(e0, e2, len(ci_vector)))
     tpsci_dim = len(ci_vector)
     assert(abs(e0 --7.67994708)<1e-7)

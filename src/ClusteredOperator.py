@@ -314,7 +314,11 @@ class ClusteredTerm:
 # }}}
 
 
-
+class LocalClusteredTerm(ClusteredTerm):
+    """
+    This is a special Clustered Term which only has operators on one cluster at a time
+    """
+    pass
 
 class ClusteredOperator:
     """
