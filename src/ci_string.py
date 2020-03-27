@@ -368,6 +368,45 @@ class ci_solver:
             #   end Kb 
 # }}}
 
+    def build_H_matrix(self, basis):
+        
+        print(" Compute spin diagonals")
+        self.Hdiag_s[0] = self.precompute_spin_diagonal_block(self.nea)
+        self.Hdiag_s[1] = self.precompute_spin_diagonal_block(self.neb)
+        
+        self.ket_a = ci_string(self.no,self.nea)
+        self.ket_b = ci_string(self.no,self.neb)
+        self.bra_a = ci_string(self.no,self.nea)
+        self.bra_b = ci_string(self.no,self.neb)
+        
+        ket_a = self.ket_a
+        ket_b = self.ket_b
+        bra_a = self.bra_a
+        bra_b = self.bra_b
+
+        ket_a.fill_ca_lookup()
+        ket_b.fill_ca_lookup()
+        
+        Hci = np.zeros((self.full_dim,self.full_dim))
+        ket_a = self.ket_a
+        ket_b = self.ket_b
+       
+       
+        #   TODO: replace this with matrix free implementation for larger systems
+
+        #   
+        #   Add spin diagonal components
+        #print(" Add spin diagonals")
+        Hci += np.kron(np.eye(ket_a.max()), self.Hdiag_s[1])
+        Hci += np.kron(self.Hdiag_s[0],np.eye(ket_b.max()))
+
+        #print(" Do alpha/beta terms")
+        self.compute_ab_terms_direct(Hci)
+
+        
+        return basis.T @ Hci @ basis
+       
+
     def run(self):
         #print(" Compute spin diagonals")
         self.Hdiag_s[0] = self.precompute_spin_diagonal_block(self.nea)

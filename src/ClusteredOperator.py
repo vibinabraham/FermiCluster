@@ -69,11 +69,16 @@ class ClusteredTerm:
         self.ints = ints
         #self.sign = 1
         self.active = [] 
-        assert(len(self.ints.shape) == 2 or len(self.ints.shape) == 4) 
-        if len(self.ints.shape) == 2:
+        
+        if len(self.ints.shape) == 0:
+            self.ints_inds = ''
+        elif len(self.ints.shape) == 2:
             self.ints_inds = 'ab'
         elif len(self.ints.shape) == 4:
             self.ints_inds = 'abcd'
+        else:
+            print(" Problem with integral tensor")
+            exit()
 
         self.contract_string = ""
         self.contract_string_matvec = ""
@@ -318,7 +323,15 @@ class LocalClusteredTerm(ClusteredTerm):
     """
     This is a special Clustered Term which only has operators on one cluster at a time
     """
-    pass
+    def __init__(self, delta, ops, clusters):
+        super().__init__(delta, ops, np.empty([]), clusters)
+
+    
+    def matrix_element(self,fock_bra,bra,fock_ket,ket):
+        return 0
+    
+    def diag_matrix_element(self,fock,config):
+        return 0
 
 class ClusteredOperator:
     """
@@ -339,6 +352,38 @@ class ClusteredOperator:
         self.n_orb = 0
         for ci,c in enumerate(self.clusters):
             self.n_orb += c.n_orb
+
+    def add_local_terms(self):
+        """
+        Add terms of the form h_{pq}\hat{a}^\dagger_p\hat{a}_q
+
+        input:
+        h is a square matrix NxN, where N is the number of spatial orbitals
+        """
+# {{{
+
+        delta_tmp = []
+        ops_tmp = []
+        for ci in self.clusters:
+            delta_tmp.append([0,0])
+            ops_tmp.append("")
+        delta = tuple([tuple(i) for i in delta_tmp])
+
+        for ci in self.clusters:
+
+            ops = cp.deepcopy(ops_tmp) 
+            ops[ci.idx] += "H"
+            
+            term = LocalClusteredTerm(delta, ops, self.clusters)
+
+            term.active = [ci.idx]
+
+            try:
+                self.terms[delta].append(term)
+            except:
+                self.terms[delta] = [term]
+
+# }}}
 
     def add_1b_terms(self,h):
         """

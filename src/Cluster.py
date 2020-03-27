@@ -315,6 +315,51 @@ class Cluster(object):
         return self.ops[opstr][(fI,fJ)][I,J,:]
 
 
+    def build_local_terms(self,hin,vin):
+        start = time.time()
+        self.ops['H'] = {}
+        """
+        grab integrals acting locally and form precontracted operator in current eigenbasis
+        """
+# {{{
+        h = np.zeros([self.n_orb]*2)
+        f = np.zeros([self.n_orb]*2)
+        v = np.zeros([self.n_orb]*4)
+        
+        for pidx,p in enumerate(self.orb_list):
+            for qidx,q in enumerate(self.orb_list):
+                h[pidx,qidx] = hin[p,q]
+        
+        for pidx,p in enumerate(self.orb_list):
+            for qidx,q in enumerate(self.orb_list):
+                for ridx,r in enumerate(self.orb_list):
+                    for sidx,s in enumerate(self.orb_list):
+                        v[pidx,qidx,ridx,sidx] = vin[p,q,r,s]
+
+
+
+        H = Hamiltonian()
+        H.S = np.eye(h.shape[0])
+        H.C = H.S
+        H.t = h
+        H.V = v
+       
+        for fock in self.basis:
+            ci = ci_solver()
+            ci.algorithm = "direct"
+            na = fock[0]
+            nb = fock[1]
+            ci.init(H,na,nb,1)
+            print(ci)
+            self.ops['H'][(fock,fock)] = ci.build_H_matrix(self.basis[fock])
+            print(" GS Energy: %12.8f" %self.ops['H'][(fock,fock)][0,0])
+    # }}}
+        
+
+        stop = time.time()
+        print(" Time spent TDM 0: %12.2f" %(stop-start))
+
+
     def build_op_matrices(self):
         """
         build all operators needed
@@ -354,6 +399,7 @@ class Cluster(object):
         self.ops['Bab'] = {}
 
         start_tot = time.time()
+
 
         #  a, A
         start = time.time()
