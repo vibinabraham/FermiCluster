@@ -683,76 +683,76 @@ def heat_bath_search(h_in,v,thresh_cipsi=None, nproc=None):
             configs_l = sigma_out[fock_l] 
             
             for term in h.terms[terms]:
-                #print(" term: ", term)
-                state_sign = 1
-                for oi,o in enumerate(term.ops):
-                    if o == '':
-                        continue
-                    if len(o) == 1 or len(o) == 3:
-                        for cj in range(oi):
-                            state_sign *= (-1)**(fock_r[cj][0]+fock_r[cj][1])
+                
+                # do local terms separately
+                if len(term.active) == 1:
                     
-                #print("  ", conf_r)
-                
-                #if abs(v[fock_r][conf_r]) < 5e-2:
-                #    continue
-                # get state sign 
-                #print('state_sign ', state_sign)
-                opii = -1
-                mats = []
-                good = True
-                for opi,op in enumerate(term.ops):
-                    if op == "":
-                        continue
-                    opii += 1
-                    #print(opi,term.active)
-                    ci = clusters[opi]
-                    #ci = clusters[term.active[opii]]
-                    try:
-                        oi = ci.ops[op][(fock_l[ci.idx],fock_r[ci.idx])][:,conf_r[ci.idx],:]
-                        mats.append(oi)
-                    except KeyError:
-                        good = False
-                        break
-                if good == False:
-                    continue                        
-                    #break
-               
-                if len(mats) == 0:
-                    continue
-                #print('mats:', end='')
-                #[print(m.shape,end='') for m in mats]
-                #print()
-                #print('ints:', term.ints.shape)
-                #print("contract_string       :", term.contract_string)
-                #print("contract_string_matvec:", term.contract_string_matvec)
-                
-                
-                #tmp = oe.contract(term.contract_string_matvec, *mats, term.ints)
-                tmp = np.einsum(term.contract_string_matvec, *mats, term.ints)
-        
-                #v_coeff = v[fock_r][conf_r]
-                #tmp = state_sign * tmp.ravel() * v_coeff
-                #tmp = np.abs(state_sign * tmp.ravel() * coeff )
-                tmp = state_sign * tmp.ravel() * coeff 
-        
-                new_configs = [[i] for i in conf_r] 
-                for cacti,cact in enumerate(term.active):
-                    new_configs[cact] = range(mats[cacti].shape[0])
-                for sp_idx, spi in enumerate(itertools.product(*new_configs)):
-                    #print(" New config: %12.8f" %tmp[sp_idx], spi)
-                    #if abs(tmp[sp_idx]) > sqrt_thresh_cipsi/10.0:
-                    if abs(tmp[sp_idx]) > sqrt_thresh_cipsi:
-                        #configs_l[spi] = tmp[sp_idx] # since we are only finding configs, we don't care about coeff
-                        #configs_tmp.append([configs_l[spi],tmp[sp_idx]]) 
-                        if spi not in configs_l:
-                            configs_l[spi] = tmp[sp_idx] 
-                        else:
-                            configs_l[spi] += tmp[sp_idx] 
+                    ci = term.active[0]
+                        
+                    tmp = clusters[ci].ops['H'][(fock_l[ci],fock_r[ci])][:,conf_r[ci]] * coeff 
+                    
+                    new_configs = [[i] for i in conf_r] 
+                    
+                    new_configs[ci] = range(clusters[ci].ops['H'][(fock_l[ci],fock_r[ci])].shape[0])
+                    for sp_idx, spi in enumerate(itertools.product(*new_configs)):
+                        if abs(tmp[sp_idx]) > sqrt_thresh_cipsi:
+                            if spi not in configs_l:
+                                configs_l[spi] = tmp[sp_idx] 
+                            else:
+                                configs_l[spi] += tmp[sp_idx] 
+                    
 
-            #for config,coeff in list(configs_l.items()):
-            #    if abs(coeff) < sqrt_thresh_cipsi:
-            #        del configs_l[config]
+                else:
+                    #print(" term: ", term)
+                    state_sign = 1
+                    for oi,o in enumerate(term.ops):
+                        if o == '':
+                            continue
+                        if len(o) == 1 or len(o) == 3:
+                            for cj in range(oi):
+                                state_sign *= (-1)**(fock_r[cj][0]+fock_r[cj][1])
+                        
+                    #print("  ", conf_r)
+                    
+                    opii = -1
+                    mats = []
+                    good = True
+                    for opi,op in enumerate(term.ops):
+                        if op == "":
+                            continue
+                        opii += 1
+                        #print(opi,term.active)
+                        ci = clusters[opi]
+                        #ci = clusters[term.active[opii]]
+                        try:
+                            oi = ci.ops[op][(fock_l[ci.idx],fock_r[ci.idx])][:,conf_r[ci.idx],:]
+                            mats.append(oi)
+                        except KeyError:
+                            good = False
+                            break
+                    if good == False:
+                        continue                        
+                        #break
+                   
+                    if len(mats) == 0:
+                        continue
+                    
+                    
+                    #tmp = oe.contract(term.contract_string_matvec, *mats, term.ints)
+                    tmp = np.einsum(term.contract_string_matvec, *mats, term.ints)
+                    
+                    tmp = state_sign * tmp.ravel() * coeff 
+                    
+                    new_configs = [[i] for i in conf_r] 
+                    for cacti,cact in enumerate(term.active):
+                        new_configs[cact] = range(mats[cacti].shape[0])
+                    for sp_idx, spi in enumerate(itertools.product(*new_configs)):
+                        if abs(tmp[sp_idx]) > sqrt_thresh_cipsi:
+                            if spi not in configs_l:
+                                configs_l[spi] = tmp[sp_idx] 
+                            else:
+                                configs_l[spi] += tmp[sp_idx] 
+
         for fockspace,configs in sigma_out.items():
             for config,coeff in list(configs.items()):
                 if abs(coeff) < sqrt_thresh_cipsi:

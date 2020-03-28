@@ -467,10 +467,6 @@ def bc_cipsi(ci_vector, clustered_ham,
 
 def hb_tpsci(ci_vector, clustered_ham, thresh_cipsi=1e-4, thresh_ci_clip=1e-5, thresh_conv=1e-8, max_iter=30, n_roots=1,thresh_asci=0,nproc=None):
 # {{{
-    print(" Compute diagonal elements",flush=True)
-    # compute local states energies
-    precompute_cluster_basis_energies(clustered_ham)
-    print(" done.",flush=True)
   
     pt_vector = ci_vector.copy()
     Hd_vector = ClusteredState(ci_vector.clusters)
