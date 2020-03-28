@@ -356,9 +356,9 @@ class Cluster(object):
             na = fock[0]
             nb = fock[1]
             ci.init(H,na,nb,1)
-            print(ci)
+            #print(ci)
             self.ops['H'][(fock,fock)] = ci.build_H_matrix(self.basis[fock])
-            print(" GS Energy: %12.8f" %self.ops['H'][(fock,fock)][0,0])
+            #print(" GS Energy: %12.8f" %self.ops['H'][(fock,fock)][0,0])
     # }}}
         
 

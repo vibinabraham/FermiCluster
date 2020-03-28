@@ -188,54 +188,31 @@ if mol.symmetry == True:
     for i in range(len(osym)):
         print("%4d %8s %16.8f"%(i+1,osym[i],mo_energy[i]))
 
-if do_tci:
-    clusters = []
-    for ci,c in enumerate(blocks):
-        clusters.append(Cluster(ci,c))
+# setup
+clusters, clustered_ham = system_setup(h, g, ecore, blocks)
 
-    ci_vector = ClusteredState(clusters)
-    ci_vector.init(init_fspace)
+# intial state
+ci_vector = ClusteredState(clusters)
+ci_vector.init(init_fspace)
 
+# do cmf
+do_cmf = 1
+if do_cmf:
+    # Get CMF reference
+    cmf(clustered_ham, ci_vector, h, g, max_iter=100,max_nroots=100,dm_guess=(dm_aa,dm_bb),diis=True)
 
-    print(" Clusters:")
-    [print(ci) for ci in clusters]
-
-    clustered_ham = ClusteredOperator(clusters)
-    print(" Add 1-body terms")
-    clustered_ham.add_1b_terms(h)
-    print(" Add 2-body terms")
-    clustered_ham.add_2b_terms(g)
-    #clustered_ham.combine_common_terms(iprint=1)
+edps = build_hamiltonian_diagonal(clustered_ham,ci_vector)
+ci_vector, pt_vector, etci, etci2, t_conv = bc_cipsi_tucker(ci_vector.copy(), clustered_ham,thresh_cipsi=1e-5, thresh_ci_clip=1e-7, max_tucker_iter=4,thresh_asci=1e-2)
 
 
-    do_cmf = 1
-    if do_cmf:
-        # Get CMF reference
-        cmf(clustered_ham, ci_vector, h, g, max_iter=50,max_nroots=50,dm_guess=(dm_aa,dm_bb),diis=True)
-
-    else:
-        # Get vaccum reference
-        for ci_idx, ci in enumerate(clusters):
-            print()
-            print(" Form basis by diagonalize local Hamiltonian for cluster: ",ci_idx)
-            ci.form_eigbasis_from_ints(h,g,max_roots=50)
-            print(" Build these local operators")
-            print(" Build mats for cluster ",ci.idx)
-            ci.build_op_matrices()
-
-    edps = build_hamiltonian_diagonal(clustered_ham,ci_vector)
-    ci_vector, pt_vector, etci, etci2, t_conv = bc_cipsi_tucker(ci_vector.copy(), clustered_ham,thresh_cipsi=1e-7, thresh_ci_clip=1e-4, max_tucker_iter=4,thresh_asci=5e-4)
-
-    #ci_vector, pt_vector, etci, etci2, t_conv = bc_cipsi_tucker(ci_vector.copy(), clustered_ham,
-    #    thresh_cipsi=1e-4, thresh_ci_clip=5e-3, max_tucker_iter=3,asci_clip=.1)
-    print("init DPS",(edps+ecore))
-    print("")
-    print(" TPSCI:          %12.8f      Dim:%6d" % (etci+ecore, len(ci_vector)))
-    print(" TPSCI(2):       %12.8f      Dim:%6d" % (etci2+ecore,len(pt_vector)))
-    print("coefficient of dominant determinant")
-    ci_vector.print_configs()
-    tci_dim = len(ci_vector)
-    etci = etci+ecore
-    etci2 = etci2+ecore
-    print("radius:",r0)
+print("init DPS",(edps+ecore))
+print("")
+print(" TPSCI:          %12.8f      Dim:%6d" % (etci+ecore, len(ci_vector)))
+print(" TPSCI(2):       %12.8f      Dim:%6d" % (etci2+ecore,len(pt_vector)))
+print("coefficient of dominant determinant")
+ci_vector.print_configs()
+tci_dim = len(ci_vector)
+etci = etci+ecore
+etci2 = etci2+ecore
+print("radius:",r0)
 
