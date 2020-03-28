@@ -328,10 +328,48 @@ class LocalClusteredTerm(ClusteredTerm):
 
     
     def matrix_element(self,fock_bra,bra,fock_ket,ket):
-        return 0
+        """
+        Compute the matrix element between <fock1,config1|H|fock2,config2>
+        where fock is the 'fock-block' of bra. This is just a specification
+        of the particle number space of each cluster. Eg., 
+        ((2,3),(4,3),(2,2)) would have 3 clusters with 2(3), 4(3), 2(2) 
+        alpha(beta) electrons, respectively. 
+        
+        For this Local term, it just needs to return the matrix element of the stored operator
+
+        Args:
+            fock_bra (tuple(tuple)): fock-block for bra
+            bra (tuple): cluster state configuration within specified fock block
+            fock_ket (tuple(tuple)): fock-block for ket 
+            ket (tuple): cluster state configuration within specified fock block
+        Returns:
+            matrix element. <IJK...|Hterm|LMN...>, where IJK, and LMN
+            are the state indices for clusters 1, 2, and 3, respectively, in the 
+            particle number blocks specified by fock_bra and fock_ket.
+        """
+        # {{{
+        for ci in range(self.n_clusters):
+            if (bra[ci]!=ket[ci]) and (ci not in self.active):
+                return 0
+     
+        assert(len(fock_bra) == len(fock_ket))
+        assert(len(fock_ket) == len(bra))
+        assert(len(bra) == len(ket))
+        assert(len(ket) == self.n_clusters)
+        assert(len(self.active) == 1)
+
+        ci = self.active[0]
+        return self.clusters[ci].ops['H'][(fock_bra[ci],fock_ket[ci])][bra[ci],ket[ci]]
+# }}}
     
     def diag_matrix_element(self,fock,config):
+        exit()
         return 0
+
+
+
+
+
 
 class ClusteredOperator:
     """
@@ -349,6 +387,7 @@ class ClusteredOperator:
         self.n_clusters = len(clusters)
         self.clusters = clusters
         self.terms = OrderedDict()
+        self.local_terms = []
         self.n_orb = 0
         for ci,c in enumerate(self.clusters):
             self.n_orb += c.n_orb
@@ -362,6 +401,7 @@ class ClusteredOperator:
         """
 # {{{
 
+        self.local_terms = []
         delta_tmp = []
         ops_tmp = []
         for ci in self.clusters:
@@ -405,6 +445,8 @@ class ClusteredOperator:
 
         for ci in self.clusters:
             for cj in self.clusters:
+                if ci == cj:
+                    continue
                 delta_a = list(cp.deepcopy(delta_tmp)) #alpha hopping
                 delta_b = list(cp.deepcopy(delta_tmp)) #beta hopping
                 ops_a = cp.deepcopy(ops_tmp) #alpha hopping
@@ -510,6 +552,8 @@ class ClusteredOperator:
             for cj in self.clusters:
                 for ck in self.clusters:
                     for cl in self.clusters:
+                        if ci == cj and ci == ck and ci == cl:
+                            continue
                         delta_aa = list(cp.deepcopy(delta_tmp)) 
                         delta_bb = list(cp.deepcopy(delta_tmp)) 
                         delta_ab = list(cp.deepcopy(delta_tmp)) 

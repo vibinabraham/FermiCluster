@@ -976,7 +976,6 @@ def build_full_hamiltonian_parallel1(clustered_ham_in,ci_vector_in,iprint=1, npr
             if not term_exists:
                 continue 
 
-            
             for config_li, config_l in enumerate(configs_l):
                 idx_l = config_li 
                 #idx_l = fock_space_shifts[fock_li] + config_li 
@@ -995,27 +994,27 @@ def build_full_hamiltonian_parallel1(clustered_ham_in,ci_vector_in,iprint=1, npr
                     if not allowed:
                         continue
                    
-
-                    #d = do[(fock_bra[oi],fock_ket[oi])][bra[oi],ket[oi]] #D(I,J,:,:...)
-                    mats = []
-                    for ci in term.active:
-                        mats.append( clusters[ci].ops[term.ops[ci]][(fock_l[ci],fock_r[ci])][config_l[ci],config_r[ci]] ) 
-
-                    me = 0.0
-                  
-                    if len(mats) != len(term.active):
-                        continue
-                    
-                    #check that the mats where treated as views and also contiguous
-                    #for m in mats:
-                    #    print(m.flags['OWNDATA'])  #False -- apparently this is a view
-                    #    print(m.__array_interface__)
-                    #    print()
-
-                    # todo:
-                    #    For some reason, precompiled contract expression is slower than direct einsum - figure this out
-                    #me = term.contract_expression(*mats) * state_sign
-                    me = np.einsum(term.contract_string,*mats,term.ints) * state_sign
+                    me = term.matrix_element(fock_l,config_l,fock_r,config_r)
+#                    #d = do[(fock_bra[oi],fock_ket[oi])][bra[oi],ket[oi]] #D(I,J,:,:...)
+#                    mats = []
+#                    for ci in term.active:
+#                        mats.append( clusters[ci].ops[term.ops[ci]][(fock_l[ci],fock_r[ci])][config_l[ci],config_r[ci]] ) 
+#
+#                    me = 0.0
+#                  
+#                    if len(mats) != len(term.active):
+#                        continue
+#                    
+#                    #check that the mats where treated as views and also contiguous
+#                    #for m in mats:
+#                    #    print(m.flags['OWNDATA'])  #False -- apparently this is a view
+#                    #    print(m.__array_interface__)
+#                    #    print()
+#
+#                    # todo:
+#                    #    For some reason, precompiled contract expression is slower than direct einsum - figure this out
+#                    #me = term.contract_expression(*mats) * state_sign
+#                    me = np.einsum(term.contract_string,*mats,term.ints) * state_sign
 
                     Hblock[idx_l,idx_r] += me
                    
