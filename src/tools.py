@@ -409,6 +409,7 @@ def matvec1_parallel2(h_in,v,term_thresh=1e-12, nproc=None):
     global h 
     global clusters
     global sigma 
+    global clustered_ham
     print(" In matvec1_parallel1. nproc=",nproc) 
     h = h_in
     clusters = h_in.clusters
@@ -450,69 +451,91 @@ def matvec1_parallel2(h_in,v,term_thresh=1e-12, nproc=None):
             configs_l = sigma_out[fock_l] 
             
             for term in h.terms[terms]:
-                #print(" term: ", term)
-                state_sign = 1
-                for oi,o in enumerate(term.ops):
-                    if o == '':
-                        continue
-                    if len(o) == 1 or len(o) == 3:
-                        for cj in range(oi):
-                            state_sign *= (-1)**(fock_r[cj][0]+fock_r[cj][1])
+                
+                # do local terms separately
+                if len(term.active) == 1:
                     
-                #print("  ", conf_r)
-                
-                #if abs(v[fock_r][conf_r]) < 5e-2:
-                #    continue
-                # get state sign 
-                #print('state_sign ', state_sign)
-                opii = -1
-                mats = []
-                good = True
-                for opi,op in enumerate(term.ops):
-                    if op == "":
+                    ci = term.active[0]
+                        
+                    tmp = clusters[ci].ops['H'][(fock_l[ci],fock_r[ci])][:,conf_r[ci]] * coeff 
+                    
+                    new_configs = [[i] for i in conf_r] 
+                    
+                    new_configs[ci] = range(clusters[ci].ops['H'][(fock_l[ci],fock_r[ci])].shape[0])
+                    
+                    for sp_idx, spi in enumerate(itertools.product(*new_configs)):
+                        #print(" New config: %12.8f" %tmp[sp_idx], spi)
+                        if abs(tmp[sp_idx]) > term_thresh:
+                            if spi not in configs_l:
+                                configs_l[spi] = tmp[sp_idx] 
+                            else:
+                                configs_l[spi] += tmp[sp_idx] 
+
+
+                else:
+                    #print(" term: ", term)
+                    state_sign = 1
+                    for oi,o in enumerate(term.ops):
+                        if o == '':
+                            continue
+                        if len(o) == 1 or len(o) == 3:
+                            for cj in range(oi):
+                                state_sign *= (-1)**(fock_r[cj][0]+fock_r[cj][1])
+                        
+                    #print("  ", conf_r)
+                    
+                    #if abs(v[fock_r][conf_r]) < 5e-2:
+                    #    continue
+                    # get state sign 
+                    #print('state_sign ', state_sign)
+                    opii = -1
+                    mats = []
+                    good = True
+                    for opi,op in enumerate(term.ops):
+                        if op == "":
+                            continue
+                        opii += 1
+                        #print(opi,term.active)
+                        ci = clusters[opi]
+                        #ci = clusters[term.active[opii]]
+                        try:
+                            oi = ci.ops[op][(fock_l[ci.idx],fock_r[ci.idx])][:,conf_r[ci.idx],:]
+                            mats.append(oi)
+                        except KeyError:
+                            good = False
+                            break
+                    if good == False:
+                        continue                        
+                        #break
+                   
+                    if len(mats) == 0:
                         continue
-                    opii += 1
-                    #print(opi,term.active)
-                    ci = clusters[opi]
-                    #ci = clusters[term.active[opii]]
-                    try:
-                        oi = ci.ops[op][(fock_l[ci.idx],fock_r[ci.idx])][:,conf_r[ci.idx],:]
-                        mats.append(oi)
-                    except KeyError:
-                        good = False
-                        break
-                if good == False:
-                    continue                        
-                    #break
-               
-                if len(mats) == 0:
-                    continue
-                #print('mats:', end='')
-                #[print(m.shape,end='') for m in mats]
-                #print()
-                #print('ints:', term.ints.shape)
-                #print("contract_string       :", term.contract_string)
-                #print("contract_string_matvec:", term.contract_string_matvec)
-                
-                
-                #tmp = oe.contract(term.contract_string_matvec, *mats, term.ints)
-                tmp = np.einsum(term.contract_string_matvec, *mats, term.ints)
-                
-        
-                #v_coeff = v[fock_r][conf_r]
-                #tmp = state_sign * tmp.ravel() * v_coeff
-                tmp = state_sign * tmp.ravel() * coeff 
-        
-                new_configs = [[i] for i in conf_r] 
-                for cacti,cact in enumerate(term.active):
-                    new_configs[cact] = range(mats[cacti].shape[0])
-                for sp_idx, spi in enumerate(itertools.product(*new_configs)):
-                    #print(" New config: %12.8f" %tmp[sp_idx], spi)
-                    if abs(tmp[sp_idx]) > term_thresh:
-                        if spi not in configs_l:
-                            configs_l[spi] = tmp[sp_idx] 
-                        else:
-                            configs_l[spi] += tmp[sp_idx] 
+                    #print('mats:', end='')
+                    #[print(m.shape,end='') for m in mats]
+                    #print()
+                    #print('ints:', term.ints.shape)
+                    #print("contract_string       :", term.contract_string)
+                    #print("contract_string_matvec:", term.contract_string_matvec)
+                    
+                    
+                    #tmp = oe.contract(term.contract_string_matvec, *mats, term.ints)
+                    tmp = np.einsum(term.contract_string_matvec, *mats, term.ints)
+                    
+                    
+                    #v_coeff = v[fock_r][conf_r]
+                    #tmp = state_sign * tmp.ravel() * v_coeff
+                    tmp = state_sign * tmp.ravel() * coeff 
+                    
+                    new_configs = [[i] for i in conf_r] 
+                    for cacti,cact in enumerate(term.active):
+                        new_configs[cact] = range(mats[cacti].shape[0])
+                    for sp_idx, spi in enumerate(itertools.product(*new_configs)):
+                        #print(" New config: %12.8f" %tmp[sp_idx], spi)
+                        if abs(tmp[sp_idx]) > term_thresh:
+                            if spi not in configs_l:
+                                configs_l[spi] = tmp[sp_idx] 
+                            else:
+                                configs_l[spi] += tmp[sp_idx] 
         return sigma_out
     
     import multiprocessing as mp
@@ -797,6 +820,8 @@ def build_full_hamiltonian_open(clustered_ham,ci_vector,iprint=1):
     Build hamiltonian in basis in ci_vector
     """
 # {{{
+    print("OBSOLETE: build_full_hamiltonian_open")
+    exit()
     clusters = ci_vector.clusters
     H = np.zeros((len(ci_vector),len(ci_vector)))
     n_clusters = len(clusters)
@@ -1195,8 +1220,6 @@ def build_hamiltonian_diagonal_parallel1(clustered_ham_in,ci_vector, nproc=None)
         terms = clustered_ham.terms[delta_fock]
         ## add diagonal energies
         tmp = 0
-        for ci in clusters:
-            tmp += ci.energies[fockspace[ci.idx]][config[ci.idx]]
         
         for term in terms:
             #tmp += term.matrix_element(fockspace,config,fockspace,config)
@@ -1259,9 +1282,6 @@ def update_hamiltonian_diagonal(clustered_ham,ci_vector,Hd_vector):
 
                 ## add diagonal energies
                 tmp = 0
-                for ci in clusters:
-                    tmp += ci.energies[fockspace[ci.idx]][config[ci.idx]]
-                
                 for term in terms:
                     #Hd[idx] += term.matrix_element(fockspace,config,fockspace,config)
                     tmp += term.diag_matrix_element(fockspace,config)
@@ -1341,6 +1361,8 @@ def precompute_cluster_basis_energies(clustered_ham):
     for each cluster state
     """
     # {{{
+    print("OBSOLETE: precompute_cluster_basis_energies")
+    exit()
     clusters = clustered_ham.clusters
 
 

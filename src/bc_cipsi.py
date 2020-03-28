@@ -29,6 +29,7 @@ def system_setup(h, g, ecore, blocks, max_roots=1000):
 
     clustered_ham = ClusteredOperator(clusters)
     print(" Add 1-body terms")
+    clustered_ham.add_local_terms()
     clustered_ham.add_1b_terms(h)
     print(" Add 2-body terms")
     clustered_ham.add_2b_terms(g)
@@ -49,6 +50,7 @@ def system_setup(h, g, ecore, blocks, max_roots=1000):
     for c in clusters:
         print(" Build mats for cluster ",c.idx,flush=True)
         c.build_op_matrices()
+        c.build_local_terms(h,g)
     
     return clusters, clustered_ham
 
@@ -234,10 +236,10 @@ def bc_cipsi_tucker(ci_vector, clustered_ham, selection="cipsi",
 def bc_cipsi(ci_vector, clustered_ham,  
     thresh_cipsi=1e-4, thresh_ci_clip=1e-5, thresh_conv=1e-8, max_iter=30, n_roots=1,thresh_asci=0,nproc=None):
 # {{{
-    print(" Compute diagonal elements",flush=True)
+    #print(" Compute diagonal elements",flush=True)
     # compute local states energies
-    precompute_cluster_basis_energies(clustered_ham)
-    print(" done.",flush=True)
+    #precompute_cluster_basis_energies(clustered_ham)
+    #print(" done.",flush=True)
   
     pt_vector = ci_vector.copy()
     Hd_vector = ClusteredState(ci_vector.clusters)

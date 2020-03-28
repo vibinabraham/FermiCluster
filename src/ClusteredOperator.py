@@ -363,8 +363,7 @@ class LocalClusteredTerm(ClusteredTerm):
 # }}}
     
     def diag_matrix_element(self,fock,config):
-        exit()
-        return 0
+        return self.matrix_element(fock,config,fock,config) 
 
 
 
