@@ -300,7 +300,14 @@ class Cluster(object):
                 if fspace_l in U and fspace_r in U:
                     Ul = U[fspace_l]
                     Ur = U[fspace_r]
-                    self.ops[op][fspace_delta] = np.einsum('pq,rs,pr...->qs...',Ul,Ur,self.ops[op][fspace_delta], optimize=True)
+                    try:
+                        self.ops[op][fspace_delta] = np.einsum('pq,rs,pr...->qs...',Ul,Ur,self.ops[op][fspace_delta], optimize=True)
+                    except ValueError:
+                        print("Error: Rotate basis failed for term: ", op, " fspace_delta: ", fspace_delta) 
+                        print(Ul.shape)
+                        print(Ur.shape)
+                        print(self.ops[op][fspace_delta].shape)
+                        exit()
    # }}}
     
     
@@ -364,6 +371,7 @@ class Cluster(object):
         """
         build all operators needed
         """
+# {{{
         start = time.time()
         self.ops['A'] = {}
         self.ops['a'] = {}
@@ -706,7 +714,7 @@ class Cluster(object):
 
         stop_tot = time.time()
         print(" Time spent building TDMs Total %12.2f" %(stop_tot-start_tot))
-
+# }}}
 
 
 ###################################################################################################################

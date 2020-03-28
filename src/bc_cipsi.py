@@ -529,7 +529,7 @@ def hb_tpsci(ci_vector, clustered_ham, thresh_cipsi=1e-4, thresh_ci_clip=1e-5, t
         stop=time.time()
         print(" Number of new configurations found         : ", len(pt_vector))
         print(" Time spent in heat bath search: %12.2f" %(stop-start),flush=True)
-
+        
         print(" Remove CI space from results")
         for fockspace,configs in pt_vector.items():
             if fockspace in ci_vector.fblocks():
@@ -555,6 +555,7 @@ def hb_tpsci(ci_vector, clustered_ham, thresh_cipsi=1e-4, thresh_ci_clip=1e-5, t
         print(" Dimension of next CI space: ", len(ci_vector))
         print(" Time spent in finding new CI space: %12.2f" %(end - start), flush=True)
 
+        exit()
         start = time.time()
 
         delta_e = e0 - e_prev

@@ -62,6 +62,7 @@ def cmf(clustered_ham, ci_vector, h, g, max_iter=20, thresh=1e-8, max_nroots=100
         
             print(" Build new operators for cluster ",ci.idx)
             ci.build_op_matrices()
+            ci.build_local_terms(h,g)
       
         print(" Compute CMF energy")
         e_curr = build_full_hamiltonian(clustered_ham, ci_vector)[0,0]
@@ -150,6 +151,7 @@ def cmf(clustered_ham, ci_vector, h, g, max_iter=20, thresh=1e-8, max_nroots=100
         print(" Build these local operators")
         print(" Build mats for cluster ",ci.idx)
         ci.build_op_matrices()
+        ci.build_local_terms(h,g)
 
     return e_curr,converged
    # }}}
@@ -702,6 +704,7 @@ def heat_bath_search(h_in,v,thresh_cipsi=None, nproc=None):
                                 configs_l[spi] += tmp[sp_idx] 
                     
 
+                # now do non-local terms 
                 else:
                     #print(" term: ", term)
                     state_sign = 1

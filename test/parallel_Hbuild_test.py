@@ -108,8 +108,8 @@ def test_1():
         c.build_op_matrices()
         c.build_local_terms(h,g)
 
-    ci_vector.expand_to_full_space()
-    #ci_vector.expand_each_fock_space()
+    #ci_vector.expand_to_full_space()
+    ci_vector.expand_each_fock_space()
     #ci_vector.add_single_excitonic_states()
     #ci_vector.print_configs()
     edps = build_hamiltonian_diagonal(clustered_ham,ci_vector)

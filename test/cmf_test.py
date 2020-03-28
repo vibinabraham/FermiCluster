@@ -90,23 +90,10 @@ def test_cmf():
         print(" FCI:        %12.8f Dim:%6d"%(efci,fci_dim))
     
 
-    clusters = []
-    for ci,c in enumerate(blocks):
-        clusters.append(Cluster(ci,c))
+    clusters, clustered_ham = system_setup(h, g, ecore, blocks)
     
     ci_vector = ClusteredState(clusters)
     ci_vector.init(init_fspace)
-   
-
-    print(" Clusters:")
-    [print(ci) for ci in clusters]
-    
-    clustered_ham = ClusteredOperator(clusters)
-    print(" Add 1-body terms")
-    clustered_ham.add_1b_terms(h)
-    print(" Add 2-body terms")
-    clustered_ham.add_2b_terms(g)
-    #clustered_ham.combine_common_terms(iprint=1)
    
    
     # Get CMF reference
@@ -193,33 +180,17 @@ def test_truncate_basis():
         print(" FCI:        %12.8f Dim:%6d"%(efci,fci_dim))
     
 
-    clusters = []
-    for ci,c in enumerate(blocks):
-        clusters.append(Cluster(ci,c))
+    clusters, clustered_ham = system_setup(h, g, ecore, blocks)
     
     ci_vector = ClusteredState(clusters)
     ci_vector.init(init_fspace)
-   
-
-    print(" Clusters:")
-    [print(ci) for ci in clusters]
-    
-    clustered_ham = ClusteredOperator(clusters)
-    print(" Add 1-body terms")
-    clustered_ham.add_1b_terms(h)
-    print(" Add 2-body terms")
-    clustered_ham.add_2b_terms(g)
-    #clustered_ham.combine_common_terms(iprint=1)
-   
    
     # Get CMF reference
     cmf(clustered_ham, ci_vector, h, g, max_iter=10, max_nroots=20)
 
 
-    ci_vector, pt_vector, e0, e2, t_conv = bc_cipsi_tucker(ci_vector.copy(), clustered_ham, 
-            thresh_cipsi=1e-5,
-            thresh_ci_clip=1e-6, 
-            max_tucker_iter = 20)
+    ci_vector, pt_vector, e0, e2, t_conv = bc_cipsi_tucker(ci_vector.copy(), clustered_ham, thresh_cipsi=1e-5,
+            thresh_ci_clip=1e-6, max_tucker_iter = 20)
    
 
     assert(np.isclose(e0,-4.51144784,atol=1e-7))
@@ -227,5 +198,5 @@ def test_truncate_basis():
 
 
 if __name__== "__main__":
-    test_cmf() 
+    #test_cmf()     # need to add some reference
     test_truncate_basis() 
