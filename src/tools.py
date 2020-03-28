@@ -160,6 +160,8 @@ def matvec1(h,v,term_thresh=1e-12):
     Compute the action of H onto a sparse trial vector v
     returns a ClusteredState object. 
 
+    serial version
+
     """
 # {{{
     clusters = h.clusters
@@ -194,69 +196,92 @@ def matvec1(h,v,term_thresh=1e-12):
             configs_l = sigma[fock_l] 
            
             for term in h.terms[terms]:
-                #print(" term: ", term)
-                state_sign = 1
-                for oi,o in enumerate(term.ops):
-                    if o == '':
-                        continue
-                    if len(o) == 1 or len(o) == 3:
-                        for cj in range(oi):
-                            state_sign *= (-1)**(fock_r[cj][0]+fock_r[cj][1])
+                
+                # do local terms separately
+                if len(term.active) == 1:
                     
-                for conf_ri, conf_r in enumerate(v[fock_r]):
-                    #print("  ", conf_r)
-                    
-                    #if abs(v[fock_r][conf_r]) < 5e-2:
-                    #    continue
-                    # get state sign 
-                    #print('state_sign ', state_sign)
-                    opii = -1
-                    mats = []
-                    good = True
-                    for opi,op in enumerate(term.ops):
-                        if op == "":
+                    for conf_ri, conf_r in enumerate(v[fock_r]):
+                        ci = term.active[0]
+                            
+                        coeff = v[fock_r][conf_r]
+                        tmp = clusters[ci].ops['H'][(fock_l[ci],fock_r[ci])][:,conf_r[ci]] * coeff 
+                        
+                        new_configs = [[i] for i in conf_r] 
+                        
+                        new_configs[ci] = range(clusters[ci].ops['H'][(fock_l[ci],fock_r[ci])].shape[0])
+                        
+                        for sp_idx, spi in enumerate(itertools.product(*new_configs)):
+                            if abs(tmp[sp_idx]) > term_thresh:
+                                if spi not in configs_l:
+                                    configs_l[spi] = tmp[sp_idx] 
+                                else:
+                                    configs_l[spi] += tmp[sp_idx] 
+
+
+                else:
+                
+                    state_sign = 1
+                    for oi,o in enumerate(term.ops):
+                        if o == '':
                             continue
-                        opii += 1
-                        #print(opi,term.active)
-                        ci = clusters[opi]
-                        #ci = clusters[term.active[opii]]
-                        try:
-                            oi = ci.ops[op][(fock_l[ci.idx],fock_r[ci.idx])][:,conf_r[ci.idx],:]
-                            mats.append(oi)
-                        except KeyError:
-                            good = False
-                            break
-                    if good == False:
-                        continue                        
-                        #break
-                   
-                    if len(mats) == 0:
-                        continue
-                    #print('mats:', end='')
-                    #[print(m.shape,end='') for m in mats]
-                    #print()
-                    #print('ints:', term.ints.shape)
-                    #print("contract_string       :", term.contract_string)
-                    #print("contract_string_matvec:", term.contract_string_matvec)
+                        if len(o) == 1 or len(o) == 3:
+                            for cj in range(oi):
+                                state_sign *= (-1)**(fock_r[cj][0]+fock_r[cj][1])
+                        
+                    for conf_ri, conf_r in enumerate(v[fock_r]):
+                        #print("  ", conf_r)
+                        
+                        #if abs(v[fock_r][conf_r]) < 5e-2:
+                        #    continue
+                        # get state sign 
+                        #print('state_sign ', state_sign)
+                        opii = -1
+                        mats = []
+                        good = True
+                        for opi,op in enumerate(term.ops):
+                            if op == "":
+                                continue
+                            opii += 1
+                            #print(opi,term.active)
+                            ci = clusters[opi]
+                            #ci = clusters[term.active[opii]]
+                            try:
+                                oi = ci.ops[op][(fock_l[ci.idx],fock_r[ci.idx])][:,conf_r[ci.idx],:]
+                                mats.append(oi)
+                            except KeyError:
+                                good = False
+                                break
+                        if good == False:
+                            continue                        
+                            #break
+                       
+                        if len(mats) == 0:
+                            continue
+                        #print('mats:', end='')
+                        #[print(m.shape,end='') for m in mats]
+                        #print()
+                        #print('ints:', term.ints.shape)
+                        #print("contract_string       :", term.contract_string)
+                        #print("contract_string_matvec:", term.contract_string_matvec)
+                        
+                        
+                        #tmp = oe.contract(term.contract_string_matvec, *mats, term.ints)
+                        tmp = np.einsum(term.contract_string_matvec, *mats, term.ints)
+                        
                     
+                        v_coeff = v[fock_r][conf_r]
+                        tmp = state_sign * tmp.ravel() * v_coeff
                     
-                    #tmp = oe.contract(term.contract_string_matvec, *mats, term.ints)
-                    tmp = np.einsum(term.contract_string_matvec, *mats, term.ints)
-                    
-
-                    v_coeff = v[fock_r][conf_r]
-                    tmp = state_sign * tmp.ravel() * v_coeff
-
-                    new_configs = [[i] for i in conf_r] 
-                    for cacti,cact in enumerate(term.active):
-                        new_configs[cact] = range(mats[cacti].shape[0])
-                    for sp_idx, spi in enumerate(itertools.product(*new_configs)):
-                        #print(" New config: %12.8f" %tmp[sp_idx], spi)
-                        if abs(tmp[sp_idx]) > term_thresh:
-                            if spi not in configs_l:
-                                configs_l[spi] = tmp[sp_idx] 
-                            else:
-                                configs_l[spi] += tmp[sp_idx] 
+                        new_configs = [[i] for i in conf_r] 
+                        for cacti,cact in enumerate(term.active):
+                            new_configs[cact] = range(mats[cacti].shape[0])
+                        for sp_idx, spi in enumerate(itertools.product(*new_configs)):
+                            #print(" New config: %12.8f" %tmp[sp_idx], spi)
+                            if abs(tmp[sp_idx]) > term_thresh:
+                                if spi not in configs_l:
+                                    configs_l[spi] = tmp[sp_idx] 
+                                else:
+                                    configs_l[spi] += tmp[sp_idx] 
     
     print(" This is how much memory is being used to store collected results: ",sys.getsizeof(sigma.data)) 
     return sigma 
