@@ -556,20 +556,25 @@ def matvec1_parallel2(h_in,v,term_thresh=1e-12, nproc=None, opt_einsum=True):
                    
                     if len(mats) == 0:
                         continue
-                    start = time.time()
-                    print()
-                    print(term)
-                    print('mats:', end='')
-                    [print(m.shape,end='') for m in mats]
-                    print('ints:', term.ints.shape)
-                    print("contract_string       :", term.contract_string)
-                    print("contract_string_matvec:", term.contract_string_matvec, flush=True)
+                    
+                    #start = time.time()
+                    #print()
+                    #print(term)
+                    #print('mats:', end='')
+                    #[print(m.shape,end='') for m in mats]
+                    #print('ints:', term.ints.shape)
+                    #print("contract_string       :", term.contract_string)
+                    #print("contract_string_matvec:", term.contract_string_matvec, flush=True)
                     
                     
                     #tmp = oe.contract(term.contract_string_matvec, *mats, term.ints)
+                    
+
                     tmp = np.einsum(term.contract_string_matvec, *mats, term.ints, optimize=opt_einsum)
-                    stop = time.time()
-                    print(" Time spent in einsum: %12.2f: NBody: %6i" %( stop-start, len(term.active)))
+                    
+
+                    #stop = time.time()
+                    #print(" Time spent in einsum: %12.2f: NBody: %6i" %( stop-start, len(term.active)))
                     
                     
                     #v_coeff = v[fock_r][conf_r]
