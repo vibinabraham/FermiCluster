@@ -105,7 +105,7 @@ class ClusteredTerm:
         """
         return self.active
     
-    def matrix_element(self,fock_bra,bra,fock_ket,ket):
+    def matrix_element(self,fock_bra,bra,fock_ket,ket, opt_einsum=True):
         """
         Compute the matrix element between <fock1,config1|H|fock2,config2>
         where fock is the 'fock-block' of bra. This is just a specification
@@ -180,13 +180,13 @@ class ClusteredTerm:
         # todo:
         #    For some reason, precompiled contract expression is slower than direct einsum - figure this out
         #me = self.contract_expression(*mats) * state_sign
-        me = np.einsum(self.contract_string,*mats,self.ints) * state_sign
+        me = np.einsum(self.contract_string,*mats,self.ints, optimize=opt_einsum) * state_sign
         
         return me
 # }}}
 
 
-    def diag_matrix_element(self,fock,config):
+    def diag_matrix_element(self,fock,config, opt_einsum=True):
         """
         Compute the diagonal matrix element between <fock,config|H|fock,config>
         where fock is the fockspace of bra. This is just a specification
@@ -233,7 +233,7 @@ class ClusteredTerm:
         if len(mats) == 0:
             return 0 
         me = 0.0
-        me = np.einsum(self.contract_string,*mats,self.ints)
+        me = np.einsum(self.contract_string,*mats,self.ints, optimize=opt_einsum)
         
         return me
 # }}}
@@ -818,6 +818,7 @@ class ClusteredOperator:
                     term.delta = [term.delta[cluster_idx]]
                     op.add_term(term)
         return op
+
     def extract_local_embedded_operator(self,cluster_idx,rdm):
         """
         Extract Local operator, considering only terms which are completely contained inside cluster,

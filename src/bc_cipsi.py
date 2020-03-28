@@ -17,6 +17,7 @@ from tools import *
 
 
 def system_setup(h, g, ecore, blocks, max_roots=1000):
+# {{{
     n_blocks = len(blocks)
 
     clusters = []
@@ -53,7 +54,7 @@ def system_setup(h, g, ecore, blocks, max_roots=1000):
         c.build_local_terms(h,g)
     
     return clusters, clustered_ham
-
+# }}}
 
 
 def bc_cipsi_tucker(ci_vector, clustered_ham, selection="cipsi",
@@ -107,59 +108,10 @@ def bc_cipsi_tucker(ci_vector, clustered_ham, selection="cipsi",
             t_conv = True
             break
         e_prev = e_curr
-        for ci in clustered_ham.clusters:
-            print()
-            print(" --------------------------------------------------------")
-            print(" Density matrix: Cluster ", ci)
-            print()
-            print(" Compute BRDM",flush=True)
-            print(" Hshift = ",hshift)
-            start = time.time()
-            rdms = build_brdm(pt_vector, ci.idx)
-            end = time.time()
-            print(" done.",flush=True)
-            print(" Time spent building BRDMs: %12.2f" %(end-start))
-            norm = 0
-            entropy = 0
-            rotations = {}
-            for fspace,rdm in rdms.items():
-               
-                fspace_norm = 0
-                fspace_entropy = 0
-                print(" Diagonalize RDM for Cluster %2i in Fock space:"%ci.idx, fspace,flush=True)
-                n,U = np.linalg.eigh(rdm)
-                idx = n.argsort()[::-1]
-                n = n[idx]
-                U = U[:,idx]
-
-                if hshift != None:
-                    """Adding cluster hamiltonian to RDM before diagonalization to make null space unique. """
-                    Hlocal = ci.ops['H'][(fspace,fspace)]
-                    n,U = np.linalg.eigh(rdm + hshift*Hlocal)
-                    n = np.diag(U.T @ rdm @ U)
-                    idx = n.argsort()[::-1]
-                    n = n[idx]
-                    U = U[:,idx]
-                
-                norm += sum(n)
-                fspace_norm = sum(n)
-                for ni_idx,ni in enumerate(n):
-                    if abs(ni/norm) > 1e-12:
-                        fspace_entropy -= ni*np.log(ni/norm)/norm
-                        entropy -=  ni*np.log(ni)
-                        print("   Rotated State %4i:    %12.8f"%(ni_idx,ni), flush=True)
-                print("   ----")
-                print("   Entanglement entropy:  %12.8f" %fspace_entropy, flush=True) 
-                print("   Norm:                  %12.8f" %fspace_norm, flush=True) 
-                rotations[fspace] = U
-            print(" Final entropy:.... %12.8f"%entropy)
-            print(" Final norm:....... %12.8f"%norm)
-            print(" --------------------------------------------------------", flush=True)
         
-            start = time.time()
-            ci.rotate_basis(rotations)
-            end = time.time()
-            print(" Time spent rotating cluster basis: %12.2f" %(end-start))
+        # do the Tucker decomposition
+        hosvd(pt_vector, clustered_ham, hshift=hshift)
+
         delta_e = e0 - e_last
         e_last = e0
         if abs(delta_e) < 1e-8:
@@ -305,13 +257,24 @@ def bc_cipsi(ci_vector, clustered_ham,
         #asci_vector.normalize()
 
         print(" Compute Matrix Vector Product:", flush=True)
+
+        profile = 0
+        if profile:
+            import cProfile
+            pr = cProfile.Profile()
+            pr.enable()
+
         start = time.time()
         if nproc==1:
             pt_vector = matvec1(clustered_ham, asci_vector)
         else:
-            pt_vector = matvec1_parallel1(clustered_ham, asci_vector, nproc=nproc)
+            pt_vector = matvec1_parallel2(clustered_ham, asci_vector, nproc=nproc)
         stop = time.time()
         print(" Time spent in matvec: %12.2f" %( stop-start))
+    
+        if profile:
+            pr.disable()
+            pr.print_stats(sort='time')
         
         pt_vector.prune_empty_fock_spaces()
 
@@ -573,6 +536,7 @@ def hosvd(ci_vector, clustered_ham, hshift=1e-8):
     """
     Peform HOSVD aka Tucker Decomposition of ClusteredState
     """
+# {{{
     for ci in clustered_ham.clusters:
         print()
         print(" --------------------------------------------------------")
@@ -628,7 +592,7 @@ def hosvd(ci_vector, clustered_ham, hshift=1e-8):
         end = time.time()
         print(" Time spent rotating cluster basis: %12.2f" %(end-start))
     return
-
+# }}}
 
 
 

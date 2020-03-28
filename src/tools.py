@@ -447,7 +447,7 @@ def matvec1_parallel1(h_in,v,term_thresh=1e-12, nproc=None):
 # }}}
 
 
-def matvec1_parallel2(h_in,v,term_thresh=1e-12, nproc=None):
+def matvec1_parallel2(h_in,v,term_thresh=1e-12, nproc=None, opt_einsum=True):
     """
     Compute the action of H onto a sparse trial vector v
     returns a ClusteredState object. 
@@ -457,7 +457,7 @@ def matvec1_parallel2(h_in,v,term_thresh=1e-12, nproc=None):
     global clusters
     global sigma 
     global clustered_ham
-    print(" In matvec1_parallel1. nproc=",nproc) 
+    print(" In matvec1_parallel2. nproc=",nproc) 
     h = h_in
     clusters = h_in.clusters
     
@@ -556,16 +556,20 @@ def matvec1_parallel2(h_in,v,term_thresh=1e-12, nproc=None):
                    
                     if len(mats) == 0:
                         continue
-                    #print('mats:', end='')
-                    #[print(m.shape,end='') for m in mats]
-                    #print()
-                    #print('ints:', term.ints.shape)
-                    #print("contract_string       :", term.contract_string)
-                    #print("contract_string_matvec:", term.contract_string_matvec)
+                    start = time.time()
+                    print()
+                    print(term)
+                    print('mats:', end='')
+                    [print(m.shape,end='') for m in mats]
+                    print('ints:', term.ints.shape)
+                    print("contract_string       :", term.contract_string)
+                    print("contract_string_matvec:", term.contract_string_matvec, flush=True)
                     
                     
                     #tmp = oe.contract(term.contract_string_matvec, *mats, term.ints)
-                    tmp = np.einsum(term.contract_string_matvec, *mats, term.ints)
+                    tmp = np.einsum(term.contract_string_matvec, *mats, term.ints, optimize=opt_einsum)
+                    stop = time.time()
+                    print(" Time spent in einsum: %12.2f: NBody: %6i" %( stop-start, len(term.active)))
                     
                     
                     #v_coeff = v[fock_r][conf_r]
@@ -592,7 +596,12 @@ def matvec1_parallel2(h_in,v,term_thresh=1e-12, nproc=None):
         pool = Pool()
     else:
         pool = Pool(processes=nproc)
-   
+ 
+    print(" This is the Hamiltonian we will process:")
+    for terms in clustered_ham.terms:
+        print(terms)
+        for term in clustered_ham.terms[terms]:
+            print(term)
    
 
     print(" Using Pathos library for parallelization. Number of workers: ", pool.ncpus, flush=True )
@@ -618,9 +627,16 @@ def matvec1_parallel2(h_in,v,term_thresh=1e-12, nproc=None):
             tmp += 1
     assert(len(v) == tmp)
 
+    #import pathos.profile as pr
+    #pr.enable_profiling()
 
     out = pool.map(do_batch, conf_batches)
     #out = pool.map(do_parallel_work, v, batches=100)
+    
+    #pr.profile('cumulative', pipe=pool.pipe)(test_import, 'pox')
+    #pr.disable_profiling()
+
+    
     pool.close()
     pool.join()
     pool.clear()
@@ -815,7 +831,7 @@ def heat_bath_search(h_in,v,thresh_cipsi=None, nproc=None):
 # }}}
 
 
-def build_full_hamiltonian(clustered_ham,ci_vector,iprint=0):
+def build_full_hamiltonian(clustered_ham,ci_vector,iprint=0, opt_einsum=True):
     """
     Build hamiltonian in basis in ci_vector
     """
@@ -978,7 +994,7 @@ def build_full_hamiltonian_open(clustered_ham,ci_vector,iprint=1):
 # }}}
 
 
-def build_full_hamiltonian_parallel1(clustered_ham_in,ci_vector_in,iprint=1, nproc=None):
+def build_full_hamiltonian_parallel1(clustered_ham_in,ci_vector_in,iprint=1, nproc=None, opt_einsum=True):
     """
     Build hamiltonian in basis in ci_vector
     """

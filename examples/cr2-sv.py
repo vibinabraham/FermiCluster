@@ -196,13 +196,15 @@ ci_vector = ClusteredState(clusters)
 ci_vector.init(init_fspace)
 
 # do cmf
-do_cmf = 1
+do_cmf = 0
 if do_cmf:
     # Get CMF reference
-    cmf(clustered_ham, ci_vector, h, g, max_iter=100,max_nroots=100,dm_guess=(dm_aa,dm_bb),diis=True)
+    cmf(clustered_ham, ci_vector, h, g, max_iter=2,max_nroots=400,dm_guess=(dm_aa,dm_bb),diis=True)
 
 edps = build_hamiltonian_diagonal(clustered_ham,ci_vector)
-ci_vector, pt_vector, etci, etci2, t_conv = bc_cipsi_tucker(ci_vector.copy(), clustered_ham,thresh_cipsi=1e-5, thresh_ci_clip=1e-7, max_tucker_iter=4,thresh_asci=1e-2)
+ci_vector, pt_vector, etci, etci2, t_conv = bc_cipsi_tucker(ci_vector.copy(), clustered_ham,thresh_cipsi=1e-3, thresh_ci_clip=1e-7, max_tucker_iter=4,thresh_asci=1e-2, nproc=1)
+
+ci_vector, pt_vector, etci, etci2, t_conv = bc_cipsi_tucker(ci_vector.copy(), clustered_ham,thresh_cipsi=1e-5, thresh_ci_clip=1e-7, max_tucker_iter=4,thresh_asci=1e-2, nproc=1)
 
 
 print("init DPS",(edps+ecore))
