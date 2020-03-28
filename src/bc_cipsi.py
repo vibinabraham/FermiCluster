@@ -134,8 +134,8 @@ def bc_cipsi_tucker(ci_vector, clustered_ham, selection="cipsi",
 
                 if hshift != None:
                     """Adding cluster hamiltonian to RDM before diagonalization to make null space unique. """
-                    Hci = ci.Hci[fspace]
-                    n,U = np.linalg.eigh(rdm + hshift*Hci)
+                    Hlocal = ci.ops['H'][(fspace,fspace)]
+                    n,U = np.linalg.eigh(rdm + hshift*Hlocal)
                     n = np.diag(U.T @ rdm @ U)
                     idx = n.argsort()[::-1]
                     n = n[idx]
@@ -601,8 +601,8 @@ def hosvd(ci_vector, clustered_ham, hshift=1e-8):
 
             if hshift != None:
                 """Adding cluster hamiltonian to RDM before diagonalization to make null space unique. """
-                Hci = ci.Hci[fspace]
-                n,U = np.linalg.eigh(rdm + hshift*Hci)
+                Hlocal = ci.ops['H'][(fspace,fspace)]
+                n,U = np.linalg.eigh(rdm + hshift*Hlocal)
                 n = np.diag(U.T @ rdm @ U)
                 idx = n.argsort()[::-1]
                 n = n[idx]

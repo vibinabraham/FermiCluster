@@ -53,7 +53,6 @@ class Cluster(object):
         self.ops    = {}
         
         self.energies = {}                  # Diagonal of local operators
-        self.Hci = {}
 
     def __len__(self):
         return len(self.orb_list) 
@@ -175,7 +174,7 @@ class Cluster(object):
                 Hci = ci.run()
                 #self.basis[(na,nb)] = np.eye(ci.results_v.shape[0])
                 self.basis[(na,nb)] = ci.results_v
-                self.Hci[(na,nb)] = ci.results_v.T @ Hci @ ci.results_v
+                #self.Hci[(na,nb)] = ci.results_v.T @ Hci @ ci.results_v
     # }}}
     
     def form_eigbasis_from_local_operator(self,local_op,max_roots=1000,ratio = 1,s2_shift=False):
@@ -211,7 +210,7 @@ class Cluster(object):
                 Hci = ci.run()
                 #self.basis[(na,nb)] = np.eye(ci.results_v.shape[0])
                 self.basis[(na,nb)] = ci.results_v
-                self.Hci[(na,nb)] = Hci
+                #self.Hci[(na,nb)] = Hci
                 #print(ci.results_v)
                 if s2_shift == True:
                     S2 = form_S2(self.n_orb,na,nb)
@@ -271,7 +270,7 @@ class Cluster(object):
                     Hci = ci.run()
                     #self.basis[(na,nb)] = np.eye(ci.results_v.shape[0])
                     self.basis[(na,nb)] = ci.results_v
-                    self.Hci[(na,nb)] = Hci
+                    #self.Hci[(na,nb)] = Hci
 # }}}
                     
             
@@ -283,7 +282,7 @@ class Cluster(object):
 # {{{
         for fspace,mat in U.items():
             self.basis[fspace] = self.basis[fspace] @ mat
-            self.Hci[fspace] = mat.T @ self.Hci[fspace] @ mat 
+            #self.Hci[fspace] = mat.T @ self.Hci[fspace] @ mat 
             #self.Hci[fspace] = self.basis[fspace].T @ self.Hci[fspace] @ self.basis[fspace]
         #print(" Build all operators:")
         #self.build_op_matrices()
