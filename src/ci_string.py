@@ -370,7 +370,7 @@ class ci_solver:
 
     def build_H_matrix(self, basis):
         
-        print(" Compute spin diagonals")
+        #print(" Compute spin diagonals")
         self.Hdiag_s[0] = self.precompute_spin_diagonal_block(self.nea)
         self.Hdiag_s[1] = self.precompute_spin_diagonal_block(self.neb)
         
