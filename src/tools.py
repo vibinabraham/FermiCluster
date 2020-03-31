@@ -157,7 +157,7 @@ def cmf(clustered_ham, ci_vector, h, g, max_iter=20, thresh=1e-8, max_nroots=100
    # }}}
 
     
-def matvec1(h,v,term_thresh=1e-12):
+def matvec1(h,v,term_thresh=1e-12, opt_einsum=True, nbody_limit=4):
     """
     Compute the action of H onto a sparse trial vector v
     returns a ClusteredState object. 
@@ -198,9 +198,16 @@ def matvec1(h,v,term_thresh=1e-12):
             configs_l = sigma[fock_l] 
            
             for term in h.terms[terms]:
+                if len(term.active) > nbody_limit:
+                    continue
+                
+                #print()
+                #print(term)
+                #start1 = time.time()
                 
                 # do local terms separately
                 if len(term.active) == 1:
+                    #start2 = time.time()
                     
                     for conf_ri, conf_r in enumerate(v[fock_r]):
                         ci = term.active[0]
@@ -218,6 +225,7 @@ def matvec1(h,v,term_thresh=1e-12):
                                     configs_l[spi] = tmp[sp_idx] 
                                 else:
                                     configs_l[spi] += tmp[sp_idx] 
+                    #stop2 = time.time()
 
 
                 else:
@@ -231,6 +239,10 @@ def matvec1(h,v,term_thresh=1e-12):
                                 state_sign *= (-1)**(fock_r[cj][0]+fock_r[cj][1])
                         
                     for conf_ri, conf_r in enumerate(v[fock_r]):
+                    
+                        #nonzeros = []
+                        #nnz = 0
+                
                         #print("  ", conf_r)
                         
                         #if abs(v[fock_r][conf_r]) < 5e-2:
@@ -240,7 +252,16 @@ def matvec1(h,v,term_thresh=1e-12):
                         opii = -1
                         mats = []
                         good = True
+                        #sparse_thresh = 1e-3
                         for opi,op in enumerate(term.ops):
+                   
+                            # this is from the JW code used to find non-zero transitions
+                            #for i,ii in enumerate(oi[:,ket[ci_idx]]):
+                            #    if ii*ii > thresh_transition:
+                            #        nonzeros_curr.append(i)
+                            #        nnz += 1
+                            #nonzeros.append(nonzeros_curr)
+                            
                             if op == "":
                                 continue
                             opii += 1
@@ -249,6 +270,17 @@ def matvec1(h,v,term_thresh=1e-12):
                             #ci = clusters[term.active[opii]]
                             try:
                                 oi = ci.ops[op][(fock_l[ci.idx],fock_r[ci.idx])][:,conf_r[ci.idx],:]
+                                #shape_save = list(oi.shape)
+                                #oi.shape = (oi.shape[0], np.prod(oi.shape[1:]))
+                                #print(oi.shape)
+                                #print(oi) 
+                                #nonzeros_curr = np.nonzero(np.abs(np.amax(np.abs(oi), axis=1))>sparse_thresh)[0]
+                                #shape_save[0] = len(nonzeros_curr)
+                                #print(nonzeros_curr)
+                                #print(shape_save)
+                                #oi.shape = shape_save
+                                #oinz = oi[nonzeros_curr,:]
+                                #print(oinz.shape)
                                 mats.append(oi)
                             except KeyError:
                                 good = False
@@ -268,7 +300,9 @@ def matvec1(h,v,term_thresh=1e-12):
                         
                         
                         #tmp = oe.contract(term.contract_string_matvec, *mats, term.ints)
-                        tmp = np.einsum(term.contract_string_matvec, *mats, term.ints)
+                        #start2 = time.time()
+                        tmp = np.einsum(term.contract_string_matvec, *mats, term.ints, optimize=opt_einsum)
+                        #stop2 = time.time()
                         
                     
                         v_coeff = v[fock_r][conf_r]
@@ -280,17 +314,20 @@ def matvec1(h,v,term_thresh=1e-12):
                         for sp_idx, spi in enumerate(itertools.product(*new_configs)):
                             #print(" New config: %12.8f" %tmp[sp_idx], spi)
                             if abs(tmp[sp_idx]) > term_thresh:
+                                pass
                                 if spi not in configs_l:
                                     configs_l[spi] = tmp[sp_idx] 
                                 else:
                                     configs_l[spi] += tmp[sp_idx] 
+                #stop1 = time.time()
+                #print(" Time spent in einsum: %12.2f: total: %12.2f: NBody: %6i" %( stop2-start2,  stop1-start1, len(term.active)))
     
     print(" This is how much memory is being used to store collected results: ",sys.getsizeof(sigma.data)) 
     return sigma 
 # }}}
 
 
-def matvec1_parallel1(h_in,v,term_thresh=1e-12, nproc=None):
+def matvec1_parallel1(h_in,v,term_thresh=1e-12, nproc=None, nbody_limit=4):
     """
     Compute the action of H onto a sparse trial vector v
     returns a ClusteredState object. 
@@ -339,6 +376,8 @@ def matvec1_parallel1(h_in,v,term_thresh=1e-12, nproc=None):
             configs_l = sigma_out[fock_l] 
             
             for term in h.terms[terms]:
+                if len(term.active) > nbody_limit:
+                    continue
                 
                 # do local terms separately
                 if len(term.active) == 1:
@@ -447,7 +486,7 @@ def matvec1_parallel1(h_in,v,term_thresh=1e-12, nproc=None):
 # }}}
 
 
-def matvec1_parallel2(h_in,v,term_thresh=1e-12, nproc=None, opt_einsum=True):
+def matvec1_parallel2(h_in,v,term_thresh=1e-12, nproc=None, opt_einsum=True, nbody_limit=4):
     """
     Compute the action of H onto a sparse trial vector v
     returns a ClusteredState object. 
@@ -498,9 +537,15 @@ def matvec1_parallel2(h_in,v,term_thresh=1e-12, nproc=None, opt_einsum=True):
             configs_l = sigma_out[fock_l] 
             
             for term in h.terms[terms]:
+                if len(term.active) > nbody_limit:
+                    continue
+                #print()
+                #print(term)
+                #start1 = time.time()
                 
                 # do local terms separately
                 if len(term.active) == 1:
+                    #start2 = time.time()
                     
                     ci = term.active[0]
                         
@@ -516,6 +561,7 @@ def matvec1_parallel2(h_in,v,term_thresh=1e-12, nproc=None, opt_einsum=True):
                                 configs_l[spi] = tmp[sp_idx] 
                             else:
                                 configs_l[spi] += tmp[sp_idx] 
+                    #stop2 = time.time()
 
 
                 else:
@@ -557,7 +603,7 @@ def matvec1_parallel2(h_in,v,term_thresh=1e-12, nproc=None, opt_einsum=True):
                     if len(mats) == 0:
                         continue
                     
-                    #start = time.time()
+                    #start2 = time.time()
                     #print()
                     #print(term)
                     #print('mats:', end='')
@@ -573,8 +619,7 @@ def matvec1_parallel2(h_in,v,term_thresh=1e-12, nproc=None, opt_einsum=True):
                     tmp = np.einsum(term.contract_string_matvec, *mats, term.ints, optimize=opt_einsum)
                     
 
-                    #stop = time.time()
-                    #print(" Time spent in einsum: %12.2f: NBody: %6i" %( stop-start, len(term.active)))
+                    #stop2 = time.time()
                     
                     
                     #v_coeff = v[fock_r][conf_r]
@@ -591,6 +636,8 @@ def matvec1_parallel2(h_in,v,term_thresh=1e-12, nproc=None, opt_einsum=True):
                                 configs_l[spi] = tmp[sp_idx] 
                             else:
                                 configs_l[spi] += tmp[sp_idx] 
+                #stop1 = time.time()
+                #print(" Time spent in einsum: %12.2f: total: %12.2f: NBody: %6i" %( stop2-start2,  stop1-start1, len(term.active)))
         return sigma_out
     
     import multiprocessing as mp
@@ -602,11 +649,11 @@ def matvec1_parallel2(h_in,v,term_thresh=1e-12, nproc=None, opt_einsum=True):
     else:
         pool = Pool(processes=nproc)
  
-    print(" This is the Hamiltonian we will process:")
-    for terms in clustered_ham.terms:
-        print(terms)
-        for term in clustered_ham.terms[terms]:
-            print(term)
+    #print(" This is the Hamiltonian we will process:")
+    #for terms in clustered_ham.terms:
+    #    print(terms)
+    #    for term in clustered_ham.terms[terms]:
+    #        print(term)
    
 
     print(" Using Pathos library for parallelization. Number of workers: ", pool.ncpus, flush=True )

@@ -382,12 +382,13 @@ class ClusteredOperator:
                 with p,q,r on cluster 2, and s on cluster 4
                 ^this needs cleaned up
     """
-    def __init__(self,clusters):
+    def __init__(self,clusters, core_energy=0.0):
         self.n_clusters = len(clusters)
         self.clusters = clusters
         self.terms = OrderedDict()
         self.local_terms = []
         self.n_orb = 0
+        self.core_energy = core_energy 
         for ci,c in enumerate(self.clusters):
             self.n_orb += c.n_orb
 
@@ -758,9 +759,9 @@ class ClusteredOperator:
                     print(tt)
 # }}}
 
-    def combine_common_terms(self,iprint=0):
+    def combine_common_terms(self,iprint=1):
         """
-        
+        Combine identical terms     
         """
 # {{{
         if iprint > 0:

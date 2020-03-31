@@ -28,7 +28,7 @@ def system_setup(h, g, ecore, blocks, max_roots=1000):
     print(" Clusters:")
     [print(ci) for ci in clusters]
 
-    clustered_ham = ClusteredOperator(clusters)
+    clustered_ham = ClusteredOperator(clusters, core_energy=ecore)
     print(" Add 1-body terms")
     clustered_ham.add_local_terms()
     clustered_ham.add_1b_terms(h)
@@ -186,7 +186,8 @@ def bc_cipsi_tucker(ci_vector, clustered_ham, selection="cipsi",
 
 
 def bc_cipsi(ci_vector, clustered_ham,  
-    thresh_cipsi=1e-4, thresh_ci_clip=1e-5, thresh_conv=1e-8, max_iter=30, n_roots=1,thresh_asci=0,nproc=None):
+    thresh_cipsi=1e-4, thresh_ci_clip=1e-5, thresh_conv=1e-8, max_iter=30, n_roots=1,thresh_asci=0,
+    nbody_limit=4, nproc=None):
 # {{{
     #print(" Compute diagonal elements",flush=True)
     # compute local states energies
@@ -266,12 +267,12 @@ def bc_cipsi(ci_vector, clustered_ham,
 
         start = time.time()
         if nproc==1:
-            pt_vector = matvec1(clustered_ham, asci_vector)
+            pt_vector = matvec1(clustered_ham, asci_vector, nbody_limit=nbody_limit)
         else:
-            pt_vector = matvec1_parallel2(clustered_ham, asci_vector, nproc=nproc)
+            pt_vector = matvec1_parallel2(clustered_ham, asci_vector, nproc=nproc, nbody_limit=nbody_limit)
         stop = time.time()
         print(" Time spent in matvec: %12.2f" %( stop-start))
-    
+     
         if profile:
             pr.disable()
             pr.print_stats(sort='time')
