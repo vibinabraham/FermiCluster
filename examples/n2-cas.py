@@ -60,13 +60,19 @@ for ri in range(0,20):
     if do_hci:
         ehci, hci_dim = run_hci_pyscf(h,g,cas_nel,ecore=ecore,select_cutoff=1e-3,ci_cutoff=1e-3)
     #idx = e1_order(D[cas_nstart:,cas_nstart:],cut_off = 1e-4)
+    idx = e1_order(h,cut_off = 2e-3)
+    h,g = reorder_integrals(idx,h,g)
+    print("hcore")
+    print(h)
     print("hcore")
     print(h)
     if do_tci:
         ci_vector, pt_vector, etci, etci2 = run_tpsci(h,g,blocks,init_fspace,ecore=ecore,
-            thresh_ci_clip=5e-4,thresh_cipsi=1e-6,max_tucker_iter=20,max_cipsi_iter=20)
+            thresh_ci_clip=1e-7,thresh_cipsi=1e-6,max_tucker_iter=1,max_cipsi_iter=20)
         #ci_vector.print_configs()
         tci_dim = len(ci_vector)
+        ci_vector.clip(1e-5)
+        ci_vector.print_configs()
 
 
 
