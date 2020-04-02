@@ -170,7 +170,100 @@ def matvec1(h,v,term_thresh=1e-12, opt_einsum=True, nbody_limit=4):
     sigma = ClusteredState(clusters)
     sigma = v.copy() 
     sigma.zero()
-   
+ 
+    #from numba import jit
+    #@jit
+    #@jit(nopython=True)
+    
+
+    def map_configs_local_to_global(coeff_tensor, new_configs, term_thresh, configs):
+        for sp_idx, spi in enumerate(itertools.product(*new_configs)):
+            #print(" New config: %12.8f" %tmp[sp_idx], spi)
+            if abs(coeff_tensor[sp_idx]) > term_thresh:
+                if spi not in configs:
+                    configs[spi] = tmp[sp_idx] 
+                else:
+                    configs[spi] += tmp[sp_idx] 
+            #    #try:    
+            #    #    configs[spi] += tmp[sp_idx] 
+            #    #except:
+            #    #    configs[spi] = tmp[sp_idx] 
+
+        return 
+
+    def update_with_new_configs(coeff_tensor, new_configs, configs, active, term_thresh=None):
+       
+        nactive = len(active) 
+       
+        term_thresh = 1e-12
+
+        config_curr = [i[0] for i in new_configs]
+        config_idx  = 0
+        if nactive==2:
+            c0 = new_configs[active[0]]
+            c1 = new_configs[active[1]]
+            for i in range(len(new_configs[active[0]])):
+                for j in range(len(new_configs[active[1]])):
+                    if np.abs(coeff_tensor[c0[i],c1[j]]) < term_thresh:
+                        continue
+                    config_curr[active[0]] = c0[i]
+                    config_curr[active[1]] = c1[j]
+                    key = tuple(config_curr)
+                    if key not in configs:
+                        configs[key] = coeff_tensor[c0[i],c1[j]]
+                        #configs[config_curr] = coeff_tensor[config_idx]
+                    else:
+                        configs[key] += coeff_tensor[c0[i],c1[j]]
+                        #configs[config_curr] += coeff_tensor[config_idx]
+                    config_idx += 1
+                        
+        elif nactive==3:
+            c0 = new_configs[active[0]]
+            c1 = new_configs[active[1]]
+            c2 = new_configs[active[2]]
+            for i in range(len(new_configs[active[0]])):
+                for j in range(len(new_configs[active[1]])):
+                    for k in range(len(new_configs[active[2]])):
+                        if np.abs(coeff_tensor[c0[i],c1[j],c2[k]]) < term_thresh:
+                            continue
+                        config_curr[active[0]] = c0[i]
+                        config_curr[active[1]] = c1[j]
+                        config_curr[active[2]] = c2[k]
+                        key = tuple(config_curr)
+                        if key not in configs:
+                            configs[key] = coeff_tensor[c0[i],c1[j],c2[k]]
+                        else:
+                            configs[key] += coeff_tensor[c0[i],c1[j],c2[k]]
+                        config_idx += 1
+        elif nactive==4:
+            c0 = new_configs[active[0]]
+            c1 = new_configs[active[1]]
+            c2 = new_configs[active[2]]
+            c3 = new_configs[active[3]]
+            for i in range(len(new_configs[active[0]])):
+                for j in range(len(new_configs[active[1]])):
+                    for k in range(len(new_configs[active[2]])):
+                        for l in range(len(new_configs[active[3]])):
+                            if np.abs(coeff_tensor[c0[i],c1[j],c2[k],c3[l]]) < term_thresh:
+                                continue
+                            config_curr[active[0]] = c0[i]
+                            config_curr[active[1]] = c1[j]
+                            config_curr[active[2]] = c2[k]
+                            config_curr[active[3]] = c3[l]
+                            key = tuple(config_curr)
+                            if key not in configs:
+                                configs[key] = coeff_tensor[c0[i],c1[j],c2[k],c3[l]]
+                            else:
+                                configs[key] += coeff_tensor[c0[i],c1[j],c2[k],c3[l]]
+                            config_idx += 1
+        else:
+            # local terms should trigger a fail since they are handled separately 
+            print(" Wrong value in update_with_new_configs")
+            exit()
+
+
+        return 
+
     if 0:
         # use this to debug
         sigma.expand_to_full_space()
@@ -201,13 +294,13 @@ def matvec1(h,v,term_thresh=1e-12, opt_einsum=True, nbody_limit=4):
                 if len(term.active) > nbody_limit:
                     continue
                 
-                #print()
-                #print(term)
-                #start1 = time.time()
+                print()
+                print(term)
+                start1 = time.time()
                 
                 # do local terms separately
                 if len(term.active) == 1:
-                    #start2 = time.time()
+                    start2 = time.time()
                     
                     for conf_ri, conf_r in enumerate(v[fock_r]):
                         ci = term.active[0]
@@ -225,7 +318,7 @@ def matvec1(h,v,term_thresh=1e-12, opt_einsum=True, nbody_limit=4):
                                     configs_l[spi] = tmp[sp_idx] 
                                 else:
                                     configs_l[spi] += tmp[sp_idx] 
-                    #stop2 = time.time()
+                    stop2 = time.time()
 
 
                 else:
@@ -300,27 +393,33 @@ def matvec1(h,v,term_thresh=1e-12, opt_einsum=True, nbody_limit=4):
                         
                         
                         #tmp = oe.contract(term.contract_string_matvec, *mats, term.ints)
-                        #start2 = time.time()
+                        start2 = time.time()
                         tmp = np.einsum(term.contract_string_matvec, *mats, term.ints, optimize=opt_einsum)
-                        #stop2 = time.time()
+                        stop2 = time.time()
                         
                     
                         v_coeff = v[fock_r][conf_r]
-                        tmp = state_sign * tmp.ravel() * v_coeff
+                        #tmp = state_sign * tmp.ravel() * v_coeff
+                        tmp = state_sign * tmp * v_coeff
                     
                         new_configs = [[i] for i in conf_r] 
                         for cacti,cact in enumerate(term.active):
                             new_configs[cact] = range(mats[cacti].shape[0])
-                        for sp_idx, spi in enumerate(itertools.product(*new_configs)):
-                            #print(" New config: %12.8f" %tmp[sp_idx], spi)
-                            if abs(tmp[sp_idx]) > term_thresh:
-                                pass
-                                if spi not in configs_l:
-                                    configs_l[spi] = tmp[sp_idx] 
-                                else:
-                                    configs_l[spi] += tmp[sp_idx] 
-                #stop1 = time.time()
-                #print(" Time spent in einsum: %12.2f: total: %12.2f: NBody: %6i" %( stop2-start2,  stop1-start1, len(term.active)))
+                        
+                        #map_configs_local_to_global(tmp, new_configs, term_thresh, configs_l)
+                        update_with_new_configs(tmp, new_configs, configs_l, term.active)
+                        #map_configs_local_to_global(tmp, new_configs, term_thresh)
+                        #map_configs_local_to_global(tmp, new_configs, term_thresh, configs_l)
+                        
+                        #for sp_idx, spi in enumerate(itertools.product(*new_configs)):
+                        #    #print(" New config: %12.8f" %tmp[sp_idx], spi)
+                        #    if abs(tmp[sp_idx]) > term_thresh:
+                        #        if spi not in configs_l:
+                        #            configs_l[spi] = tmp[sp_idx] 
+                        #        else:
+                        #            configs_l[spi] += tmp[sp_idx] 
+                stop1 = time.time()
+                print(" Time spent in einsum: %12.2f: total: %12.2f: NBody: %6i" %( stop2-start2,  stop1-start1, len(term.active)))
     
     print(" This is how much memory is being used to store collected results: ",sys.getsizeof(sigma.data)) 
     return sigma 

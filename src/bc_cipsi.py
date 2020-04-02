@@ -60,7 +60,7 @@ def system_setup(h, g, ecore, blocks, max_roots=1000):
 def bc_cipsi_tucker(ci_vector, clustered_ham, selection="cipsi",
         thresh_cipsi=1e-4, thresh_ci_clip=1e-5, thresh_cipsi_conv=1e-8, max_cipsi_iter=30, 
         thresh_tucker_conv = 1e-6, max_tucker_iter=20, tucker_state_clip=None,hshift=1e-8,
-        thresh_asci=0,nproc=None):
+        thresh_asci=0,nbody_limit=4, nproc=None):
     """
     Run iterations of TP-CIPSI to make the tucker decomposition self-consistent
     """
@@ -79,7 +79,7 @@ def bc_cipsi_tucker(ci_vector, clustered_ham, selection="cipsi",
             start = time.time()
             ci_vector, pt_vector, e0, e2 = bc_cipsi(ci_vector_ref.copy(), clustered_ham, 
                     thresh_cipsi=thresh_cipsi, thresh_ci_clip=thresh_ci_clip, thresh_conv=thresh_cipsi_conv, max_iter=max_cipsi_iter,thresh_asci=thresh_asci,
-                    nproc=nproc)
+                    nbody_limit=nbody_limit, nproc=nproc)
             end = time.time()
             e_curr = e2
             print(" CIPSI: E0 = %12.8f E2 = %12.8f CI_DIM: %-12i Time spent %-12.2f" %(e0, e2, len(ci_vector), end-start))
@@ -272,7 +272,7 @@ def bc_cipsi(ci_vector, clustered_ham,
             pt_vector = matvec1_parallel2(clustered_ham, asci_vector, nproc=nproc, nbody_limit=nbody_limit)
         stop = time.time()
         print(" Time spent in matvec: %12.2f" %( stop-start))
-     
+
         if profile:
             pr.disable()
             pr.print_stats(sort='time')
@@ -345,6 +345,7 @@ def bc_cipsi(ci_vector, clustered_ham,
                         ci_vector[fockspace][config] = 0
         end = time.time()
         print(" Time spent in finding new CI space: %12.2f" %(end - start), flush=True)
+        #exit()
 
         delta_e = e0 - e_prev
         e_prev = e0
