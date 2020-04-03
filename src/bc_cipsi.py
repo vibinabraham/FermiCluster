@@ -60,7 +60,8 @@ def system_setup(h, g, ecore, blocks, max_roots=1000):
 def bc_cipsi_tucker(ci_vector, clustered_ham, selection="cipsi",
         thresh_cipsi=1e-4, thresh_ci_clip=1e-5, thresh_cipsi_conv=1e-8, max_cipsi_iter=30, 
         thresh_tucker_conv = 1e-6, max_tucker_iter=20, tucker_state_clip=None,hshift=1e-8,
-        thresh_asci=0, thresh_search=None, nbody_limit=4, nproc=None):
+        thresh_asci=0, thresh_search=None, nbody_limit=4, 
+        tucker_conv_target=2, nproc=None):
     """
     Run iterations of TP-CIPSI to make the tucker decomposition self-consistent
    
@@ -70,7 +71,10 @@ def bc_cipsi_tucker(ci_vector, clustered_ham, selection="cipsi",
     thresh_cipsi_conv   :   stop selected CI when delta E is smaller than this value
     thresh_asci         :   only consider couplings to pspace configs with probabilities larger than this value
     thresh_search       :   delete couplings to pspace configs
-                        default: thresh_cipsi^1/2 / 1000
+                                default: thresh_cipsi^1/2 / 1000
+    tucker_conv_target  :   Which energy should we use to determine convergence? 
+                                0 = variational energy
+                                2 = pt2 energy
     """
 # {{{
 
@@ -89,7 +93,13 @@ def bc_cipsi_tucker(ci_vector, clustered_ham, selection="cipsi",
                     thresh_cipsi=thresh_cipsi, thresh_ci_clip=thresh_ci_clip, thresh_conv=thresh_cipsi_conv, max_iter=max_cipsi_iter,thresh_asci=thresh_asci,
                     nbody_limit=nbody_limit, thresh_search=thresh_search, nproc=nproc)
             end = time.time()
-            e_curr = e2
+            if tucker_conv_target == 0:
+                e_curr = e0
+            elif tucker_conv_target == 2:
+                e_curr = e2
+            else:
+                print(" wrong value for tucker_conv_target")
+                exit()
             print(" CIPSI: E0 = %12.8f E2 = %12.8f CI_DIM: %-12i Time spent %-12.2f" %(e0, e2, len(ci_vector), end-start))
             
             pt_vector.add(ci_vector)
@@ -119,6 +129,16 @@ def bc_cipsi_tucker(ci_vector, clustered_ham, selection="cipsi",
         
         # do the Tucker decomposition
         hosvd(pt_vector, clustered_ham, hshift=hshift)
+
+        print(" Ensure TDMs are still contiguous:")
+        for ci in clustered_ham.clusters:
+            print(ci)
+            for o in ci.ops:
+                for fock in ci.ops[o]:
+                    if ci.ops[o][fock].data.contiguous == False:
+                        print(" Rearrange data for %5s :" %o, fock)
+                        ci.ops[o][fock] = np.ascontiguousarray(ci.ops[o][fock])
+
 
         delta_e = e0 - e_last
         e_last = e0
@@ -220,6 +240,9 @@ def bc_cipsi(ci_vector, clustered_ham,
             pr.enable()
 
         start = time.time()
+        if nbody_limit != 4:
+            print(" Warning: nbody_limit set to %4i, resulting PT energies are meaningless" %nbody_limit)
+
         if nproc==1:
             pt_vector = matvec1(clustered_ham, asci_vector, thresh_search=thresh_search, nbody_limit=nbody_limit)
         else:

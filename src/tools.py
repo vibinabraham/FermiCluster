@@ -170,9 +170,9 @@ def matvec_update_with_new_configs(coeff_tensor, new_configs, configs, active, t
 
 
     config_curr = [i[0] for i in new_configs]
+    count = 0
     if nactive==2:
 
-        count = 0
         for I in np.argwhere(np.abs(coeff_tensor) > thresh_search):
             config_curr[active[0]] = I[0] 
             config_curr[active[1]] = I[1] 
@@ -181,13 +181,12 @@ def matvec_update_with_new_configs(coeff_tensor, new_configs, configs, active, t
                 configs[key] = coeff_tensor[I[0],I[1]]
             else:
                 configs[key] += coeff_tensor[I[0],I[1]]
-            count += 1
-        print(" nb2: size: %8i nonzero: %8i" %(coeff_tensor.size, count))
+            #count += 1
+        #print(" nb2: size: %8i nonzero: %8i" %(coeff_tensor.size, count))
 
                     
     elif nactive==3:
 
-        count = 0
         for I in np.argwhere(np.abs(coeff_tensor) > thresh_search):
             config_curr[active[0]] = I[0] 
             config_curr[active[1]] = I[1] 
@@ -197,8 +196,8 @@ def matvec_update_with_new_configs(coeff_tensor, new_configs, configs, active, t
                 configs[key] = coeff_tensor[I[0],I[1],I[2]]
             else:
                 configs[key] += coeff_tensor[I[0],I[1],I[2]]
-            count += 1
-        print(" nb3: size: %8i nonzero: %8i" %(coeff_tensor.size, count))
+            #count += 1
+        #print(" nb3: size: %8i nonzero: %8i" %(coeff_tensor.size, count))
 
     elif nactive==4:
 
@@ -212,6 +211,8 @@ def matvec_update_with_new_configs(coeff_tensor, new_configs, configs, active, t
                 configs[key] = coeff_tensor[I[0],I[1],I[2],I[3]]
             else:
                 configs[key] += coeff_tensor[I[0],I[1],I[2],I[3]]
+            #count += 1
+        #print(" nb4: size: %8i nonzero: %8i" %(coeff_tensor.size, count))
 
     else:
         # local terms should trigger a fail since they are handled separately 
@@ -233,6 +234,16 @@ def matvec1(h,v,thresh_search=1e-12, opt_einsum=True, nbody_limit=4):
     """
 # {{{
     clusters = h.clusters
+    assert(h.clusters is v.clusters)
+    #print(" Ensure TDMs are still contiguous:")
+    #for ci in h.clusters:
+    #    print(ci)
+    #    for o in ci.ops:
+    #        for fock in ci.ops[o]:
+    #            if ci.ops[o][fock].data.contiguous == False:
+    #                print(" Rearrange data for %5s :" %o, fock)
+    #                ci.ops[o][fock] = np.ascontiguousarray(ci.ops[o][fock])
+
     sigma = ClusteredState(clusters)
     sigma = v.copy() 
     sigma.zero()
@@ -332,7 +343,7 @@ def matvec1(h,v,thresh_search=1e-12, opt_einsum=True, nbody_limit=4):
                         
                     for conf_ri, conf_r in enumerate(v[fock_r]):
                     
-                        #nonzeros = []
+                        nonzeros = []
                         #nnz = 0
                 
                         #print("  ", conf_r)
@@ -362,18 +373,16 @@ def matvec1(h,v,thresh_search=1e-12, opt_einsum=True, nbody_limit=4):
                             #ci = clusters[term.active[opii]]
                             try:
                                 oi = ci.ops[op][(fock_l[ci.idx],fock_r[ci.idx])][:,conf_r[ci.idx],:]
-                                #shape_save = list(oi.shape)
-                                #oi.shape = (oi.shape[0], np.prod(oi.shape[1:]))
-                                #print(oi.shape)
-                                #print(oi) 
-                                #nonzeros_curr = np.nonzero(np.abs(np.amax(np.abs(oi), axis=1))>sparse_thresh)[0]
-                                #shape_save[0] = len(nonzeros_curr)
-                                #print(nonzeros_curr)
-                                #print(shape_save)
-                                #oi.shape = shape_save
-                                #oinz = oi[nonzeros_curr,:]
-                                #print(oinz.shape)
-                                mats.append(oi)
+                                
+                                nonzeros_curr = []
+                                for K in range(oi.shape[0]):
+                                    if np.amax(np.abs(oi[K,:])) > thresh_search:
+                                        nonzeros_curr.append(K)
+                                oinz = oi[nonzeros_curr,:]
+                                mats.append(oinz)
+                                nonzeros.append(nonzeros_curr)
+
+
                             except KeyError:
                                 good = False
                                 break
@@ -393,6 +402,7 @@ def matvec1(h,v,thresh_search=1e-12, opt_einsum=True, nbody_limit=4):
                         
                         #tmp = oe.contract(term.contract_string_matvec, *mats, term.ints)
                         #start2 = time.time()
+                        #print(term.contract_string_matvec)
                         tmp = np.einsum(term.contract_string_matvec, *mats, term.ints, optimize=opt_einsum)
                         #stop2 = time.time()
                         
@@ -403,8 +413,12 @@ def matvec1(h,v,thresh_search=1e-12, opt_einsum=True, nbody_limit=4):
                     
                         new_configs = [[i] for i in conf_r] 
                         for cacti,cact in enumerate(term.active):
-                            new_configs[cact] = range(mats[cacti].shape[0])
-                        
+                            new_configs[cact] = nonzeros[cacti] 
+                            #new_configs[cact] = range(mats[cacti].shape[0])
+                       
+                        #print(new_configs)
+                        #print(tmp.shape)
+                        #print("kk")
                         #map_configs_local_to_global(tmp, new_configs, thresh_search, configs_l)
                         matvec_update_with_new_configs(tmp, new_configs, configs_l, term.active, thresh_search)
                         #map_configs_local_to_global(tmp, new_configs, thresh_search)
@@ -809,7 +823,6 @@ def matvec1_parallel2(h_in,v,thresh_search=1e-12, nproc=None, opt_einsum=True, n
 # }}}
 
 
-#@profile
 def matvec1_parallel3(h_in,v,thresh_search=1e-12, nproc=None, opt_einsum=True, nbody_limit=4):
     """
     Compute the action of H onto a sparse trial vector v
@@ -843,6 +856,7 @@ def matvec1_parallel3(h_in,v,thresh_search=1e-12, nproc=None, opt_einsum=True, n
             do_parallel_work(v_curr,sigma_out)
         return sigma_out
 
+    #@profile
     def do_parallel_work(v_curr,sigma_out):
         fock_r = v_curr[0]
         conf_r = v_curr[1]
@@ -911,6 +925,8 @@ def matvec1_parallel3(h_in,v,thresh_search=1e-12, nproc=None, opt_einsum=True, n
                     #    continue
                     # get state sign 
                     #print('state_sign ', state_sign)
+
+                    nonzeros = []
                     opii = -1
                     mats = []
                     good = True
@@ -923,7 +939,16 @@ def matvec1_parallel3(h_in,v,thresh_search=1e-12, nproc=None, opt_einsum=True, n
                         #ci = clusters[term.active[opii]]
                         try:
                             oi = ci.ops[op][(fock_l[ci.idx],fock_r[ci.idx])][:,conf_r[ci.idx],:]
-                            mats.append(oi)
+                                
+                            nonzeros_curr = []
+                            for K in range(oi.shape[0]):
+                                if np.amax(np.abs(oi[K,:])) > thresh_search:
+                                    nonzeros_curr.append(K)
+                            oinz = oi[nonzeros_curr,:]
+                            mats.append(oinz)
+                            nonzeros.append(nonzeros_curr)
+                            #mats.append(oi)
+
                         except KeyError:
                             good = False
                             break
@@ -957,7 +982,8 @@ def matvec1_parallel3(h_in,v,thresh_search=1e-12, nproc=None, opt_einsum=True, n
                     
                     new_configs = [[i] for i in conf_r] 
                     for cacti,cact in enumerate(term.active):
-                        new_configs[cact] = range(mats[cacti].shape[0])
+                        new_configs[cact] = nonzeros[cacti] 
+                        #new_configs[cact] = range(mats[cacti].shape[0])
                         
                     matvec_update_with_new_configs(tmp, new_configs, configs_l, term.active, thresh_search)
                 #stop1 = time.time()
