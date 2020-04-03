@@ -942,7 +942,7 @@ def matvec1_parallel3(h_in,v,thresh_search=1e-12, nproc=None, opt_einsum=True, n
                                 
                             nonzeros_curr = []
                             for K in range(oi.shape[0]):
-                                if np.amax(np.abs(oi[K,:])) > thresh_search:
+                                if np.amax(np.abs(oi[K,:])) > thresh_search/10:
                                     nonzeros_curr.append(K)
                             oinz = oi[nonzeros_curr,:]
                             mats.append(oinz)
