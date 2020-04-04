@@ -64,13 +64,139 @@ class Cluster(object):
             has = "|"
         return "IDX%03i:DIM%04i:%s" %(self.idx, self.dim, has)
 
+    def possible_fockspaces(self, delta_elec=None):
+        """
+        Get list of possible fock spaces accessible to the cluster
+
+        delta_elec      :   ((ref_alpha, ref_beta), (delta_alpha, delta_beta)) allows restrictions to fock spaces
+                                based on a delta from some reference occupancy (ref_alpha, ref_beta)
+        """
+        # {{{
+      
+        if delta_elec != None:
+            assert(len(delta_elec) == 2)
+            assert(len(delta_elec[0]) == 2)
+            assert(len(delta_elec[1]) == 2)
+            ref_a = delta_elec[0][0]
+            ref_b = delta_elec[0][1]
+            del_a = delta_elec[1][0]
+            del_b = delta_elec[1][1]
+            
+        fspaces = []
+        for na in range(self.n_orb+1):
+            for nb in range(self.n_orb+1):
+                if delta_elec != None:
+                    if na > ref_a+del_a or na < ref_a-del_a:
+                        continue
+                    if nb > ref_b+del_b or nb < ref_b-del_b:
+                        continue
+                fspaces.append([na,nb])
+        return fspaces
+        # }}}
+    
     def add_operator(self,op):
         if op in self.ops:
             return
         else:
             self.ops[op] = {}
-    
-    def form_eigbasis_from_ints(self,hin,vin,max_roots=1000, max_nelec=None, min_nelec=None, rdm1_a=None, rdm1_b=None, ecore=0):
+
+    def form_fockspace_eigbasis(self, hin, vin, spaces, max_roots=1000, rdm1_a=None, rdm1_b=None, ecore=0, iprint=0):
+        """
+        Add basis vectors for fock space specified by #alpha (na), and #beta (nb).
+        """
+# {{{
+        for f in spaces:
+            assert(len(f)==2)
+
+        if len(f) == 0:
+            print(" No spaces requested - certainly a mistake")
+            exit()
+
+        print(" Build basis vectors for the following fockspaces:")
+        for f in spaces:
+            print("    Alpha:Beta = %4i %-4i" %(f[0],f[1]))
+
+        h = np.zeros([self.n_orb]*2)
+        f = np.zeros([self.n_orb]*2)
+        v = np.zeros([self.n_orb]*4)
+        
+        for pidx,p in enumerate(self.orb_list):
+            for qidx,q in enumerate(self.orb_list):
+                h[pidx,qidx] = hin[p,q]
+        
+        for pidx,p in enumerate(self.orb_list):
+            for qidx,q in enumerate(self.orb_list):
+                for ridx,r in enumerate(self.orb_list):
+                    for sidx,s in enumerate(self.orb_list):
+                        v[pidx,qidx,ridx,sidx] = vin[p,q,r,s]
+
+
+        if rdm1_a is not None and rdm1_b is not None:
+            print(" Compute single particle embedding potential")
+            denv_a = 1*rdm1_a
+            denv_b = 1*rdm1_b
+            for pidx,p in enumerate(self.orb_list):
+                for qidx,q in enumerate(range(rdm1_a.shape[0])):
+                    denv_a[p,q] = 0
+                    denv_b[p,q] = 0
+                    denv_a[q,p] = 0
+                    denv_b[q,p] = 0
+           
+            if iprint>0:
+                print(" Environment 1RDM:")
+                print_mat(denv_a+denv_b)
+            print(" Trace of env 1RDM: %12.8f" %np.trace(denv_a + denv_b))
+            print(" Compute energy of 1rdm:")
+            e1 =  np.trace(hin @ rdm1_a )
+            e1 += np.trace(hin @ rdm1_b )
+            e2 =  np.einsum('pqrs,pq,rs->',vin,rdm1_a,rdm1_a)
+            e2 -= np.einsum('pqrs,ps,qr->',vin,rdm1_a,rdm1_a)
+            
+            e2 += np.einsum('pqrs,pq,rs->',vin,rdm1_b,rdm1_b)
+            e2 -= np.einsum('pqrs,ps,qr->',vin,rdm1_b,rdm1_b)
+            
+            e2 += np.einsum('pqrs,pq,rs->',vin,rdm1_a,rdm1_b)
+            e2 += np.einsum('pqrs,pq,rs->',vin,rdm1_b,rdm1_a)
+            #e += np.einsum('pqrs,pq,rs->',vin,d,d)
+           
+            e = e1 + .5*e2
+            print(" E: %12.8f" %(e+ecore))
+           
+            fa =  hin*0 
+            fb =  hin*0
+            fa += np.einsum('pqrs,pq->rs',vin,denv_a)
+            fa += np.einsum('pqrs,pq->rs',vin,denv_b)
+            fa -= np.einsum('pqrs,ps->qr',vin,denv_a)
+            fb += np.einsum('pqrs,pq->rs',vin,denv_b)
+            fb += np.einsum('pqrs,pq->rs',vin,denv_a)
+            fb -= np.einsum('pqrs,ps->qr',vin,denv_b)
+
+        
+            for pidx,p in enumerate(self.orb_list):
+                for qidx,q in enumerate(self.orb_list):
+                    f[pidx,qidx] = .5*(fa[p,q] + fb[p,q])
+           
+
+        H = Hamiltonian()
+        H.S = np.eye(h.shape[0])
+        H.C = H.S
+        H.t = h + f
+        H.V = v
+        H.ecore = ecore
+        self.basis = {}
+       
+        for na,nb in spaces:
+            ci = ci_solver()
+            ci.algorithm = "direct"
+            ci.init(H,na,nb,max_roots)
+            print(ci)
+            Hci = ci.run()
+            #self.basis[(na,nb)] = np.eye(ci.results_v.shape[0])
+            self.basis[(na,nb)] = ci.results_v
+            #self.Hci[(na,nb)] = ci.results_v.T @ Hci @ ci.results_v
+    # }}}
+
+    def form_eigbasis_from_ints(self,hin,vin,max_roots=1000, max_elec=None, min_elec=0, rdm1_a=None, rdm1_b=None, ecore=0):
         """
         grab integrals acting locally and form eigenbasis by FCI
 
@@ -136,37 +262,9 @@ class Cluster(object):
                 for qidx,q in enumerate(self.orb_list):
                     f[pidx,qidx] = .5*(fa[p,q] + fb[p,q])
            
-            print(" 1 particle potential from environment")
-            print_mat(f)
-#            e = 0
-#            n_alpha = int(np.trace(d))
-#            n_beta = int(np.trace(d))
-#            for i in range(n_alpha):
-#                e += hin[i,i]
-#            for i in range(n_beta):
-#                e += hin[i,i]
-#            for i in range(n_alpha):
-#                for j in range(i,n_alpha):
-#                    e += vin[i,i,j,j] - vin[i,j,j,i]
-#            for i in range(n_beta):
-#                for j in range(i,n_beta):
-#                    e += vin[i,i,j,j] - vin[i,j,j,i]
-#            for i in range(n_alpha):
-#                for j in range(n_beta):
-#                    e += vin[i,i,j,j] 
-#            
-#            print(" E:       %12.8f" %(e))
-#            print(" E+ecore: %12.8f" %(e+ecore))
 
-        if max_nelec == None:
-            max_nelec = [self.n_orb, self.n_orb]
-        if min_nelec == None:
-            min_nelec = [0,0]
-        assert(len(max_nelec) == 2 and len(min_nelec) == 2 )
-        assert(max_nelec[0] <= self.n_orb)
-        assert(max_nelec[1] <= self.n_orb)
-        assert(min_nelec[0] >= 0)
-        assert(min_nelec[1] >= 0)
+        if max_elec == None:
+            max_elec == self.n_orb
 
         H = Hamiltonian()
         H.S = np.eye(h.shape[0])
@@ -175,9 +273,10 @@ class Cluster(object):
         H.V = v
         self.basis = {}
         print(" Do CI for each particle number block")
-        for na in range(min_nelec[0],max_nelec[0]+1):
-            for nb in range(min_nelec[1],max_nelec[1]+1):
-            #for nb in range(self.n_orb+1):
+        for na in range(self.n_orb+1):
+            for nb in range(self.n_orb+1):
+                if (na+nb) > max_elec or (na+nb) < min_elec:
+                    continue
                 ci = ci_solver()
                 ci.algorithm = "direct"
                 ci.init(H,na,nb,max_roots)
@@ -377,7 +476,7 @@ class Cluster(object):
         print(" Time spent TDM 0: %12.2f" %(stop-start))
 
 
-    def build_op_matrices(self):
+    def build_op_matrices(self, iprint=1):
         """
         build all operators needed
         """
@@ -433,7 +532,8 @@ class Cluster(object):
                 #   basis transformation costs, but simplifies later manipulations. Later I need to 
                 #   remove the redundant storage by manually handling the transpositions from a to A
         stop = time.time()
-        print(" Time spent TDM 1: %12.2f" %(stop-start))
+        if iprint>0:
+            print(" Time spent TDM 1: %12.2f" %(stop-start))
 
         #  b, B 
         start = time.time()
@@ -449,7 +549,8 @@ class Cluster(object):
                 #   basis transformation costs, but simplifies later manipulations. Later I need to 
                 #   remove the redundant storage by manually handling the transpositions from a to A
         stop = time.time()
-        print(" Time spent TDM 2: %12.2f" %(stop-start))
+        if iprint>0:
+            print(" Time spent TDM 2: %12.2f" %(stop-start))
 
         #  Aa
         start = time.time()
@@ -460,7 +561,8 @@ class Cluster(object):
                 except KeyError:
                     continue
         stop = time.time()
-        print(" Time spent TDM 3: %12.2f" %(stop-start))
+        if iprint>0:
+            print(" Time spent TDM 3: %12.2f" %(stop-start))
         
         #  Bb
         start = time.time()
@@ -471,7 +573,8 @@ class Cluster(object):
                 except KeyError:
                     continue
         stop = time.time()
-        print(" Time spent TDM 4: %12.2f" %(stop-start))
+        if iprint>0:
+            print(" Time spent TDM 4: %12.2f" %(stop-start))
 
                
 
@@ -486,7 +589,8 @@ class Cluster(object):
                 except KeyError:
                     continue
         stop = time.time()
-        print(" Time spent TDM 5: %12.2f" %(stop-start))
+        if iprint>0:
+            print(" Time spent TDM 5: %12.2f" %(stop-start))
 
         
         """       
@@ -500,7 +604,8 @@ class Cluster(object):
                 except KeyError:
                     continue
         stop = time.time()
-        print(" Time spent TDM 6: %12.2f" %(stop-start))
+        if iprint>0:
+            print(" Time spent TDM 6: %12.2f" %(stop-start))
 
 
 
@@ -515,7 +620,8 @@ class Cluster(object):
                 except KeyError:
                     continue
         stop = time.time()
-        print(" Time spent TDM 7: %12.2f" %(stop-start))
+        if iprint>0:
+            print(" Time spent TDM 7: %12.2f" %(stop-start))
         """
 
         
@@ -531,7 +637,8 @@ class Cluster(object):
                 except KeyError:
                     continue
         stop = time.time()
-        print(" Time spent TDM 8: %12.2f" %(stop-start))
+        if iprint>0:
+            print(" Time spent TDM 8: %12.2f" %(stop-start))
 
         # BB
         start = time.time()
@@ -545,7 +652,8 @@ class Cluster(object):
                 except KeyError:
                     continue
         stop = time.time()
-        print(" Time spent TDM 9: %12.2f" %(stop-start))
+        if iprint>0:
+            print(" Time spent TDM 9: %12.2f" %(stop-start))
 
 
 
@@ -565,7 +673,8 @@ class Cluster(object):
                 except KeyError:
                     continue
         stop = time.time()
-        print(" Time spent TDM10: %12.2f" %(stop-start))
+        if iprint>0:
+            print(" Time spent TDM10: %12.2f" %(stop-start))
 
         
                
@@ -578,7 +687,8 @@ class Cluster(object):
                 except KeyError:
                     continue
         stop = time.time()
-        print(" Time spent TDM11: %12.2f" %(stop-start))
+        if iprint>0:
+            print(" Time spent TDM11: %12.2f" %(stop-start))
 
 
         #  BBb
@@ -590,7 +700,8 @@ class Cluster(object):
                 except KeyError:
                     continue
         stop = time.time()
-        print(" Time spent TDM12: %12.2f" %(stop-start))
+        if iprint>0:
+            print(" Time spent TDM12: %12.2f" %(stop-start))
 
 
         #  ABb
@@ -602,7 +713,8 @@ class Cluster(object):
                 except KeyError:
                     continue
         stop = time.time()
-        print(" Time spent TDM13: %12.2f" %(stop-start))
+        if iprint>0:
+            print(" Time spent TDM13: %12.2f" %(stop-start))
 
         #  BAa
         start = time.time()
@@ -613,7 +725,8 @@ class Cluster(object):
                 except KeyError:
                     continue
         stop = time.time()
-        print(" Time spent TDM14: %12.2f" %(stop-start))
+        if iprint>0:
+            print(" Time spent TDM14: %12.2f" %(stop-start))
 
 
         #  ABa
@@ -625,7 +738,8 @@ class Cluster(object):
                 except KeyError:
                     continue
         stop = time.time()
-        print(" Time spent TDM15: %12.2f" %(stop-start))
+        if iprint>0:
+            print(" Time spent TDM15: %12.2f" %(stop-start))
 
         #  BAb
         start = time.time()
@@ -636,7 +750,8 @@ class Cluster(object):
                 except KeyError:
                     continue
         stop = time.time()
-        print(" Time spent TDM16: %12.2f" %(stop-start))
+        if iprint>0:
+            print(" Time spent TDM16: %12.2f" %(stop-start))
 
 
         #  Aaa
@@ -648,7 +763,8 @@ class Cluster(object):
                 except KeyError:
                     continue
         stop = time.time()
-        print(" Time spent TDM17: %12.2f" %(stop-start))
+        if iprint>0:
+            print(" Time spent TDM17: %12.2f" %(stop-start))
 
         
         #  Bbb
@@ -660,7 +776,8 @@ class Cluster(object):
                 except KeyError:
                     continue
         stop = time.time()
-        print(" Time spent TDM18: %12.2f" %(stop-start))
+        if iprint>0:
+            print(" Time spent TDM18: %12.2f" %(stop-start))
 
         
         #  Aab
@@ -672,7 +789,8 @@ class Cluster(object):
                 except KeyError:
                     continue
         stop = time.time()
-        print(" Time spent TDM19: %12.2f" %(stop-start))
+        if iprint>0:
+            print(" Time spent TDM19: %12.2f" %(stop-start))
 
 
         #  Bba
@@ -684,7 +802,8 @@ class Cluster(object):
                 except KeyError:
                     continue
         stop = time.time()
-        print(" Time spent TDM20: %12.2f" %(stop-start))
+        if iprint>0:
+            print(" Time spent TDM20: %12.2f" %(stop-start))
 
 
         #  Aba
@@ -696,7 +815,8 @@ class Cluster(object):
                 except KeyError:
                     continue
         stop = time.time()
-        print(" Time spent TDM21: %12.2f" %(stop-start))
+        if iprint>0:
+            print(" Time spent TDM21: %12.2f" %(stop-start))
 
 
         #  Bab
@@ -708,18 +828,21 @@ class Cluster(object):
                 except KeyError:
                     continue
         stop = time.time()
-        print(" Time spent TDM22: %12.2f" %(stop-start))
+        if iprint>0:
+            print(" Time spent TDM22: %12.2f" %(stop-start))
 
         
 
-        print(" Swapping axes to get contiguous data")
+        if iprint>0:
+            print(" Swapping axes to get contiguous data")
         start = time.time()
         for o in self.ops:
             for f in self.ops[o]:
                 self.ops[o][f] = np.ascontiguousarray(self.ops[o][f])
                 #self.ops[o][f] = np.ascontiguousarray(np.swapaxes(self.ops[o][f],0,1))
         stop = time.time()
-        print(" Time spent making data contiguous: %12.2f" %(stop-start))
+        if iprint>0:
+            print(" Time spent making data contiguous: %12.2f" %(stop-start))
 
 
         stop_tot = time.time()

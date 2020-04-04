@@ -14,21 +14,32 @@ from ClusteredState import *
 from Cluster import *
 
 
-def cmf(clustered_ham, ci_vector, h, g, max_iter=20, thresh=1e-8, 
-        max_nroots=1000,
-        delta_elec=None,
-        dm_guess=None,diis=False,diis_start=1,max_diis=6):
+def cmf(clustered_ham, ci_vector, h, g, max_iter=20, thresh=1e-8, dm_guess=None,diis=False,diis_start=1,max_diis=6):
     """ Do CMF for a tensor product state 
        
-        This modifies the data in clustered_ham.clusters, both the basis, and the operators
+        This modifies the data in clustered_ham.clusters, both the basis, and the operators such that the 
+        cluster basis is only defined on the target fock space with only a single vector
 
-        h is the 1e integrals
-        g is the 2e integrals
+   
+        Input: 
+        ci_vector   :   ClusteredState object which defines the fock space configuration for the CMF calcultion
+                        Because CMF finds the best TPS wrt cluster state rotations, this should only have a single
+                        configuration defined. If not, error will be thrown.
 
-        thresh: how tightly to converge energy
+        h           :   1e integrals
+        g           :   2e integrals
+
+        thresh      :   how tightly to converge energy
         max_nroots  :   what is the max number of cluster states to allow in each fock space of each cluster
                             after the potential is optimized?
-        delta_elec  :   when we build the final basis, how many fock spaces away from the CMF fock space should we include?
+        dm_guess    :   Use initial guess for 1rdm? Typically one would use HF density matrix here. Input is a 
+                        tuple of density matrices for alpha/beta: (Pa, Pb)
+
+        Returns:
+        energy      :   Final CMF energy
+        converged   :   Bool indicating if it converged or not
+        Da,Db       :   Tuple of optimized density matrices to be used for generating the rest of the cluster basis.
+                        
     """
   # {{{
     print()
@@ -59,7 +70,12 @@ def cmf(clustered_ham, ci_vector, h, g, max_iter=20, thresh=1e-8,
         diis_errors = []
         diis_size = 0
 
+    ecore = clustered_ham.core_energy
     for cmf_iter in range(max_iter):
+        print(" --------------------------------------")
+        print("     CMF Iter:", cmf_iter)
+        print(" --------------------------------------")
+
         rdm_a_old = rdm_a
         rdm_b_old = rdm_b
         
@@ -68,23 +84,12 @@ def cmf(clustered_ham, ci_vector, h, g, max_iter=20, thresh=1e-8,
             print(ci)
             assert(ci_idx == ci.idx)
             if cmf_iter > 0:
-                ci.form_eigbasis_from_ints(h,g,max_roots=1, rdm1_a=rdm_a, rdm1_b=rdm_b,
-                        max_nelec=[fspace[ci_idx][0],fspace[ci_idx][1]],
-                        min_nelec=[fspace[ci_idx][0],fspace[ci_idx][1]]
-                        )
-            elif dm_guess != None: 
-                ci.form_eigbasis_from_ints(h,g,max_roots=1, rdm1_a=rdm_a, rdm1_b=rdm_b,
-                        max_nelec=[fspace[ci_idx][0],fspace[ci_idx][1]],
-                        min_nelec=[fspace[ci_idx][0],fspace[ci_idx][1]]
-                        )
+                ci.form_fockspace_eigbasis(h, g, [fspace[ci_idx]], max_roots=1, rdm1_a=rdm_a, rdm1_b=rdm_b)
             else:
-                ci.form_eigbasis_from_ints(h,g,max_roots=1,
-                        max_nelec=[fspace[ci_idx][0],fspace[ci_idx][1]],
-                        min_nelec=[fspace[ci_idx][0],fspace[ci_idx][1]]
-                        )
+                ci.form_fockspace_eigbasis(h, g, [fspace[ci_idx]], max_roots=1)
         
             print(" Build new operators for cluster ",ci.idx)
-            ci.build_op_matrices()
+            ci.build_op_matrices(iprint=0)
             ci.build_local_terms(h,g)
       
         print(" Compute CMF energy")
@@ -164,37 +169,42 @@ def cmf(clustered_ham, ci_vector, h, g, max_iter=20, thresh=1e-8,
             e_last = e_curr
     
     
-    # Now compute the full basis and associated operators
-    print()
-    print(" CMF now done: Recompute the operator matrices in the new basis")
-    for ci_idx, ci in enumerate(clusters):
-    
-        # if delta_elec is set to None, build all possible fock spaces
-        if delta_elec == None:
-            dele = ci.n_orb     
-        else:
-            dele = delta_elec
-        max_e = [min(ci.n_orb, fspace[ci_idx][0]+dele), min(ci.n_orb, fspace[ci_idx][1]+dele)]
-        min_e = [max(0, fspace[ci_idx][0]-dele), max(0, fspace[ci_idx][1]-dele)]
-        print()
-        print()
-        print(" Form basis by diagonalize local Hamiltonian for cluster: ",ci_idx)
-        if rdm_a is not None and rdm_b is not None: 
-            ci.form_eigbasis_from_ints(h,g,max_roots=max_nroots, rdm1_a=rdm_a, rdm1_b=rdm_b, max_nelec=max_e, min_nelec=min_e)
-        else:
-            ci.form_eigbasis_from_ints(h,g,max_roots=max_nroots, max_nelec=max_e, min_nelec=min_e)
-        print(" Build these local operators")
-        print(" Build mats for cluster ",ci.idx)
-        ci.build_op_matrices()
-        ci.build_local_terms(h,g)
+#    # Now compute the full basis and associated operators
+#    print()
+#    print(" CMF now done: Recompute the operator matrices in the new basis")
+#    for ci_idx, ci in enumerate(clusters):
+#    
+#            
+#        
+#
+#        # if delta_elec is set to None, build all possible fock spaces
+#        if delta_elec == None:
+#            max_e = ci.n_orb     
+#            min_e = 0     
+#        else:
+#            nelec = fspace[ci_idx][0] + fspace[ci_idx][1]  
+#            max_e = min(nelec+delta_elec, ci.n_orb)    
+#            min_e = max(nelec-delta_elec, 0)
+#
+#        print()
+#        print()
+#        print(" Form basis by diagonalize local Hamiltonian for cluster: ",ci_idx)
+#        if rdm_a is not None and rdm_b is not None: 
+#            ci.form_eigbasis_from_ints(h,g,max_roots=max_nroots, rdm1_a=rdm_a, rdm1_b=rdm_b, max_elec=max_e, min_nelec=min_e)
+#        else:
+#            ci.form_eigbasis_from_ints(h,g,max_roots=max_nroots, max_elec=max_e, min_nelec=min_e)
+#        print(" Build these local operators")
+#        print(" Build mats for cluster ",ci.idx)
+#        ci.build_op_matrices()
+#        ci.build_local_terms(h,g)
 
-    return e_curr,converged
+    return e_curr, converged, rdm_a, rdm_b
    # }}}
 
-import line_profiler
-import atexit
-profile = line_profiler.LineProfiler()
-atexit.register(profile.print_stats)
+#import line_profiler
+#import atexit
+#profile = line_profiler.LineProfiler()
+#atexit.register(profile.print_stats)
 
 #@profile
 def matvec_update_with_new_configs(coeff_tensor, new_configs, configs, active, thresh_search=1e-12):

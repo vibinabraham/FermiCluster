@@ -356,21 +356,30 @@ class ClusteredState(OrderedDict):
 
     def print(self):
         """ Pretty print """
-        print(" Total Length %5i:" %len(self))
+        print(" --------------------------------------------------")
+        print(" ---------- Fockspaces in state ------: Dim = %5i"%len(self))
+        print(" --------------------------------------------------")
+        print(" %-20s%-20s%-20s"%("%Weight", "# Configs", "Fock space")) 
+        print(" %-20s%-20s%-20s"%("-------", "---------", "----------")) 
         for f in self.data:
-            print(" Dim %4i fock_space: "%len(self.data[f]), f)
+            prob = 0
+            for config, coeff in self.data[f].items():
+                prob += coeff*coeff 
+            print(" %-20.3f%-20i%-s"%(prob*100,len(self.data[f]), f))
+            #print(" Dim %4i  Weight %8.1f  fock_space: "%(len(self.data[f]),prob*100), f)
             #for config, value in self.data[f].items():
             #    print("%20s"%str(config),end="")
             #    #print_row(value)
             #    print(" ",value)
-    
+        print(" --------------------------------------------------")
+        
     def print_configs(self):
         """ Pretty print """
         for f in self.data:
             if len(self.data[f]) == 0:
                 continue
             print(" Dim %4i fock_space: "%len(self.data[f]),end='')
-            [print(" Cluster %-2i(%ia:%ib) "%(fii,fi[0],fi[1]),end='') for fii,fi in enumerate(f)] 
+            [print(" Cluster %-2i(%i:%i) "%(fii,fi[0],fi[1]),end='') for fii,fi in enumerate(f)] 
             print()
             for config, value in self.data[f].items():
                 print("%20s"%str(config),end="")
