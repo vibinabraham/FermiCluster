@@ -459,10 +459,15 @@ class ci_solver:
        
         #helpers.print_mat(Hci)
         print(" Diagonalize Matrix for %i roots" %self.n_roots)
-        l,C = scipy.sparse.linalg.eigsh(Hci,self.n_roots,which='SA')
-        sort_ind = np.argsort(l)
-        l = l[sort_ind]
-        C = C[:,sort_ind]
+
+        if Hci.shape[0] > 1:
+            l,C = scipy.sparse.linalg.eigsh(Hci,self.n_roots,which='SA')
+            sort_ind = np.argsort(l)
+            l = l[sort_ind]
+            C = C[:,sort_ind]
+        else:
+            l = [Hci[0,0]]
+            C = np.array([[1.0]])
         #print(" Diagonalize Matrix")
         #l,C = np.linalg.eigh(Hci)
         #sort_ind = np.argsort(l)

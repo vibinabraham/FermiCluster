@@ -70,7 +70,7 @@ class Cluster(object):
         else:
             self.ops[op] = {}
     
-    def form_eigbasis_from_ints(self,hin,vin,max_roots=1000, rdm1_a=None, rdm1_b=None, ecore=0):
+    def form_eigbasis_from_ints(self,hin,vin,max_roots=1000, max_nelec=None, min_nelec=None, rdm1_a=None, rdm1_b=None, ecore=0):
         """
         grab integrals acting locally and form eigenbasis by FCI
 
@@ -158,6 +158,16 @@ class Cluster(object):
 #            print(" E:       %12.8f" %(e))
 #            print(" E+ecore: %12.8f" %(e+ecore))
 
+        if max_nelec == None:
+            max_nelec = [self.n_orb, self.n_orb]
+        if min_nelec == None:
+            min_nelec = [0,0]
+        assert(len(max_nelec) == 2 and len(min_nelec) == 2 )
+        assert(max_nelec[0] <= self.n_orb)
+        assert(max_nelec[1] <= self.n_orb)
+        assert(min_nelec[0] >= 0)
+        assert(min_nelec[1] >= 0)
+
         H = Hamiltonian()
         H.S = np.eye(h.shape[0])
         H.C = H.S
@@ -165,8 +175,9 @@ class Cluster(object):
         H.V = v
         self.basis = {}
         print(" Do CI for each particle number block")
-        for na in range(self.n_orb+1):
-            for nb in range(self.n_orb+1):
+        for na in range(min_nelec[0],max_nelec[0]+1):
+            for nb in range(min_nelec[1],max_nelec[1]+1):
+            #for nb in range(self.n_orb+1):
                 ci = ci_solver()
                 ci.algorithm = "direct"
                 ci.init(H,na,nb,max_roots)

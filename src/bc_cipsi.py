@@ -16,7 +16,7 @@ from tools import *
 
 
 
-def system_setup(h, g, ecore, blocks, max_roots=1000):
+def system_setup(h, g, ecore, blocks, max_roots=1000, max_nelec=None, min_nelec=None):
 # {{{
     n_blocks = len(blocks)
 
@@ -44,7 +44,11 @@ def system_setup(h, g, ecore, blocks, max_roots=1000):
         print()
         print(" Form basis by diagonalize local Hamiltonian for cluster: ",ci_idx)
         #ci.form_eigbasis_from_local_operator(opi,max_roots=1000,s2_shift=s2_shift)
-        ci.form_eigbasis_from_ints(h,g,max_roots=max_roots, ecore=ecore)
+        ci.form_eigbasis_from_ints(h,g,
+                max_roots=max_roots, 
+                max_nelec=max_nelec,
+                min_nelec=min_nelec,
+                ecore=ecore)
 
 
     print(" Build these local operators")
