@@ -145,10 +145,10 @@ def cmf(clustered_ham, ci_vector, h, g, max_iter=20, thresh=1e-8, dm_guess=None,
                     resid = np.zeros(diis_size + 1)
                     resid[-1] = -1
 
-                    print("B")
-                    print(B)
-                    print("resid")
-                    print(resid)
+                    #print("B")
+                    #print(B)
+                    #print("resid")
+                    #print(resid)
                     # Solve Pulay equations, [Pulay:1980:393], Eqn. 6
                     ci = np.linalg.solve(B, resid)
 
@@ -2121,8 +2121,8 @@ def build_1rdm(ci_vector):
     print(" Eigenvalues of density matrix")
     [print("%4i %12.8f"%(i,occs[i])) for i in range(len(occs))]
     print(np.trace(dm_aa + dm_bb))
-    with np.printoptions(precision=6, suppress=True):
-        print(dm_aa + dm_bb)
+    #with np.printoptions(precision=6, suppress=True):
+    #    print(dm_aa + dm_bb)
     return dm_aa, dm_bb 
 
 # }}}
