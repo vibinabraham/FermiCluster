@@ -161,7 +161,7 @@ def cmf(clustered_ham, ci_vector, h, g, max_iter=20, thresh=1e-8, dm_guess=None,
                     
                     rdm_a = dm_new.copy()
                     rdm_b = dm_new.copy()
-                    print(rdm_a)
+                    #print(rdm_a)
             elif diis==False:
                 # form 1rdm from reference state
                 rdm_a, rdm_b = tools.build_1rdm(ci_vector)
@@ -1709,7 +1709,7 @@ def build_hamiltonian_diagonal(clustered_ham,ci_vector):
 # }}}
 
 
-def build_hamiltonian_diagonal_parallel1(clustered_ham_in,ci_vector, nproc=None):
+def build_hamiltonian_diagonal_parallel1(clustered_ham_in, ci_vector, nproc=None):
     """
     Build hamiltonian diagonal in basis in ci_vector
     """
@@ -1749,6 +1749,9 @@ def build_hamiltonian_diagonal_parallel1(clustered_ham_in,ci_vector, nproc=None)
 
     print(" Using Pathos library for parallelization. Number of workers: ", pool.ncpus)
 
+    #chunksize = 100
+    #print(" Chunksize: ", chunksize)
+    #out = pool.map(do_parallel_work, ci_vector, chunksize=chunksize)
     out = pool.map(do_parallel_work, ci_vector)
     pool.close()
     pool.join()

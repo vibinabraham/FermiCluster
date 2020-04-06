@@ -68,27 +68,22 @@ class Cluster(object):
         """
         Get list of possible fock spaces accessible to the cluster
 
-        delta_elec      :   ((ref_alpha, ref_beta), (delta_alpha, delta_beta)) allows restrictions to fock spaces
+        delta_elec      :   (ref_alpha, ref_beta, delta) allows restrictions to fock spaces
                                 based on a delta from some reference occupancy (ref_alpha, ref_beta)
         """
         # {{{
       
         if delta_elec != None:
-            assert(len(delta_elec) == 2)
-            assert(len(delta_elec[0]) == 2)
-            assert(len(delta_elec[1]) == 2)
-            ref_a = delta_elec[0][0]
-            ref_b = delta_elec[0][1]
-            del_a = delta_elec[1][0]
-            del_b = delta_elec[1][1]
+            assert(len(delta_elec) == 3)
+            ref_a = delta_elec[0]
+            ref_b = delta_elec[1]
+            delta = delta_elec[2]
             
         fspaces = []
         for na in range(self.n_orb+1):
             for nb in range(self.n_orb+1):
                 if delta_elec != None:
-                    if na > ref_a+del_a or na < ref_a-del_a:
-                        continue
-                    if nb > ref_b+del_b or nb < ref_b-del_b:
+                    if abs(na-ref_a)+abs(nb-ref_b) > delta:
                         continue
                 fspaces.append([na,nb])
         return fspaces
