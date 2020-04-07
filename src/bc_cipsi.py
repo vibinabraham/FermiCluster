@@ -153,12 +153,12 @@ def bc_cipsi_tucker(ci_vector, clustered_ham,
         
         # do the Tucker decomposition
         if selection == "cipsi":
+            print(" Reduce size of 1st order wavefunction",flush=True)
             pt_vector.add(ci_vector)
-            print(" Reduce size of 1st order wavefunction")
             print(" Before:",len(pt_vector))
             pt_vector.clip(tucker_state_clip)
             pt_vector.normalize()
-            print(" After:",len(pt_vector))
+            print(" After:",len(pt_vector),flush=True)
 
             hosvd(pt_vector, clustered_ham, hshift=hshift)
         
@@ -166,15 +166,17 @@ def bc_cipsi_tucker(ci_vector, clustered_ham,
             hosvd(ci_vector, clustered_ham, hshift=hshift)
 
 
-        print(" Ensure TDMs are still contiguous:")
+        print(" Ensure TDMs are still contiguous:", flush=True)
+        start = time.time()
         for ci in clustered_ham.clusters:
-            print(ci)
+            print(" ", ci)
             for o in ci.ops:
                 for fock in ci.ops[o]:
                     if ci.ops[o][fock].data.contiguous == False:
-                        print(" Rearrange data for %5s :" %o, fock)
+                        #print(" Rearrange data for %5s :" %o, fock)
                         ci.ops[o][fock] = np.ascontiguousarray(ci.ops[o][fock])
-    
+        stop = time.time()
+        print(" Time spent making operators contiguous: %12.2f" %( stop-start))
         
         print(" Saving Hamiltonian to disk",flush=True)
         hamiltonian_file = open('hamiltonian_file_tucker', 'wb')
@@ -268,6 +270,8 @@ def bc_cipsi(ci_vector, clustered_ham,
                 ci_vector.zero()
                 ci_vector.set_vector(v0)
         
+        ci_vector.print()
+        
         delta_e = e0 - e_prev
         e_prev = e0
         if len(ci_vector) <= old_dim and abs(delta_e) < thresh_conv:
@@ -278,7 +282,7 @@ def bc_cipsi(ci_vector, clustered_ham,
 
         asci_vector = ci_vector.copy()
         print(" Choose subspace from which to search for new configs. Thresh: ", thresh_asci)
-        print(" CI Dim          : ", len(asci_vector))
+        print(" CI Dim          : %8i" % len(asci_vector))
         kept_indices = asci_vector.clip(thresh_asci)
         print(" Search Dim      : %8i Norm: %12.8f" %( len(asci_vector), asci_vector.norm()))
         #asci_vector.normalize()
@@ -403,6 +407,9 @@ def bc_cipsi(ci_vector, clustered_ham,
                         ci_vector.add_fockspace(fockspace)
                         ci_vector[fockspace][config] = 0
         end = time.time()
+        
+        pt_vector.print()
+
         print(" Time spent in finding new CI space: %12.2f" %(end - start), flush=True)
         #exit()
 
