@@ -868,7 +868,7 @@ def matvec1_parallel2(h_in,v,thresh_search=1e-12, nproc=None, opt_einsum=True, n
 # }}}
 
 
-def matvec1_parallel3(h_in,v,thresh_search=1e-12, nproc=None, opt_einsum=True, nbody_limit=4, thresh_asci=0):
+def matvec1_parallel3(h_in,v,thresh_search=1e-12, nproc=None, opt_einsum=True, nbody_limit=4):
     """
     Compute the action of H onto a sparse trial vector v
     returns a ClusteredState object. 
@@ -899,9 +899,6 @@ def matvec1_parallel3(h_in,v,thresh_search=1e-12, nproc=None, opt_einsum=True, n
         sigma_out = OrderedDict() 
         for v_curr in batch:
             # only search from variational states with large ci coeffs
-            if v_curr[2]*v_curr[2] < thresh_asci:
-                continue
-
             do_parallel_work(v_curr,sigma_out)
         return sigma_out
 

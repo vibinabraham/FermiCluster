@@ -267,6 +267,14 @@ def bc_cipsi(ci_vector, clustered_ham,
 
                 ci_vector.zero()
                 ci_vector.set_vector(v0)
+        
+        delta_e = e0 - e_prev
+        e_prev = e0
+        if len(ci_vector) <= old_dim and abs(delta_e) < thresh_conv:
+            print(" Converged")
+            break
+        print(" Next iteration CI space dimension", len(ci_vector))
+    
 
         asci_vector = ci_vector.copy()
         print(" Choose subspace from which to search for new configs. Thresh: ", thresh_asci)
@@ -398,13 +406,6 @@ def bc_cipsi(ci_vector, clustered_ham,
         print(" Time spent in finding new CI space: %12.2f" %(end - start), flush=True)
         #exit()
 
-        delta_e = e0 - e_prev
-        e_prev = e0
-        if len(ci_vector) <= old_dim and abs(delta_e) < thresh_conv:
-            print(" Converged")
-            break
-        print(" Next iteration CI space dimension", len(ci_vector))
-    
 
     return ci_vector, pt_vector, e0, e0+e2
 
