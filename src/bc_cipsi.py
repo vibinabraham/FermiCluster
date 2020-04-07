@@ -154,9 +154,9 @@ def bc_cipsi_tucker(ci_vector, clustered_ham,
         # do the Tucker decomposition
         if selection == "cipsi":
             print(" Reduce size of 1st order wavefunction",flush=True)
-            pt_vector.add(ci_vector)
             print(" Before:",len(pt_vector))
             pt_vector.clip(tucker_state_clip)
+            pt_vector.add(ci_vector)
             pt_vector.normalize()
             print(" After:",len(pt_vector),flush=True)
 
