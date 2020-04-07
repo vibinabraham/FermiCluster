@@ -65,7 +65,9 @@ def system_setup(h, g, ecore, blocks, max_roots=1000, max_nelec=None, min_nelec=
 def bc_cipsi_tucker(ci_vector, clustered_ham, selection="cipsi",
         thresh_cipsi=1e-4, thresh_ci_clip=1e-5, thresh_cipsi_conv=1e-8, max_cipsi_iter=30, 
         thresh_tucker_conv = 1e-6, max_tucker_iter=20, tucker_state_clip=None,hshift=1e-8,
-        thresh_asci=0, thresh_search=None, nbody_limit=4, 
+        thresh_asci=0, 
+        thresh_search=None, 
+        nbody_limit=4, 
         tucker_conv_target=2, nproc=None):
     """
     Run iterations of TP-CIPSI to make the tucker decomposition self-consistent
@@ -95,7 +97,8 @@ def bc_cipsi_tucker(ci_vector, clustered_ham, selection="cipsi",
         if selection == "cipsi":
             start = time.time()
             ci_vector, pt_vector, e0, e2 = bc_cipsi(ci_vector_ref.copy(), clustered_ham, 
-                    thresh_cipsi=thresh_cipsi, thresh_ci_clip=thresh_ci_clip, thresh_conv=thresh_cipsi_conv, max_iter=max_cipsi_iter,thresh_asci=thresh_asci,
+                    thresh_cipsi=thresh_cipsi, thresh_ci_clip=thresh_ci_clip, thresh_conv=thresh_cipsi_conv, 
+                    max_iter=max_cipsi_iter,thresh_asci=thresh_asci,
                     nbody_limit=nbody_limit, thresh_search=thresh_search, nproc=nproc)
             end = time.time()
             if tucker_conv_target == 0:
@@ -105,18 +108,13 @@ def bc_cipsi_tucker(ci_vector, clustered_ham, selection="cipsi",
             else:
                 print(" wrong value for tucker_conv_target")
                 exit()
-            print(" CIPSI: E0 = %12.8f E2 = %12.8f CI_DIM: %-12i Time spent %-12.2f" %(e0, e2, len(ci_vector), end-start))
+            print(" TPSCI: E0 = %12.8f E2 = %12.8f CI_DIM: %-12i Time spent %-12.2f" %(e0, e2, len(ci_vector), end-start))
             
-            pt_vector.add(ci_vector)
-            print(" Reduce size of 1st order wavefunction")
-            print(" Before:",len(pt_vector))
-            pt_vector.clip(tucker_state_clip)
-            pt_vector.normalize()
-            print(" After:",len(pt_vector))
         elif selection == "heatbath":
             start = time.time()
             ci_vector, e0 = hb_tpsci(ci_vector_ref.copy(), clustered_ham, 
-                    thresh_cipsi=thresh_cipsi, thresh_ci_clip=thresh_ci_clip, thresh_conv=thresh_cipsi_conv, max_iter=max_cipsi_iter,thresh_asci=thresh_asci,
+                    thresh_cipsi=thresh_cipsi, thresh_ci_clip=thresh_ci_clip, nbody_limit=nbody_limit, 
+                    thresh_conv=thresh_cipsi_conv, max_iter=max_cipsi_iter,thresh_asci=thresh_asci,
                     nproc=nproc)
             end = time.time()
             pt_vector = ClusteredState(ci_vector.clusters)
@@ -131,9 +129,26 @@ def bc_cipsi_tucker(ci_vector, clustered_ham, selection="cipsi",
             t_conv = True
             break
         e_prev = e_curr
+        delta_e = e0 - e_last
+        e_last = e0
+        if abs(delta_e) < 1e-8:
+            print(" Converged BRDM iterations")
+            break
         
         # do the Tucker decomposition
-        hosvd(pt_vector, clustered_ham, hshift=hshift)
+        if selection == "cipsi":
+            pt_vector.add(ci_vector)
+            print(" Reduce size of 1st order wavefunction")
+            print(" Before:",len(pt_vector))
+            pt_vector.clip(tucker_state_clip)
+            pt_vector.normalize()
+            print(" After:",len(pt_vector))
+
+            hosvd(pt_vector, clustered_ham, hshift=hshift)
+        
+        elif selection == "heatbath":
+            hosvd(ci_vector, clustered_ham, hshift=hshift)
+
 
         print(" Ensure TDMs are still contiguous:")
         for ci in clustered_ham.clusters:
@@ -151,11 +166,6 @@ def bc_cipsi_tucker(ci_vector, clustered_ham, selection="cipsi",
         print(" Done.",flush=True)
 
 
-        delta_e = e0 - e_last
-        e_last = e0
-        if abs(delta_e) < 1e-8:
-            print(" Converged BRDM iterations")
-            break
     return ci_vector, pt_vector, e0, e2, t_conv
 # }}}
 
@@ -178,6 +188,7 @@ def bc_cipsi(ci_vector, clustered_ham,
   
     if thresh_search == None:
         thresh_search = np.sqrt(thresh_cipsi / 1000) 
+        print(" No thresh_search defined, choosing default: ", thresh_search)
     
     pt_vector = ci_vector.copy()
     Hd_vector = ClusteredState(ci_vector.clusters)
@@ -239,7 +250,7 @@ def bc_cipsi(ci_vector, clustered_ham,
         print(" Choose subspace from which to search for new configs. Thresh: ", thresh_asci)
         print(" CI Dim          : ", len(asci_vector))
         kept_indices = asci_vector.clip(thresh_asci)
-        print(" Search Dim      : ", len(asci_vector))
+        print(" Search Dim      : %8i Norm: %12.8f" %( len(asci_vector), asci_vector.norm()))
         #asci_vector.normalize()
 
         print(" Compute Matrix Vector Product:", flush=True)
@@ -421,7 +432,10 @@ def bc_cipsi(ci_vector, clustered_ham,
 # }}}
 
 
-def hb_tpsci(ci_vector, clustered_ham, thresh_cipsi=1e-4, thresh_ci_clip=1e-5, thresh_conv=1e-8, max_iter=30, n_roots=1,thresh_asci=0,nproc=None):
+def hb_tpsci(ci_vector, clustered_ham, 
+        thresh_cipsi=1e-4, thresh_ci_clip=1e-5, thresh_conv=1e-8, max_iter=30, n_roots=1, thresh_asci=0,
+        nbody_limit=4, 
+        nproc=None):
 # {{{
   
     pt_vector = ci_vector.copy()
@@ -479,9 +493,17 @@ def hb_tpsci(ci_vector, clustered_ham, thresh_cipsi=1e-4, thresh_ci_clip=1e-5, t
 
                 ci_vector.zero()
                 ci_vector.set_vector(v0)
+        
+        ci_vector.print()
+        
         print(" Perform Heat-Bath selection to find new configurations:",flush=True)
         start=time.time()
-        pt_vector = heat_bath_search(clustered_ham, ci_vector, thresh_cipsi=thresh_cipsi, nproc=nproc)
+        if nproc==1:
+            pt_vector = matvec1(clustered_ham, ci_vector, thresh_search=thresh_search, nbody_limit=nbody_limit)
+        else:
+            pt_vector = matvec1_parallel3(clustered_ham, ci_vector, nproc=nproc, thresh_search=thresh_cipsi, 
+                    nbody_limit=nbody_limit, thresh_asci=thresh_asci)
+        #pt_vector = heat_bath_search(clustered_ham, ci_vector, thresh_cipsi=thresh_cipsi, nproc=nproc)
         stop=time.time()
         print(" Number of new configurations found         : ", len(pt_vector))
         print(" Time spent in heat bath search: %12.2f" %(stop-start),flush=True)
@@ -492,6 +514,7 @@ def hb_tpsci(ci_vector, clustered_ham, thresh_cipsi=1e-4, thresh_ci_clip=1e-5, t
                 for config,coeff in list(configs.items()):
                     if config in ci_vector[fockspace]:
                         del pt_vector[fockspace][config]
+        pt_vector.prune_empty_fock_spaces()
         print(" Number of new configurations found (pruned): ", len(pt_vector))
 
 
@@ -500,7 +523,7 @@ def hb_tpsci(ci_vector, clustered_ham, thresh_cipsi=1e-4, thresh_ci_clip=1e-5, t
                 for config,coeff in configs.items():
                     assert(config not in pt_vector[fockspace])
 
-        print(" Norm of CI vector = %12.8f" %ci_vector.norm())
+        pt_vector.print()
 
         print(" Add new states to CI space", flush=True)
         print(" Dimension of CI space     : ", len(ci_vector))
@@ -511,7 +534,6 @@ def hb_tpsci(ci_vector, clustered_ham, thresh_cipsi=1e-4, thresh_ci_clip=1e-5, t
         print(" Dimension of next CI space: ", len(ci_vector))
         print(" Time spent in finding new CI space: %12.2f" %(end - start), flush=True)
 
-        exit()
         start = time.time()
 
         delta_e = e0 - e_prev

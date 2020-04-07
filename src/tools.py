@@ -868,7 +868,7 @@ def matvec1_parallel2(h_in,v,thresh_search=1e-12, nproc=None, opt_einsum=True, n
 # }}}
 
 
-def matvec1_parallel3(h_in,v,thresh_search=1e-12, nproc=None, opt_einsum=True, nbody_limit=4):
+def matvec1_parallel3(h_in,v,thresh_search=1e-12, nproc=None, opt_einsum=True, nbody_limit=4, thresh_asci=0):
     """
     Compute the action of H onto a sparse trial vector v
     returns a ClusteredState object. 
@@ -898,6 +898,10 @@ def matvec1_parallel3(h_in,v,thresh_search=1e-12, nproc=None, opt_einsum=True, n
     def do_batch(batch):
         sigma_out = OrderedDict() 
         for v_curr in batch:
+            # only search from variational states with large ci coeffs
+            if v_curr[2]*v_curr[2] < thresh_asci:
+                continue
+
             do_parallel_work(v_curr,sigma_out)
         return sigma_out
 
@@ -906,7 +910,7 @@ def matvec1_parallel3(h_in,v,thresh_search=1e-12, nproc=None, opt_einsum=True, n
         fock_r = v_curr[0]
         conf_r = v_curr[1]
         coeff  = v_curr[2]
-        
+       
         #sigma_out = ClusteredState(clusters)
         for terms in h.terms:
             fock_l= tuple([(terms[ci][0]+fock_r[ci][0], terms[ci][1]+fock_r[ci][1]) for ci in range(len(clusters))])
@@ -1058,6 +1062,7 @@ def matvec1_parallel3(h_in,v,thresh_search=1e-12, nproc=None, opt_einsum=True, n
     batch = []
     print(" Form batches. Max batch size: ", batch_size)
     for i,j,k in v:
+
         if len(batch) < batch_size:
             batch.append((i,j,k))
         else:
@@ -1092,6 +1097,8 @@ def matvec1_parallel3(h_in,v,thresh_search=1e-12, nproc=None, opt_einsum=True, n
     for o in out:
         sigma.add(o)
 
+    sigma.clip(thresh_search)
+    sigma.prune_empty_fock_spaces()
     print(" This is how much memory is being used to store collected results: ",sys.getsizeof(sigma.data)) 
     print(" ---------------------")
     return sigma 
