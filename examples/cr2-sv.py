@@ -265,13 +265,14 @@ def run():
     ci_vector.init(init_fspace)
 
     ci_vector, pt_vector, etci, etci2, t_conv = bc_cipsi_tucker(ci_vector.copy(), clustered_ham,
-                        thresh_cipsi=1e-3,
-                        thresh_ci_clip=1e-5,
-                        max_tucker_iter=4,
-                        thresh_asci=1e-2,
-                        nbody_limit=4,
-                        thresh_search=1e-5,
-                        nproc=None)
+                        pt_type         = 'mp',
+                        thresh_cipsi    = 1e-3,
+                        thresh_ci_clip  = 1e-5,
+                        max_tucker_iter = 4,
+                        thresh_asci     = 1e-2,
+                        nbody_limit     = 4,
+                        thresh_search   = 1e-5,
+                        nproc           = None)
 
     tci_dim = len(ci_vector)
     ci_vector.print()

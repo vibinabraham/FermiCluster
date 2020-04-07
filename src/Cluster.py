@@ -97,7 +97,13 @@ class Cluster(object):
 
     def form_fockspace_eigbasis(self, hin, vin, spaces, max_roots=1000, rdm1_a=None, rdm1_b=None, ecore=0, iprint=0):
         """
-        Add basis vectors for fock space specified by #alpha (na), and #beta (nb).
+        Get matrices of local Hamiltonians embedded in the system 1rdm and diagonalize to form
+        the cluster basis vectors. This is the main step in CMF
+
+        This function creates entries in the self.ops dictionary for self.ops['H_mf']
+        This data is used to obtain the cluster 
+        energies for an MP2 like correction rather than a EN correction.
+
         """
 # {{{
         for f in spaces:
@@ -179,6 +185,7 @@ class Cluster(object):
         H.V = v
         H.ecore = ecore
         self.basis = {}
+        self.ops['H_mf'] = {}
        
         for na,nb in spaces:
             ci = ci_solver()
@@ -187,9 +194,92 @@ class Cluster(object):
             print(ci)
             Hci = ci.run()
             #self.basis[(na,nb)] = np.eye(ci.results_v.shape[0])
-            self.basis[(na,nb)] = ci.results_v
-            #self.Hci[(na,nb)] = ci.results_v.T @ Hci @ ci.results_v
+            fock = (na,nb)
+            self.basis[fock] = ci.results_v
+            self.ops['H_mf'][(fock,fock)] = ci.results_v.T @ Hci @ ci.results_v
     # }}}
+
+#    def form_meanfield_cluster_energies(self, hin, vin, rdm1_a, rdm1_b, ecore=0, iprint=0):
+#        """
+#        Get matrices of local Hamiltonians embedded in the system 1rdm. This is the effective
+#        1cluster operator that CMF diagonalizes. This function is used to generate the cluster 
+#        energies for an MP2 like correction rather than a EN correction.
+#
+#        This function creates entries in the self.ops dictionary for self.ops['H_mf']
+#        """
+## {{{
+#        for f in spaces:
+#            assert(len(f)==2)
+#
+#        if len(f) == 0:
+#            print(" No spaces requested - certainly a mistake")
+#            exit()
+#
+#        print(" Build basis vectors for the following fockspaces:")
+#        for f in spaces:
+#            print("    Alpha:Beta = %4i %-4i" %(f[0],f[1]))
+#
+#        h = np.zeros([self.n_orb]*2)
+#        f = np.zeros([self.n_orb]*2)
+#        v = np.zeros([self.n_orb]*4)
+#        
+#        for pidx,p in enumerate(self.orb_list):
+#            for qidx,q in enumerate(self.orb_list):
+#                h[pidx,qidx] = hin[p,q]
+#        
+#        for pidx,p in enumerate(self.orb_list):
+#            for qidx,q in enumerate(self.orb_list):
+#                for ridx,r in enumerate(self.orb_list):
+#                    for sidx,s in enumerate(self.orb_list):
+#                        v[pidx,qidx,ridx,sidx] = vin[p,q,r,s]
+#
+#
+#        print(" Compute single particle embedding potential")
+#        denv_a = 1*rdm1_a
+#        denv_b = 1*rdm1_b
+#        for pidx,p in enumerate(self.orb_list):
+#            for qidx,q in enumerate(range(rdm1_a.shape[0])):
+#                denv_a[p,q] = 0
+#                denv_b[p,q] = 0
+#                denv_a[q,p] = 0
+#                denv_b[q,p] = 0
+#        
+#        if iprint>0:
+#            print(" Environment 1RDM:")
+#            print_mat(denv_a+denv_b)
+#        print(" Trace of env 1RDM: %12.8f" %np.trace(denv_a + denv_b))
+#        
+#        fa  = np.einsum('pqrs,pq->rs',vin,denv_a)
+#        fa += np.einsum('pqrs,pq->rs',vin,denv_b)
+#        fa -= np.einsum('pqrs,ps->qr',vin,denv_a)
+#        fb  = np.einsum('pqrs,pq->rs',vin,denv_b)
+#        fb += np.einsum('pqrs,pq->rs',vin,denv_a)
+#        fb -= np.einsum('pqrs,ps->qr',vin,denv_b)
+#
+#       
+#        # Use the Averaged alpha/beta 'fock' type matrix
+#        for pidx,p in enumerate(self.orb_list):
+#            for qidx,q in enumerate(self.orb_list):
+#                f[pidx,qidx] = .5*(fa[p,q] + fb[p,q])
+#           
+#
+#        H = Hamiltonian()
+#        H.S = np.eye(h.shape[0])
+#        H.C = H.S
+#        H.t = h + f
+#        H.V = v
+#        H.ecore = ecore
+#       
+#        self.ops['H_effective'] = {} 
+#        for fock in self.basis:
+#            ci = ci_solver()
+#            ci.algorithm = "direct"
+#            na = fock[0]
+#            nb = fock[1]
+#            ci.init(H,na,nb,1)
+#            self.ops['H_mf'][(fock,fock)] = ci.build_H_matrix(self.basis[fock])
+#       
+#    # }}}
 
     def form_eigbasis_from_ints(self,hin,vin,max_roots=1000, max_elec=None, min_elec=0, rdm1_a=None, rdm1_b=None, ecore=0):
         """

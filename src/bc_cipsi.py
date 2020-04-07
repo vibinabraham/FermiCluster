@@ -62,13 +62,22 @@ def system_setup(h, g, ecore, blocks, max_roots=1000, max_nelec=None, min_nelec=
 # }}}
 
 
-def bc_cipsi_tucker(ci_vector, clustered_ham, selection="cipsi",
-        thresh_cipsi=1e-4, thresh_ci_clip=1e-5, thresh_cipsi_conv=1e-8, max_cipsi_iter=30, 
-        thresh_tucker_conv = 1e-6, max_tucker_iter=20, tucker_state_clip=None,hshift=1e-8,
-        thresh_asci=0, 
-        thresh_search=None, 
-        nbody_limit=4, 
-        tucker_conv_target=2, nproc=None):
+def bc_cipsi_tucker(ci_vector, clustered_ham, 
+        selection           = "cipsi",
+        thresh_cipsi        = 1e-4, 
+        thresh_ci_clip      = 1e-5, 
+        thresh_cipsi_conv   = 1e-8, 
+        max_cipsi_iter      = 30, 
+        thresh_tucker_conv  = 1e-6, 
+        max_tucker_iter     = 20, 
+        tucker_state_clip   = None,
+        hshift              = 1e-8,
+        thresh_asci         = 0, 
+        thresh_search       = None, 
+        pt_type             = 'en',
+        nbody_limit         = 4, 
+        tucker_conv_target  = 2, 
+        nproc               = None):
     """
     Run iterations of TP-CIPSI to make the tucker decomposition self-consistent
    
@@ -79,6 +88,7 @@ def bc_cipsi_tucker(ci_vector, clustered_ham, selection="cipsi",
     thresh_asci         :   only consider couplings to pspace configs with probabilities larger than this value
     thresh_search       :   delete couplings to pspace configs
                                 default: thresh_cipsi^1/2 / 1000
+    pt_type             :   Which denominator to use? Epstein-Nesbitt (en) or Moller-Plesset-like (mp)
     tucker_conv_target  :   Which energy should we use to determine convergence? 
                                 0 = variational energy
                                 2 = pt2 energy
@@ -96,10 +106,16 @@ def bc_cipsi_tucker(ci_vector, clustered_ham, selection="cipsi",
    
         if selection == "cipsi":
             start = time.time()
-            ci_vector, pt_vector, e0, e2 = bc_cipsi(ci_vector_ref.copy(), clustered_ham, 
-                    thresh_cipsi=thresh_cipsi, thresh_ci_clip=thresh_ci_clip, thresh_conv=thresh_cipsi_conv, 
-                    max_iter=max_cipsi_iter,thresh_asci=thresh_asci,
-                    nbody_limit=nbody_limit, thresh_search=thresh_search, nproc=nproc)
+            ci_vector, pt_vector, e0, e2 = bc_cipsi(ci_vector_ref.copy(), clustered_ham,
+                                                        pt_type         = pt_type,
+                                                        thresh_cipsi    = thresh_cipsi, 
+                                                        thresh_ci_clip  = thresh_ci_clip, 
+                                                        thresh_conv     = thresh_cipsi_conv, 
+                                                        max_iter        = max_cipsi_iter,
+                                                        thresh_asci     = thresh_asci,
+                                                        nbody_limit     = nbody_limit, 
+                                                        thresh_search   = thresh_search, 
+                                                        nproc           = nproc)
             end = time.time()
             if tucker_conv_target == 0:
                 e_curr = e0
@@ -171,9 +187,15 @@ def bc_cipsi_tucker(ci_vector, clustered_ham, selection="cipsi",
 
 
 def bc_cipsi(ci_vector, clustered_ham,  
-    thresh_cipsi=1e-4, thresh_ci_clip=1e-5, thresh_conv=1e-8, max_iter=30, n_roots=1,thresh_asci=0,
-    nbody_limit=4, 
-    thresh_search=None, 
+    thresh_cipsi    = 1e-4, 
+    thresh_ci_clip  = 1e-5, 
+    thresh_conv     = 1e-8, 
+    max_iter        = 30, 
+    n_roots         = 1,
+    thresh_asci     = 0,
+    nbody_limit     = 4, 
+    pt_type         = 'en',
+    thresh_search   = None, 
     nproc=None):
     """
     thresh_cipsi    :   include qspace configurations into pspace that have probabilities larger than this value
@@ -189,7 +211,7 @@ def bc_cipsi(ci_vector, clustered_ham,
     if thresh_search == None:
         thresh_search = np.sqrt(thresh_cipsi / 1000) 
         print(" No thresh_search defined, choosing default: ", thresh_search)
-    
+   
     pt_vector = ci_vector.copy()
     Hd_vector = ClusteredState(ci_vector.clusters)
     e_prev = 0
@@ -305,23 +327,52 @@ def bc_cipsi(ci_vector, clustered_ham,
         print(" Dimension of PT space: ", len(pt_vector))
         print(" Compute Denominator",flush=True)
         #exit()
-        start = time.time()
         pt_vector.prune_empty_fock_spaces()
             
         #import cProfile
         #pr = cProfile.Profile()
         #pr.enable()
-           
-        if nproc==1:
-            Hd = update_hamiltonian_diagonal(clustered_ham, pt_vector, Hd_vector)
-        else:
-            Hd = build_hamiltonian_diagonal_parallel1(clustered_ham, pt_vector, nproc=nproc)
-        #pr.disable()
-        #pr.print_stats(sort='time')
-        end = time.time()
-        print(" Time spent in demonimator: %12.2f" %( end - start), flush=True)
 
-        denom = 1/(e0 - Hd)
+
+        # Build Denominator
+        if pt_type == 'en':
+            start = time.time()
+            if nproc==1:
+                Hd = update_hamiltonian_diagonal(clustered_ham, pt_vector, Hd_vector)
+            else:
+                Hd = build_hamiltonian_diagonal_parallel1(clustered_ham, pt_vector, nproc=nproc)
+            #pr.disable()
+            #pr.print_stats(sort='time')
+            end = time.time()
+            print(" Time spent in demonimator: %12.2f" %( end - start), flush=True)
+            
+            denom = 1/(e0 - Hd)
+        elif pt_type == 'mp':
+            start = time.time()
+            # get barycentric MP zeroth order energy
+            e0_mp = 0
+            for f,c,v in ci_vector:
+                for ci in clustered_ham.clusters:
+                    e0_mp += ci.ops['H_mf'][(f[ci.idx],f[ci.idx])][c[ci.idx],c[ci.idx]] * v * v
+            
+            print(" Zeroth-order MP energy: %12.8f" %e0_mp, flush=True)
+
+            #   This is not really MP once we have rotated away from the CMF basis.
+            #   H = F + (H - F), where F = sum_I F(I)
+            #
+            #   After Tucker basis, we just use the diagonal of this fock operator. 
+            #   Not ideal perhaps, but better than nothing at this stage
+            denom = np.zeros(len(pt_vector))
+            idx = 0
+            for f,c,v in pt_vector:
+                e0_X = 0
+                for ci in clustered_ham.clusters:
+                    e0_X += ci.ops['H_mf'][(f[ci.idx],f[ci.idx])][c[ci.idx],c[ci.idx]]
+                denom[idx] = 1/(e0_mp - e0_X)
+                idx += 1
+            end = time.time()
+            print(" Time spent in demonimator: %12.2f" %( end - start), flush=True)
+        
         pt_vector_v = pt_vector.get_vector()
         pt_vector_v.shape = (pt_vector_v.shape[0])
 
@@ -351,80 +402,8 @@ def bc_cipsi(ci_vector, clustered_ham,
         e_prev = e0
         if len(ci_vector) <= old_dim and abs(delta_e) < thresh_conv:
             print(" Converged")
-#            if thresh_asci > 0:
-#                print("\n Compute Final PT vector and correction with full variational space")
-#                start = time.time()
-#                if nproc==1:
-#                    pt_vector = matvec1(clustered_ham, ci_vector)
-#                else:
-#                    pt_vector = matvec1_parallel2(clustered_ham, ci_vector, nproc=nproc)
-#                stop = time.time()
-#                print(" Time spent in matvec: %12.2f" %(stop-start), flush=True)
-#                pt_vector.prune_empty_fock_spaces()
-#
-#                var = pt_vector.dot(pt_vector) - e0*e0
-#                print(" Variance:          %12.8f" % var,flush=True)
-#                tmp = ci_vector.dot(pt_vector)
-#                var = pt_vector.dot(pt_vector) - tmp*tmp
-#                print(" Variance Subspace: %12.8f" % var,flush=True)
-#
-#
-#                print(" Remove CI space from pt_vector vector")
-#                for fockspace,configs in pt_vector.items():
-#                    if fockspace in ci_vector.fblocks():
-#                        for config,coeff in list(configs.items()):
-#                            if config in ci_vector[fockspace]:
-#                                del pt_vector[fockspace][config]
-#
-#
-#                for fockspace,configs in ci_vector.items():
-#                    if fockspace in pt_vector:
-#                        for config,coeff in configs.items():
-#                            assert(config not in pt_vector[fockspace])
-#
-#                print(" Norm of CI vector = %12.8f" %ci_vector.norm())
-#                print(" Dimension of CI space: ", len(ci_vector))
-#                print(" Dimension of PT space: ", len(pt_vector))
-#                print(" Compute Denominator",flush=True)
-#                #next_ci_vector = cp.deepcopy(ci_vector)
-#                # compute diagonal for PT2
-#
-#                start = time.time()
-#                pt_vector.prune_empty_fock_spaces()
-#                    
-#                #import cProfile
-#                #pr = cProfile.Profile()
-#                #pr.enable()
-#                    
-#                if nproc==1:
-#                    Hd = update_hamiltonian_diagonal(clustered_ham, pt_vector, Hd_vector)
-#                else:
-#                    Hd = build_hamiltonian_diagonal_parallel1(clustered_ham, pt_vector, nproc=nproc)
-#                #pr.disable()
-#                #pr.print_stats(sort='time')
-#                end = time.time()
-#                print(" Time spent in demonimator: %12.2f" %(end - start), flush=True)
-#
-#                denom = 1/(e0 - Hd)
-#                pt_vector_v = pt_vector.get_vector()
-#                pt_vector_v.shape = (pt_vector_v.shape[0])
-#
-#                e2 = np.multiply(denom,pt_vector_v)
-#                pt_vector.set_vector(e2)
-#                e2 = np.dot(pt_vector_v,e2)
-#
-#                print(" PT2 Energy Correction = %12.8f" %e2, flush=True)
-#                print(" PT2 Energy Total      = %12.8f" %(e0+e2), flush=True)
             break
         print(" Next iteration CI space dimension", len(ci_vector))
-    #    print(" Do CMF:")
-    #    for ci_idx, ci in enumerate(clusters):
-    #        assert(ci_idx == ci.idx)
-    #        print(" Extract local operator for cluster",ci.idx)
-    #        opi = build_effective_operator(ci_idx, clustered_ham, ci_vector)
-    #        print(" Form basis by diagonalize local Hamiltonian for cluster: ",ci_idx)
-    #        ci.form_eigbasis_from_local_operator(opi,max_roots=1000)
-    #        exit()
     
 
     return ci_vector, pt_vector, e0, e0+e2
@@ -581,7 +560,7 @@ def hosvd(ci_vector, clustered_ham, hshift=1e-8):
 
             if hshift != None:
                 """Adding cluster hamiltonian to RDM before diagonalization to make null space unique. """
-                Hlocal = ci.ops['H'][(fspace,fspace)]
+                Hlocal = ci.ops['H_mf'][(fspace,fspace)]
                 n,U = np.linalg.eigh(rdm + hshift*Hlocal)
                 n = np.diag(U.T @ rdm @ U)
                 idx = n.argsort()[::-1]
