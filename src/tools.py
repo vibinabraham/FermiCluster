@@ -2204,17 +2204,13 @@ def build_1rdm(ci_vector):
                 for config_l in ci_vector.fblock(fock):
                     for config_r in ci_vector.fblock(fock):
                         # make sure all state indices are the same aside for clusters i and j
-                        delta_conf = [config_l[i] == config_r[i] for i in range(len(clusters))] 
-                        delta_conf[ci.idx] = True
-                        diag = True
-                        for i in delta_conf:
-                            if i is False:
-                                diag = False
                         
-                        if diag == False:
-                            continue
-                        pq = ci.get_op_mel('Aa', fock[ci.idx], fock[ci.idx], config_l[ci.idx], config_r[ci.idx])*ci_vector[fock][config_l] * ci_vector[fock][config_r]
-                        dm_aa[shifts[ci.idx]:shifts[ci.idx]+ci.n_orb, shifts[ci.idx]:shifts[ci.idx]+ci.n_orb] += pq
+                        delta_conf = [abs(config_l[i] - config_r[i]) for i in range(len(clusters))] 
+                        delta_conf[ci.idx] = 0
+                        
+                        if sum(delta_conf) == 0:
+                            pq = ci.get_op_mel('Aa', fock[ci.idx], fock[ci.idx], config_l[ci.idx], config_r[ci.idx])*ci_vector[fock][config_l] * ci_vector[fock][config_r]
+                            dm_aa[shifts[ci.idx]:shifts[ci.idx]+ci.n_orb, shifts[ci.idx]:shifts[ci.idx]+ci.n_orb] += pq
  
             #Bb terms
             if fock[ci.idx][1] > 0:
@@ -2223,17 +2219,12 @@ def build_1rdm(ci_vector):
                 for config_l in ci_vector.fblock(fock):
                     for config_r in ci_vector.fblock(fock):
                         # make sure all state indices are the same aside for clusters i and j
-                        delta_conf = [config_l[i] == config_r[i] for i in range(len(clusters))] 
-                        delta_conf[ci.idx] = True
-                        diag = True
-                        for i in delta_conf:
-                            if i is False:
-                                diag = False
+                        delta_conf = [abs(config_l[i] - config_r[i]) for i in range(len(clusters))] 
+                        delta_conf[ci.idx] = 0
                         
-                        if diag == False:
-                            continue
-                        pq = ci.get_op_mel('Bb', fock[ci.idx], fock[ci.idx], config_l[ci.idx], config_r[ci.idx])*ci_vector[fock][config_l] * ci_vector[fock][config_r]
-                        dm_bb[shifts[ci.idx]:shifts[ci.idx]+ci.n_orb, shifts[ci.idx]:shifts[ci.idx]+ci.n_orb] += pq
+                        if sum(delta_conf) == 0:
+                            pq = ci.get_op_mel('Bb', fock[ci.idx], fock[ci.idx], config_l[ci.idx], config_r[ci.idx])*ci_vector[fock][config_l] * ci_vector[fock][config_r]
+                            dm_bb[shifts[ci.idx]:shifts[ci.idx]+ci.n_orb, shifts[ci.idx]:shifts[ci.idx]+ci.n_orb] += pq
  
     # Off-diagonal terms
     for fock_l in ci_vector.fblocks():
