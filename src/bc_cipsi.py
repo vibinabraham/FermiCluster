@@ -397,7 +397,6 @@ def bc_cipsi(ci_vector, clustered_ham,
 
         print(" Choose which states to add to CI space", flush=True)
 
-        start = time.time()
         for fockspace,configs in pt_vector.items():
             for config,coeff in configs.items():
                 if coeff*coeff > thresh_cipsi:
@@ -406,13 +405,10 @@ def bc_cipsi(ci_vector, clustered_ham,
                     else:
                         ci_vector.add_fockspace(fockspace)
                         ci_vector[fockspace][config] = 0
-        end = time.time()
         
         pt_vector.print()
-
-        print(" Time spent in finding new CI space: %12.2f" %(end - start), flush=True)
-        #exit()
-
+        
+        print(" Dimension of next CI space: ", len(ci_vector))
 
     return ci_vector, pt_vector, e0, e0+e2
 
