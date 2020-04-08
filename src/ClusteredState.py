@@ -156,7 +156,7 @@ class ClusteredState(OrderedDict):
 
     def add_single_excitonic_states(self):
         for fspace in self.data.keys():
-            config = [0]*len(self.clusters)
+            config = [0]*self.n_clusters
             for ci in self.clusters:
                 fock_i = fspace[ci.idx]
                 new_config = cp.deepcopy(config)
@@ -222,7 +222,7 @@ class ClusteredState(OrderedDict):
 
     def expand_to_full_space(self):
         """
-        expand basis to full space
+        expand basis to full space defined by cluster basis
         """
         # {{{
         # do something here
@@ -239,9 +239,8 @@ class ClusteredState(OrderedDict):
     
         for c in self.clusters:
             nsi = []
-            for nai in range(c.n_orb+1):
-                for nbi in range(c.n_orb+1):
-                    nsi.append((nai,nbi))
+            for fspace in c.basis:
+                nsi.append(fspace)
             ns.append(nsi)
         for newfock in itertools.product(*ns):
             nacurr = 0
@@ -258,6 +257,7 @@ class ClusteredState(OrderedDict):
         for fblock,configs in self.items():
             dims = []
             for c in self.clusters:
+                #print(c, fblock)
                 # get number of vectors for current fock space
                 dims.append(range(c.basis[fblock[c.idx]].shape[1]))
             for newconfig_idx, newconfig in enumerate(itertools.product(*dims)):
@@ -354,18 +354,21 @@ class ClusteredState(OrderedDict):
                 self[fockspace][config] = coeff/norm
         return
 
-    def print(self):
+    def print(self, thresh=1e-3):
         """ Pretty print """
         print(" --------------------------------------------------")
         print(" ---------- Fockspaces in state ------: Dim = %5i"%len(self))
         print(" --------------------------------------------------")
-        print(" %-20s%-20s%-20s"%("%Weight", "# Configs", "Fock space")) 
+        print(" Printing contributions greater than: ", thresh)
+        print()
+        print(" %-20s%-20s%-20s"%("Weight", "# Configs", "Fock space")) 
         print(" %-20s%-20s%-20s"%("-------", "---------", "----------")) 
         for f in self.data:
             prob = 0
             for config, coeff in self.data[f].items():
                 prob += coeff*coeff 
-            print(" %-20.3f%-20i%-s"%(prob*100,len(self.data[f]), f))
+            if prob > thresh:
+                print(" %-20.3f%-20i%-s"%(prob,len(self.data[f]), f))
             #print(" Dim %4i  Weight %8.1f  fock_space: "%(len(self.data[f]),prob*100), f)
             #for config, value in self.data[f].items():
             #    print("%20s"%str(config),end="")

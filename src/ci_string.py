@@ -222,7 +222,7 @@ class ci_solver:
         self.Hdiag_s    = [np.array(()),np.array(())]    #   where we will store the single-spin Hamiltonian matrices
 
     def __str__(self):
-        msg = " CI solver:: Dim: %-8i NOrb: %-4i NAlpha: %-4i NBeta: %-4i "%(self.full_dim,self.no,self.nea,self.neb)
+        msg = " CI solver:: Dim: %-8i NOrb: %-4i NAlpha: %-4i NBeta: %-4i NRoots: %-4i"%(self.full_dim,self.no,self.nea,self.neb, self.n_roots)
         msg += " Status: "+self.status
         return msg
 
@@ -435,7 +435,7 @@ class ci_solver:
         return Hci
        
 
-    def run_direct(self):
+    def run_direct(self, iprint=0):
 # {{{
         #print(" self.H.e_core: %12.8f" %self.H.e_core)
         #print(" self.H.e_nuc : %12.8f" %self.H.e_nuc)
@@ -458,7 +458,8 @@ class ci_solver:
         #tools.printm(Hci)
        
         #helpers.print_mat(Hci)
-        print(" Diagonalize Matrix for %i roots" %self.n_roots)
+        if iprint>0:
+            print(" Diagonalize Matrix for %i roots" %self.n_roots)
 
         if Hci.shape[0] > 1:
             l,C = scipy.sparse.linalg.eigsh(Hci,self.n_roots,which='SA')
@@ -475,10 +476,11 @@ class ci_solver:
         #C = C[:,sort_ind]
         #l = l[0:self.n_roots]
         #C = C[:,0:self.n_roots]
-       
-        print(" Eigenvalues of CI matrix:")
-        for i,li in enumerate(l):
-            print(" State: %4i     %12.8f"%(i,l[i]))
+      
+        if iprint>0:
+            print(" Eigenvalues of CI matrix:")
+            for i,li in enumerate(l):
+                print(" State: %4i     %12.8f"%(i,l[i]))
         
         self.results_e = l 
         self.results_v = C 

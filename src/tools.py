@@ -484,7 +484,7 @@ def matvec1(h,v,thresh_search=1e-12, opt_einsum=True, nbody_limit=4):
     return sigma 
 # }}}
 
-
+# to drop:
 def matvec1_parallel1(h_in,v,thresh_search=1e-12, nproc=None, nbody_limit=4):
     """
     Compute the action of H onto a sparse trial vector v
@@ -644,6 +644,7 @@ def matvec1_parallel1(h_in,v,thresh_search=1e-12, nproc=None, nbody_limit=4):
 # }}}
 
 
+# to drop:
 def matvec1_parallel2(h_in,v,thresh_search=1e-12, nproc=None, opt_einsum=True, nbody_limit=4):
     """
     Compute the action of H onto a sparse trial vector v
@@ -1451,8 +1452,207 @@ def build_full_hamiltonian_open(clustered_ham,ci_vector,iprint=1):
 def build_full_hamiltonian_parallel1(clustered_ham_in,ci_vector_in,iprint=1, nproc=None, opt_einsum=True):
     """
     Build hamiltonian in basis in ci_vector
+
+    parallelized over fock space blocks -- inefficient
     """
 # {{{
+    global clusters
+    global ci_vector
+    global clustered_ham
+    
+    print(" In build_full_hamiltonian_parallel1. nproc=",nproc) 
+
+    clustered_ham = clustered_ham_in
+    ci_vector = ci_vector_in
+    clusters = ci_vector.clusters
+
+    H = np.zeros((len(ci_vector),len(ci_vector)))
+    n_clusters = len(clusters)
+
+    def compute_parallel_block(f):
+        fock_l  = f[0]
+        fock_li = f[1]
+        fock_r  = f[2]
+        fock_ri = f[3]
+    
+        diagonal = False
+        if fock_l == fock_r:
+            diagonal = True
+
+        if fock_li > fock_ri:
+            return 
+        
+        #print("Processing the block: ")
+        #print(fock_l,fock_r)
+        
+        configs_l = ci_vector[fock_l]
+        configs_r = ci_vector[fock_r]
+        
+        Hblock = np.zeros((len(configs_l),len(configs_r)))
+
+        delta_fock= tuple([(fock_l[ci][0]-fock_r[ci][0], fock_l[ci][1]-fock_r[ci][1]) for ci in range(len(clusters))])
+        try:
+            terms = clustered_ham.terms[delta_fock]
+        except KeyError:
+            return 
+        for term in terms:
+            # Compute the state sign now - since it only depends on fock spaces
+            state_sign = 1
+
+            term_exists = True
+            for oi,o in enumerate(term.ops):
+                if o == '':
+                    continue
+                if len(o) == 1 or len(o) == 3:
+                    for cj in range(oi):
+                        state_sign *= (-1)**(fock_r[cj][0]+fock_r[cj][1])
+            
+                # Check to make sure each cluster is allowed to make the requested transition
+                try:
+                    do = clusters[oi].ops[o]
+                except:
+                    print(" Couldn't find:", term)
+                    exit()
+                try:
+                    d = do[(fock_l[oi],fock_r[oi])]
+                    #d = do[(fock_bra[oi],fock_ket[oi])][bra[oi],ket[oi]] #D(I,J,:,:...)
+                except:
+                    term_exists = False
+            if not term_exists:
+                continue 
+
+            for config_li, config_l in enumerate(configs_l):
+                idx_l = config_li 
+                #idx_l = fock_space_shifts[fock_li] + config_li 
+                for config_ri, config_r in enumerate(configs_r):        
+                    idx_r = config_ri 
+                    #idx_r = fock_space_shifts[fock_ri] + config_ri 
+                    
+                    if diagonal and idx_r<idx_l:
+                        continue
+            
+                    # Check to make sure each cluster is diagonal except if active
+                    allowed = True
+                    for ci in range(n_clusters):
+                        if (config_l[ci]!=config_r[ci]) and (ci not in term.active):
+                            allowed = False
+                    if not allowed:
+                        continue
+                   
+                    me = term.matrix_element(fock_l,config_l,fock_r,config_r)
+#                    #d = do[(fock_bra[oi],fock_ket[oi])][bra[oi],ket[oi]] #D(I,J,:,:...)
+#                    mats = []
+#                    for ci in term.active:
+#                        mats.append( clusters[ci].ops[term.ops[ci]][(fock_l[ci],fock_r[ci])][config_l[ci],config_r[ci]] ) 
+#
+#                    me = 0.0
+#                  
+#                    if len(mats) != len(term.active):
+#                        continue
+#                    
+#                    #check that the mats where treated as views and also contiguous
+#                    #for m in mats:
+#                    #    print(m.flags['OWNDATA'])  #False -- apparently this is a view
+#                    #    print(m.__array_interface__)
+#                    #    print()
+#
+#                    # todo:
+#                    #    For some reason, precompiled contract expression is slower than direct einsum - figure this out
+#                    #me = term.contract_expression(*mats) * state_sign
+#                    me = np.einsum(term.contract_string,*mats,term.ints) * state_sign
+
+                    Hblock[idx_l,idx_r] += me
+                   
+                    if diagonal and idx_r>idx_l:
+                        Hblock[idx_r,idx_l] += me
+        return Hblock
+        
+
+
+
+    fock_space_shifts = [0]
+    for fi,f in enumerate(ci_vector.fblocks()):
+        configs_i = ci_vector[f]
+        fock_space_shifts.append(fock_space_shifts[-1]+len(configs_i))
+
+
+    fock_space_blocks = []
+    for fock_li, fock_l in enumerate(ci_vector.data):
+        for fock_ri, fock_r in enumerate(ci_vector.data):
+            if fock_li > fock_ri:
+                continue 
+            fock_space_blocks.append( (fock_l, fock_li, fock_r, fock_ri))
+
+    #for f in fock_space_blocks:
+    #    compute_parallel_block(f)
+
+
+    import multiprocessing as mp
+    from pathos.multiprocessing import ProcessingPool as Pool
+
+    
+    if nproc == None:
+        pool = Pool()
+    else:
+        pool = Pool(processes=nproc)
+
+    def test(f):
+        fock_l  = f[0]
+        fock_li = f[1]
+        fock_r  = f[2]
+        fock_ri = f[3]
+
+        if fock_li > fock_ri:
+            return 
+        print(fock_l,fock_r)
+        
+        configs_l = ci_vector[fock_l]
+        configs_r = ci_vector[fock_r]
+
+    #pool.map(test, fock_space_blocks)
+    Hblocks = pool.map(compute_parallel_block, fock_space_blocks)
+
+    pool.close()
+    pool.join()
+    pool.clear()
+    
+    for fi,f in enumerate(fock_space_blocks):
+        fock_l  = f[0] 
+        fock_li = f[1] 
+        fock_r  = f[2] 
+        fock_ri = f[3]
+        start_l = fock_space_shifts[fock_li]
+        stop_l  = fock_space_shifts[fock_li+1]
+        start_r = fock_space_shifts[fock_ri]
+        stop_r  = fock_space_shifts[fock_ri+1]
+        
+        if np.all(Hblocks[fi]) != None:
+            H[start_l:stop_l,start_r:stop_r] = Hblocks[fi]
+        if fock_l != fock_r:
+            if np.all(Hblocks[fi]) != None:
+                H[start_r:stop_r,start_l:stop_l] = Hblocks[fi].T
+            #try:
+            #if np.all(Hblocks[fi]) != None:
+            #try:
+            #    H[start_r:stop_r,start_l:stop_l] = Hblocks[fi].T
+            #except:
+            #    pass
+    
+    return H
+    
+
+# }}}
+
+
+
+def build_full_hamiltonian_parallel2(clustered_ham_in,ci_vector_in,iprint=1, nproc=None, opt_einsum=True, blocksize=1000):
+    """
+    Build hamiltonian in basis in ci_vector
+
+    parallelized over matrix elements
+    """
+# {{{
+    print(" NYI") 
     global clusters
     global ci_vector
     global clustered_ham
@@ -1756,6 +1956,8 @@ def build_hamiltonian_diagonal_parallel1(clustered_ham_in, ci_vector, nproc=None
     #chunksize = 100
     #print(" Chunksize: ", chunksize)
     #out = pool.map(do_parallel_work, ci_vector, chunksize=chunksize)
+    if len(ci_vector) == 0:
+        return np.array([])
     out = pool.map(do_parallel_work, ci_vector)
     pool.close()
     pool.join()
@@ -1958,7 +2160,8 @@ def build_1rdm(ci_vector):
     dm_bb = np.zeros((n_orb,n_orb))
     clusters = ci_vector.clusters
    
-    if 0:
+    if 0:   # doesn't work anymore after removing local terms from add_1b_terms
+        print(ci_vector.norm())
         # build 1rdm in slow (easy) way
         dm_aa_slow = np.zeros((n_orb,n_orb))
         for i in range(n_orb):
@@ -1966,16 +2169,19 @@ def build_1rdm(ci_vector):
                 op = ClusteredOperator(clusters)
                 h = np.zeros((n_orb,n_orb))
                 h[i,j] = 1
+                #op.add_local_terms()
                 op.add_1b_terms(h)
-                Nv = matvec1(op, ci_vector, term_thresh=0)
+                Nv = matvec1(op, ci_vector, thresh_search=1e-8)
                 Nv = ci_vector.dot(Nv)
                 dm_aa_slow[i,j] = Nv
         print(" Here is the slow version:")
         print(dm_aa_slow)
         occs = np.linalg.eig(dm_aa_slow)[0]
-        #[print("%4i %12.8f"%(i,occs[i])) for i in range(len(occs))]
-        with np.printoptions(precision=6, suppress=True):
-            print(dm_aa_slow)
+        [print("%4i %12.8f"%(i,occs[i])) for i in range(len(occs))]
+        #with np.printoptions(precision=6, suppress=True):
+        #    print(dm_aa_slow)
+        print(" Trace slow:",np.trace(dm_aa_slow))
+        exit()
 
     # define orbital index shifts
     tmp = 0
@@ -2120,11 +2326,11 @@ def build_1rdm(ci_vector):
     dm_bb = dm_bb[:,idx][idx,:]
                 
 
-    print(ci_vector.norm())
     occs = np.linalg.eig(dm_aa + dm_bb)[0]
     print(" Eigenvalues of density matrix")
-    [print("%4i %12.8f"%(i,occs[i])) for i in range(len(occs))]
-    print(np.trace(dm_aa + dm_bb))
+    [print(" %4i %12.8f"%(i,occs[i])) for i in range(len(occs))]
+    print(" Trace of Pa:", np.trace(dm_aa))
+    print(" Trace of Pb:", np.trace(dm_bb))
     #with np.printoptions(precision=6, suppress=True):
     #    print(dm_aa + dm_bb)
     return dm_aa, dm_bb 

@@ -17,48 +17,64 @@ from tools import *
 
 
 
-def system_setup(h, g, ecore, blocks, max_roots=1000, max_nelec=None, min_nelec=None):
+def system_setup(h, g, ecore, blocks, init_fspace,
+        max_roots   = 1000, 
+        delta_elec  = None,
+        maxiter_cmf = 10,
+        rdm_a       = None,     #initial guess density matrix for cmf (alpha)
+        rdm_b       = None      #initial guess density matrix for cmf (beta)
+        ):
 # {{{
+    
+    print(" System setup option:")
+    print("     |init_fspace    : ", init_fspace)
+    print("     |max_roots      : ", max_roots)
+    print("     |delta_elec     : ", delta_elec)
+    print("     |maxiter_cmf    : ", maxiter_cmf)
     n_blocks = len(blocks)
-
-    clusters = []
-
-    for ci,c in enumerate(blocks):
-        clusters.append(Cluster(ci,c))
-
+    clusters = [Cluster(ci,c) for ci,c in enumerate(blocks)]
+    
     print(" Clusters:")
     [print(ci) for ci in clusters]
-
+    
     clustered_ham = ClusteredOperator(clusters, core_energy=ecore)
     print(" Add 1-body terms")
     clustered_ham.add_local_terms()
     clustered_ham.add_1b_terms(h)
     print(" Add 2-body terms")
     clustered_ham.add_2b_terms(g)
-
-    print(" Build cluster basis")
-    for ci_idx, ci in enumerate(clusters):
-        assert(ci_idx == ci.idx)
-        #print(" Extract local operator for cluster",ci.idx)
-        #opi = clustered_ham.extract_local_operator(ci_idx)
-        #print()
-        print()
-        print(" Form basis by diagonalize local Hamiltonian for cluster: ",ci_idx)
-        #ci.form_eigbasis_from_local_operator(opi,max_roots=1000,s2_shift=s2_shift)
-        ci.form_eigbasis_from_ints(h,g,
-                max_roots=max_roots, 
-                max_nelec=max_nelec,
-                min_nelec=min_nelec,
-                ecore=ecore)
-
-
-    print(" Build these local operators")
-    for c in clusters:
-        print(" Build mats for cluster ",c.idx,flush=True)
-        c.build_op_matrices()
-        c.build_local_terms(h,g)
     
-    return clusters, clustered_ham
+
+    if rdm_a == None:
+        rdm_a = np.zeros(h.size)
+    if rdm_b == None:
+        rdm_b = np.zeros(h.size)
+    
+    ci_vector = ClusteredState(clusters)
+    ci_vector.init(init_fspace)
+
+    if maxiter_cmf > 0:
+        e_cmf, cmf_conv, rdm_a, rdm_b = cmf(clustered_ham, ci_vector, h, g)
+    
+
+    # build cluster basis and operator matrices using CMF optimized density matrices
+    for ci_idx, ci in enumerate(clusters):
+        if delta_elec != None:
+            fspaces_i = init_fspace[ci_idx]
+            fspaces_i = ci.possible_fockspaces( delta_elec=(fspaces_i[0], fspaces_i[1], delta_elec) )
+        else:
+            fspaces_i = ci.possible_fockspaces()
+    
+        print()
+        print(" Form basis by diagonalizing local Hamiltonian for cluster: ",ci_idx)
+        ci.form_fockspace_eigbasis(h, g, fspaces_i, max_roots=max_roots)
+        
+        print(" Build operator matrices for cluster ",ci.idx)
+        ci.build_op_matrices()
+        ci.build_local_terms(h,g)
+
+    
+    return clusters, clustered_ham, ci_vector
 # }}}
 
 
@@ -66,14 +82,14 @@ def bc_cipsi_tucker(ci_vector, clustered_ham,
         selection           = "cipsi",
         thresh_cipsi        = 1e-4, 
         thresh_ci_clip      = 1e-5, 
+        thresh_asci         = 0, 
         thresh_cipsi_conv   = 1e-8, 
-        max_cipsi_iter      = 30, 
         thresh_tucker_conv  = 1e-6, 
+        thresh_search       = 0, 
+        max_cipsi_iter      = 30, 
         max_tucker_iter     = 20, 
         tucker_state_clip   = None,
         hshift              = 1e-8,
-        thresh_asci         = 0, 
-        thresh_search       = None, 
         pt_type             = 'en',
         nbody_limit         = 4, 
         tucker_conv_target  = 2, 
@@ -95,6 +111,22 @@ def bc_cipsi_tucker(ci_vector, clustered_ham,
     """
 # {{{
 
+    print(" Tucker optimization options:")
+    print("     |selection          : ", selection          )
+    print("     |thresh_cipsi       : ", thresh_cipsi       )
+    print("     |thresh_ci_clip     : ", thresh_ci_clip     )
+    print("     |thresh_cipsi_conv  : ", thresh_cipsi_conv  )
+    print("     |max_cipsi_iter     : ", max_cipsi_iter     )
+    print("     |thresh_tucker_conv : ", thresh_tucker_conv )
+    print("     |max_tucker_iter    : ", max_tucker_iter    )
+    print("     |tucker_state_clip  : ", tucker_state_clip  )
+    print("     |hshift             : ", hshift             )
+    print("     |thresh_asci        : ", thresh_asci        )
+    print("     |thresh_search      : ", thresh_search      )
+    print("     |pt_type            : ", pt_type            )
+    print("     |nbody_limit        : ", nbody_limit        )
+    print("     |tucker_conv_target : ", tucker_conv_target )
+    print("     |nproc              : ", nproc              )
     
     t_conv = False
     if tucker_state_clip == None:
@@ -102,7 +134,7 @@ def bc_cipsi_tucker(ci_vector, clustered_ham,
     e_prev = 0
     e_last = 0
     ci_vector_ref = ci_vector.copy()
-    for brdm_iter in range(max_tucker_iter):
+    for brdm_iter in range(max_tucker_iter+1):
    
         if selection == "cipsi":
             start = time.time()
@@ -141,15 +173,15 @@ def bc_cipsi_tucker(ci_vector, clustered_ham,
         
       
         if abs(e_prev-e_curr) < thresh_tucker_conv:
-            print(" Converged BRDMs")
+            print(" Converged: Tucker")
             t_conv = True
             break
-        e_prev = e_curr
-        delta_e = e0 - e_last
-        e_last = e0
-        if abs(delta_e) < 1e-8:
-            print(" Converged BRDM iterations")
+        elif brdm_iter >= max_tucker_iter:
+            print(" Maxcycles: Tucker")
+            t_conv = False 
             break
+
+        e_prev = e_curr
         
         # do the Tucker decomposition
         if selection == "cipsi":
@@ -197,8 +229,9 @@ def bc_cipsi(ci_vector, clustered_ham,
     thresh_asci     = 0,
     nbody_limit     = 4, 
     pt_type         = 'en',
-    thresh_search   = None, 
-    nproc=None):
+    thresh_search   = 0, 
+    nproc           = None
+    ):
     """
     thresh_cipsi    :   include qspace configurations into pspace that have probabilities larger than this value
     thresh_ci_clip  :   drop pspace configs whose variational solution yields probabilities smaller than this value
@@ -209,15 +242,24 @@ def bc_cipsi(ci_vector, clustered_ham,
     nbody_limit     :   only compute up to n-body interactions when searching for new configs
     """
 # {{{
-  
-    if thresh_search == None:
-        thresh_search = np.sqrt(thresh_cipsi / 1000) 
-        print(" No thresh_search defined, choosing default: ", thresh_search)
-   
+
+    print()
+    print(" TPSCI options: ")
+    print("     |thresh_cipsi   : ", thresh_cipsi   )
+    print("     |thresh_ci_clip : ", thresh_ci_clip )
+    print("     |thresh_conv    : ", thresh_conv    )
+    print("     |thresh_search  : ", thresh_search  )
+    print("     |max_iter       : ", max_iter       )
+    print("     |n_roots        : ", n_roots        )
+    print("     |thresh_asci    : ", thresh_asci    )
+    print("     |nbody_limit    : ", nbody_limit    )
+    print("     |pt_type        : ", pt_type        )
+    print("     |nproc          : ", nproc          )
+
     pt_vector = ci_vector.copy()
     Hd_vector = ClusteredState(ci_vector.clusters)
     e_prev = 0
-    for it in range(max_iter):
+    for it in range(max_iter+1):
         print()
         print(" ===================================================================")
         print("     Selected CI Iteration: %4i epsilon: %12.8f" %(it,thresh_cipsi))
@@ -275,7 +317,7 @@ def bc_cipsi(ci_vector, clustered_ham,
         delta_e = e0 - e_prev
         e_prev = e0
         if len(ci_vector) <= old_dim and abs(delta_e) < thresh_conv:
-            print(" Converged")
+            print(" Converged: TPSCI")
             break
         print(" Next iteration CI space dimension", len(ci_vector))
     
@@ -288,7 +330,6 @@ def bc_cipsi(ci_vector, clustered_ham,
         #asci_vector.normalize()
 
         print(" Compute Matrix Vector Product:", flush=True)
-
         profile = 0
         if profile:
             import cProfile
@@ -394,9 +435,17 @@ def bc_cipsi(ci_vector, clustered_ham,
 
         print(" PT2 Energy Correction = %12.8f" %e2)
         print(" PT2 Energy Total      = %12.8f" %(e0+e2))
+        
+        if it >= max_iter:
+            print(" Maxcycles: TPSCI")
+            break
 
         print(" Choose which states to add to CI space", flush=True)
-
+        new_configs = pt_vector.copy()
+        new_configs.clip(thresh_cipsi)
+        #ci_vector.add(new_configs)
+        
+        new_configs.print()
         for fockspace,configs in pt_vector.items():
             for config,coeff in configs.items():
                 if coeff*coeff > thresh_cipsi:
@@ -406,7 +455,6 @@ def bc_cipsi(ci_vector, clustered_ham,
                         ci_vector.add_fockspace(fockspace)
                         ci_vector[fockspace][config] = 0
         
-        pt_vector.print()
         
         print(" Dimension of next CI space: ", len(ci_vector))
 
@@ -416,10 +464,26 @@ def bc_cipsi(ci_vector, clustered_ham,
 
 
 def hb_tpsci(ci_vector, clustered_ham, 
-        thresh_cipsi=1e-4, thresh_ci_clip=1e-5, thresh_conv=1e-8, max_iter=30, n_roots=1, thresh_asci=0,
+        thresh_cipsi=1e-4, 
+        thresh_ci_clip=1e-5, 
+        thresh_conv=1e-8, 
+        max_iter=30, 
+        n_roots=1, 
+        thresh_asci=0,
         nbody_limit=4, 
         nproc=None):
 # {{{
+    
+    print()
+    print(" HB-TPSCI options: ")
+    print("     |thresh_cipsi   : ", thresh_cipsi   )
+    print("     |thresh_ci_clip : ", thresh_ci_clip )
+    print("     |thresh_conv    : ", thresh_conv    )
+    print("     |max_iter       : ", max_iter       )
+    print("     |n_roots        : ", n_roots        )
+    print("     |thresh_asci    : ", thresh_asci    )
+    print("     |nbody_limit    : ", nbody_limit    )
+    print("     |nproc          : ", nproc          )
   
     pt_vector = ci_vector.copy()
     Hd_vector = ClusteredState(ci_vector.clusters)
@@ -484,8 +548,10 @@ def hb_tpsci(ci_vector, clustered_ham,
         if nproc==1:
             pt_vector = matvec1(clustered_ham, ci_vector, thresh_search=thresh_search, nbody_limit=nbody_limit)
         else:
-            pt_vector = matvec1_parallel3(clustered_ham, ci_vector, nproc=nproc, thresh_search=thresh_cipsi, 
-                    nbody_limit=nbody_limit, thresh_asci=thresh_asci)
+            pt_vector = matvec1_parallel3(clustered_ham, ci_vector, 
+                                            nproc=nproc, 
+                                            thresh_search=thresh_cipsi, 
+                                            nbody_limit=nbody_limit)
         #pt_vector = heat_bath_search(clustered_ham, ci_vector, thresh_cipsi=thresh_cipsi, nproc=nproc)
         stop=time.time()
         print(" Number of new configurations found         : ", len(pt_vector))
@@ -682,7 +748,7 @@ if __name__ == "__main__":
     
     #ci_vector.expand_to_full_space()
     #ci_vector.expand_each_fock_space()
-    ci_vector.add_single_excitonic_states()
+    #ci_vector.add_single_excitonic_states()
     ci_vector.print_configs()
 
 

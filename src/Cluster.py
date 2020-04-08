@@ -281,6 +281,7 @@ class Cluster(object):
 #       
 #    # }}}
 
+    #remove:
     def form_eigbasis_from_ints(self,hin,vin,max_roots=1000, max_elec=None, min_elec=0, rdm1_a=None, rdm1_b=None, ecore=0):
         """
         grab integrals acting locally and form eigenbasis by FCI
@@ -372,6 +373,7 @@ class Cluster(object):
                 #self.Hci[(na,nb)] = ci.results_v.T @ Hci @ ci.results_v
     # }}}
     
+    #remove:
     def form_eigbasis_from_local_operator(self,local_op,max_roots=1000,ratio = 1,s2_shift=False):
         """
         grab integrals acting locally and form eigenbasis by FCI
@@ -432,6 +434,7 @@ class Cluster(object):
                     self.basis[(na,nb)] = ci.results_v[:,-max_roots:]
                     # }}}
 
+    #remove:
     def form_eigbasis_from_local_operator_nanb(self,local_op,n_max,max_roots=1000,ratio = 1):
         """
         grab integrals acting locally and form eigenbasis by FCI

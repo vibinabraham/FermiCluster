@@ -392,7 +392,7 @@ class ClusteredOperator:
         for ci,c in enumerate(self.clusters):
             self.n_orb += c.n_orb
 
-    def add_local_terms(self):
+    def add_local_terms(self, opstr="H"):
         """
         Add terms of the form h_{pq}\hat{a}^\dagger_p\hat{a}_q
 
@@ -412,7 +412,7 @@ class ClusteredOperator:
         for ci in self.clusters:
 
             ops = cp.deepcopy(ops_tmp) 
-            ops[ci.idx] += "H"
+            ops[ci.idx] += opstr 
             
             term = LocalClusteredTerm(delta, ops, self.clusters)
 

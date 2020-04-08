@@ -83,11 +83,36 @@ def test_1():
         print(" FCI:        %12.8f Dim:%6d"%(efci,fci_dim))
     if do_tci:
     
-        clusters, clustered_ham = system_setup(h, g, ecore, blocks)
+
+        clusters = [Cluster(ci,c) for ci,c in enumerate(blocks)]
+        
+        print(" Clusters:")
+        [print(ci) for ci in clusters]
+        
+        clustered_ham = ClusteredOperator(clusters, core_energy=ecore)
+        print(" Add 1-body terms")
+        clustered_ham.add_local_terms()
+        clustered_ham.add_1b_terms(h)
+        print(" Add 2-body terms")
+        clustered_ham.add_2b_terms(g)
+        # build cluster basis and operator matrices using CMF optimized density matrices
+        for ci_idx, ci in enumerate(clusters):
+            fspaces_i = ci.possible_fockspaces()
+        
+            print()
+            print(" Form basis by diagonalizing local Hamiltonian for cluster: ",ci_idx)
+            ci.form_fockspace_eigbasis(h, g, fspaces_i, max_roots=100)
+            
+            print(" Build mats for cluster ",ci.idx)
+            ci.build_op_matrices()
+            ci.build_local_terms(h,g)
+        
+        
+        rdm_a = np.zeros(h.size)
+        rdm_b = np.zeros(h.size)
         
         ci_vector = ClusteredState(clusters)
         ci_vector.init(init_fspace)
-
         # do this just to rotate vectors about
 
         
