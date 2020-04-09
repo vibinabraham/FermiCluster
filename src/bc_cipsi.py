@@ -278,7 +278,7 @@ def bc_cipsi(ci_vector, clustered_ham,
         if nproc==1:
             H = build_full_hamiltonian(clustered_ham, ci_vector)
         else:
-            H = build_full_hamiltonian_parallel1(clustered_ham, ci_vector, nproc=nproc)
+            H = build_full_hamiltonian_parallel2(clustered_ham, ci_vector, nproc=nproc)
         stop = time.time()
         print(" Time spent building Hamiltonian matrix: %12.2f" %(stop-start))
         print(" Diagonalize Hamiltonian Matrix:",flush=True)
@@ -507,7 +507,7 @@ def hb_tpsci(ci_vector, clustered_ham,
         if nproc==1:
             H = build_full_hamiltonian(clustered_ham, ci_vector)
         else:
-            H = build_full_hamiltonian_parallel1(clustered_ham, ci_vector, nproc=nproc)
+            H = build_full_hamiltonian_parallel2(clustered_ham, ci_vector, nproc=nproc)
         stop = time.time()
         print(" Time spent building Hamiltonian matrix: %12.2f" %(stop-start))
         print(" Diagonalize Hamiltonian Matrix:",flush=True)
