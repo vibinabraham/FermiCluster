@@ -79,7 +79,7 @@ def cmf(clustered_ham, ci_vector, h, g,
     ecore = clustered_ham.core_energy
     for cmf_iter in range(max_iter):
         print(" --------------------------------------")
-        print("     CMF Iter:", cmf_iter)
+        print("     Iteration:", cmf_iter)
         print(" --------------------------------------")
 
         rdm_a_old = rdm_a
