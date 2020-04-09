@@ -68,7 +68,7 @@ def system_setup(h, g, ecore, blocks, init_fspace,
                 dm_guess    = cmf_dm_guess,
                 diis_start  = cmf_diis_start,
                 max_diis    = cmf_max_diis,
-                thresh      = cmf_thresh
+                thresh      = cmf_thresh,
                 max_iter    = cmf_maxiter)
     
 
