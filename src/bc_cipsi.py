@@ -82,7 +82,7 @@ def system_setup(h, g, ecore, blocks, init_fspace,
     
         print()
         print(" Form basis by diagonalizing local Hamiltonian for cluster: ",ci_idx)
-        ci.form_fockspace_eigbasis(h, g, fspaces_i, max_roots=max_roots)
+        ci.form_fockspace_eigbasis(h, g, fspaces_i, max_roots=max_roots, rdm1_a=rdm_a, rdm1_b=rdm_b, ecore=ecore)
         
         print(" Build operator matrices for cluster ",ci.idx)
         ci.build_op_matrices()
