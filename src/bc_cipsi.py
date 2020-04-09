@@ -63,7 +63,13 @@ def system_setup(h, g, ecore, blocks, init_fspace,
     ci_vector.init(init_fspace)
 
     if cmf_maxiter > 0:
-        e_cmf, cmf_conv, rdm_a, rdm_b = cmf(clustered_ham, ci_vector, h, g)
+        e_cmf, cmf_conv, rdm_a, rdm_b = cmf(clustered_ham, ci_vector, h, g, 
+                diis        = cmf_diis,
+                dm_guess    = cmf_dm_guess,
+                diis_start  = cmf_diis_start,
+                max_diis    = cmf_max_diis,
+                thresh      = cmf_thresh
+                max_iter    = cmf_maxiter)
     
 
     # build cluster basis and operator matrices using CMF optimized density matrices
