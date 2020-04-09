@@ -64,16 +64,19 @@ def run(nproc=None):
 
 
         
-    clusters, clustered_ham, ci_vector = system_setup(h, g, ecore, blocks, init_fspace, cmf_maxiter = 20 )
+    clusters, clustered_ham, ci_vector = system_setup(h, g, ecore, blocks, init_fspace, 
+                        cmf_maxiter = 20,
+                        cmf_diis    = True,
+                        cmf_thresh  = 1e-14)
 
     #hamiltonian_file = open('cmf_hamiltonian_file', 'wb')
     #pickle.dump(clustered_ham, hamiltonian_file)
 
 
     ci_vector, pt_vector, etci, etci2, conv = bc_cipsi_tucker(ci_vector, clustered_ham, 
-                                                        thresh_cipsi    = 1e-5, 
-                                                        thresh_ci_clip  = 1e-6, 
-                                                        max_tucker_iter = 20,
+                                                        thresh_cipsi        = 1e-5, 
+                                                        thresh_ci_clip      = 1e-8, 
+                                                        max_tucker_iter     = 20,
                                                         nproc=nproc)
     
     
@@ -84,7 +87,7 @@ def run(nproc=None):
 
     print(" ecore: ", ecore)
     print(" TCI:        %12.9f Dim:%6d"%(etci,tci_dim))
-    assert(abs(etci --108.855579790)< 1e-7)
+    assert(abs(etci --108.85558061)< 1e-6)
     #assert(abs(etci --108.855580011)< 1e-7)
     assert(tci_dim == 43)
 

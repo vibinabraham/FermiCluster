@@ -33,9 +33,10 @@ def system_setup(h, g, ecore, blocks, init_fspace,
     print("     |init_fspace    : ", init_fspace)
     print("     |max_roots      : ", max_roots)
     print("     |delta_elec     : ", delta_elec)
-    print("     |cmf_maxiter    : ", cmf_maxiter)
-    print("     |cmf_thresh     : ", cmf_thresh)
     print("     |cmf_diis       : ", cmf_diis)
+    print("     |cmf_maxiter    : ", cmf_maxiter)
+    print("     |cmf_dm_guess   : ", cmf_dm_guess)
+    print("     |cmf_thresh     : ", cmf_thresh)
     print("     |cmf_diis_start : ", cmf_diis_start)
     print("     |cmf_max_diis   : ", cmf_max_diis)
     n_blocks = len(blocks)
@@ -52,13 +53,6 @@ def system_setup(h, g, ecore, blocks, init_fspace,
     clustered_ham.add_2b_terms(g)
 
 
-    if cmf_dm_guess == None:
-        rdm_a = np.zeros(h.size)
-        rdm_b = np.zeros(h.size)
-    else:
-        rdm_a = cmf_dm_guess[0]
-        rdm_b = cmf_dm_guess[1]
-    
     ci_vector = ClusteredState(clusters)
     ci_vector.init(init_fspace)
 
@@ -164,6 +158,8 @@ def bc_cipsi_tucker(ci_vector, clustered_ham,
                                                         thresh_search   = thresh_search, 
                                                         nproc           = nproc)
             end = time.time()
+            
+            ecore = clustered_ham.core_energy
             if tucker_conv_target == 0:
                 e_curr = e0
             elif tucker_conv_target == 2:
@@ -171,7 +167,7 @@ def bc_cipsi_tucker(ci_vector, clustered_ham,
             else:
                 print(" wrong value for tucker_conv_target")
                 exit()
-            print(" TPSCI: E0 = %12.8f E2 = %12.8f CI_DIM: %-12i Time spent %-12.2f" %(e0, e2, len(ci_vector), end-start))
+            print(" TPSCI: E0 = %12.8f E2 = %16.8f CI_DIM: %-12i Time spent %-12.1f" %(e0+ecore, e2+ecore, len(ci_vector), end-start))
             
         elif selection == "heatbath":
             start = time.time()
@@ -183,7 +179,7 @@ def bc_cipsi_tucker(ci_vector, clustered_ham,
             pt_vector = ClusteredState(ci_vector.clusters)
             e_curr = e0
             e2 = 0
-            print(" HB-TPSCI: E0 = %12.8f CI_DIM: %-12i Time spent %-12.2f" %(e0, len(ci_vector), end-start))
+            print(" HB-TPSCI: E0 = %16.8f CI_DIM: %-12i Time spent %-12.2f" %(e0+ecore, len(ci_vector), end-start))
 
         
       

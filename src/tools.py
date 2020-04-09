@@ -60,11 +60,14 @@ def cmf(clustered_ham, ci_vector, h, g,
 
     
     if dm_guess == None:
-        rdm_a = None
-        rdm_b = None
+        rdm_a = np.zeros(h.shape)
+        rdm_b = np.zeros(h.shape)
     else:
         rdm_a = dm_guess[0]
         rdm_b = dm_guess[1]
+    
+    assert(rdm_a.shape == h.shape)
+    assert(rdm_b.shape == h.shape)
     converged = False
     clusters = clustered_ham.clusters
     e_last = 999
@@ -103,7 +106,7 @@ def cmf(clustered_ham, ci_vector, h, g,
 
         print(" Converged?")
         if abs(e_curr-e_last) < thresh:
-            print("*CMF Iter: %4i Energy: %12.8f" %(cmf_iter,e_curr))
+            print("*CMF Iter: %4i Energy: %20.12f Delta E: %12.1e" %(cmf_iter,e_curr, e_curr-e_last))
             print(" CMF Converged. ")
              
             # form 1rdm from reference state
@@ -111,10 +114,10 @@ def cmf(clustered_ham, ci_vector, h, g,
             converged = True
             break
         elif abs(e_curr-e_last) >= thresh and cmf_iter == max_iter-1:
-            print("?CMF Iter: %4i Energy: %12.8f" %(cmf_iter,e_curr))
+            print("?CMF Iter: %4i Energy: %20.12f Delta E: %12.1e" %(cmf_iter,e_curr, e_curr-e_last))
             print(" Max CMF iterations reached. Just continue anyway")
         elif abs(e_curr-e_last) >= thresh and cmf_iter < max_iter-1:
-            print(" CMF Iter: %4i Energy: %12.8f" %(cmf_iter,e_curr))
+            print(" CMF Iter: %4i Energy: %20.12f Delta E: %12.1e" %(cmf_iter,e_curr, e_curr-e_last))
             print(" Continue CMF optimization")
 
 
