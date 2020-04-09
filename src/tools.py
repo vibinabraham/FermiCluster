@@ -14,7 +14,13 @@ from ClusteredState import *
 from Cluster import *
 
 
-def cmf(clustered_ham, ci_vector, h, g, max_iter=20, thresh=1e-8, dm_guess=None,diis=False,diis_start=1,max_diis=6):
+def cmf(clustered_ham, ci_vector, h, g, 
+            max_iter    = 20, 
+            thresh      = 1e-8, 
+            dm_guess    = None,
+            diis        = False,
+            diis_start  = 1,
+            max_diis    = 6):
     """ Do CMF for a tensor product state 
        
         This modifies the data in clustered_ham.clusters, both the basis, and the operators such that the 
@@ -419,13 +425,14 @@ def matvec1(h,v,thresh_search=1e-12, opt_einsum=True, nbody_limit=4):
                             try:
                                 oi = ci.ops[op][(fock_l[ci.idx],fock_r[ci.idx])][:,conf_r[ci.idx],:]
                                 
-                                nonzeros_curr = []
-                                for K in range(oi.shape[0]):
-                                    if np.amax(np.abs(oi[K,:])) > thresh_search:
-                                        nonzeros_curr.append(K)
-                                oinz = oi[nonzeros_curr,:]
-                                mats.append(oinz)
-                                nonzeros.append(nonzeros_curr)
+                                #nonzeros_curr = []
+                                #for K in range(oi.shape[0]):
+                                #    if np.amax(np.abs(oi[K,:])) > thresh_search:
+                                #        nonzeros_curr.append(K)
+                                #oinz = oi[nonzeros_curr,:]
+                                #mats.append(oinz)
+                                #nonzeros.append(nonzeros_curr)
+                                mats.append(oi)
 
 
                             except KeyError:
@@ -458,8 +465,8 @@ def matvec1(h,v,thresh_search=1e-12, opt_einsum=True, nbody_limit=4):
                     
                         new_configs = [[i] for i in conf_r] 
                         for cacti,cact in enumerate(term.active):
-                            new_configs[cact] = nonzeros[cacti] 
-                            #new_configs[cact] = range(mats[cacti].shape[0])
+                            #new_configs[cact] = nonzeros[cacti] 
+                            new_configs[cact] = range(mats[cacti].shape[0])
                        
                         #print(new_configs)
                         #print(tmp.shape)
@@ -987,14 +994,14 @@ def matvec1_parallel3(h_in,v,thresh_search=1e-12, nproc=None, opt_einsum=True, n
                         try:
                             oi = ci.ops[op][(fock_l[ci.idx],fock_r[ci.idx])][:,conf_r[ci.idx],:]
                                 
-                            nonzeros_curr = []
-                            for K in range(oi.shape[0]):
-                                if np.amax(np.abs(oi[K,:])) > thresh_search/10:
-                                    nonzeros_curr.append(K)
-                            oinz = oi[nonzeros_curr,:]
-                            mats.append(oinz)
-                            nonzeros.append(nonzeros_curr)
-                            #mats.append(oi)
+                            #nonzeros_curr = []
+                            #for K in range(oi.shape[0]):
+                            #    if np.amax(np.abs(oi[K,:])) > thresh_search/10:
+                            #        nonzeros_curr.append(K)
+                            #oinz = oi[nonzeros_curr,:]
+                            #mats.append(oinz)
+                            #nonzeros.append(nonzeros_curr)
+                            mats.append(oi)
 
                         except KeyError:
                             good = False
@@ -1029,8 +1036,8 @@ def matvec1_parallel3(h_in,v,thresh_search=1e-12, nproc=None, opt_einsum=True, n
                     
                     new_configs = [[i] for i in conf_r] 
                     for cacti,cact in enumerate(term.active):
-                        new_configs[cact] = nonzeros[cacti] 
-                        #new_configs[cact] = range(mats[cacti].shape[0])
+                        #new_configs[cact] = nonzeros[cacti] 
+                        new_configs[cact] = range(mats[cacti].shape[0])
                         
                     matvec_update_with_new_configs(tmp, new_configs, configs_l, term.active, thresh_search)
                 #stop1 = time.time()

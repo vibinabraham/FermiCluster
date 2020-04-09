@@ -180,13 +180,9 @@ def test_truncate_basis():
         print(" FCI:        %12.8f Dim:%6d"%(efci,fci_dim))
     
 
-    clusters, clustered_ham = system_setup(h, g, ecore, blocks)
     
-    ci_vector = ClusteredState(clusters)
-    ci_vector.init(init_fspace)
-   
-    # Get CMF reference
-    cmf(clustered_ham, ci_vector, h, g, max_iter=10, max_nroots=20)
+    clusters, clustered_ham, ci_vector = system_setup(h, g, ecore, blocks, init_fspace, max_roots = 20,  cmf_maxiter = 0 )
+    
 
 
     ci_vector, pt_vector, e0, e2, t_conv = bc_cipsi_tucker(ci_vector.copy(), clustered_ham, thresh_cipsi=1e-5,

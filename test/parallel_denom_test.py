@@ -57,27 +57,19 @@ def test_1():
 
 
 
-    #cluster using hcore
-    #idx = e1_order(h,cut_off = 1e-4)
-    #h,g = reorder_integrals(idx,h,g)
-
-        
-    #efci, fci_dim = run_fci_pyscf(h,g,cas_nel,ecore=ecore)
-    #print(" FCI energy: %12.8f" %efci)
-
-    clusters, clustered_ham = system_setup(h, g, ecore, blocks)
-    
-    ci_vector = ClusteredState(clusters)
-    ci_vector.init(((2,2),(4,4),(1,1)))
+    init_fspace = ((2,2),(4,4),(2,2))
+    clusters, clustered_ham, ci_vector = system_setup(h, g, ecore, blocks, init_fspace,
+                                                        max_roots   = 100,
+                                                        cmf_maxiter = 0
+                                                        )
 
     ci_vector.expand_to_full_space()
-    ci_vector.expand_each_fock_space()
+    print(" Length of ci vector: ", len(ci_vector), flush=True)
     #ci_vector.add_single_excitonic_states()
     #ci_vector.print_configs()
     edps = build_hamiltonian_diagonal(clustered_ham,ci_vector)
     #print("init DPS %16.8f"%(edps+ecore))
     
-    print(" Length of ci vector: ", len(ci_vector))
     start = timer()
     #Hd2 = build_hamiltonian_diagonal_parallel1(clustered_ham, pt_vector, nproc=1)
     Hd2 = build_hamiltonian_diagonal_parallel1(clustered_ham, ci_vector.copy())

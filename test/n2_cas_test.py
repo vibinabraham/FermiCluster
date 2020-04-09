@@ -62,53 +62,12 @@ def run(nproc=None):
     idx = e1_order(h,cut_off = 1e-4)
     h,g = reorder_integrals(idx,h,g)
 
-    clusters = []
 
-    for ci,c in enumerate(blocks):
-        clusters.append(Cluster(ci,c))
+        
+    clusters, clustered_ham, ci_vector = system_setup(h, g, ecore, blocks, init_fspace, cmf_maxiter = 20 )
 
-    print(" Clusters:")
-    [print(ci) for ci in clusters]
-
-    clustered_ham = ClusteredOperator(clusters, core_energy=ecore)
-    print(" Add 1-body terms")
-    clustered_ham.add_local_terms()
-    clustered_ham.add_1b_terms(h)
-    print(" Add 2-body terms")
-    clustered_ham.add_2b_terms(g)
-
-    # intial state
-    ci_vector = ClusteredState(clusters)
-    ci_vector.init(init_fspace)
-    ci_vector.print()
-
-    # do cmf
-    do_cmf = 1
-    if do_cmf:
-        # Get CMF reference
-        e_cmf, cmf_conv, rdm_a, rdm_b = cmf(clustered_ham, ci_vector, h, g, max_iter=10)
-        #e_cmf, cmf_conv, rdm_a, rdm_b = cmf(clustered_ham, ci_vector, h, g, max_iter=10, dm_guess=(dm_aa, dm_bb), diis=True)
-
-    print(" Final CMF Total Energy %12.8f" %(e_cmf + ecore))
-
-    # build cluster basis and operator matrices using CMF optimized density matrices
-    for ci_idx, ci in enumerate(clusters):
-        print(ci)
-        fspaces_i = init_fspace[ci_idx]
-        delta_e = 3
-        fspaces_i = ci.possible_fockspaces( delta_elec=(fspaces_i[0], fspaces_i[1], delta_e) )
-
-        print()
-        print(" Form basis by diagonalizing local Hamiltonian for cluster: ",ci_idx)
-        ci.form_fockspace_eigbasis(h, g, fspaces_i, max_roots=100, rdm1_a=rdm_a, rdm1_b=rdm_b)
-
-        print(" Build mats for cluster ",ci.idx)
-        ci.build_op_matrices()
-        ci.build_local_terms(h,g)
-
-
-    hamiltonian_file = open('cmf_hamiltonian_file', 'wb')
-    pickle.dump(clustered_ham, hamiltonian_file)
+    #hamiltonian_file = open('cmf_hamiltonian_file', 'wb')
+    #pickle.dump(clustered_ham, hamiltonian_file)
 
 
     ci_vector, pt_vector, etci, etci2, conv = bc_cipsi_tucker(ci_vector, clustered_ham, 
@@ -123,13 +82,11 @@ def run(nproc=None):
     etci += ecore
     etci2 += ecore
 
-
+    print(" ecore: ", ecore)
     print(" TCI:        %12.9f Dim:%6d"%(etci,tci_dim))
-    print(" HCI:        %12.9f Dim:%6d"%(ehci,hci_dim))
-    print(" FCI:        %12.9f Dim:%6d"%(efci,fci_dim))
-    assert(abs(etci --108.855580011)< 1e-7)
+    assert(abs(etci --108.855579790)< 1e-7)
+    #assert(abs(etci --108.855580011)< 1e-7)
     assert(tci_dim == 43)
-    assert(abs(efci   --108.85574521)< 1e-7)
 
 def test_1():
     run(nproc=None)
@@ -139,4 +96,4 @@ def test_2():
 
 if __name__== "__main__":
     test_1() 
-    test_2() 
+    #test_2() 

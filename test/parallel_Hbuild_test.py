@@ -69,44 +69,20 @@ def test_1():
     efci, fci_dim = run_fci_pyscf(h,g,cas_nel,ecore=ecore)
     print(" FCI energy: %12.8f" %efci)
 
-    clusters = []
+    init_fspace = ((4,4),(1,1))
+    clusters, clustered_ham, ci_vector = system_setup(h, g, ecore, blocks, init_fspace,
+                                                        max_roots   = 100,
+                                                        cmf_maxiter = 0
+                                                        )
 
-    for ci,c in enumerate(blocks):
-        clusters.append(Cluster(ci,c))
+    ci_vector.add_fockspace(((4,3),(1,2)))
+    ci_vector.add_fockspace(((3,4),(2,1)))
+    
 
-    ci_vector = ClusteredState(clusters)
-    if orb_basis == 'boys':
-        ci_vector.init(((3,2),(2,3)))
-        ci_vector.add_fockspace(((2,3),(3,2)))
-        ci_vector.add_fockspace(((1,4),(4,1)))
-        ci_vector.add_fockspace(((4,1),(1,4)))
-    elif orb_basis == 'scf':
-        ci_vector.init(((4,4),(1,1)))
-        ci_vector.init(((4,3),(1,2)))
-        ci_vector.init(((3,4),(2,1)))
-        #ci_vector.init(((3,3),(2,2)))
 
     #ci_vector.add_fockspace(((2,2),(3,3)))
     #ci_vector.add_fockspace(((3,3),(2,2)))
 
-    print(" Clusters:")
-    [print(ci) for ci in clusters]
-
-    clustered_ham = ClusteredOperator(clusters)
-    print(" Add 1-body terms")
-    clustered_ham.add_local_terms()
-    clustered_ham.add_1b_terms(h)
-    print(" Add 2-body terms")
-    clustered_ham.add_2b_terms(g)
-
-
-    #clustered_ham.add_ops_to_clusters()
-    print(" Build cluster basis")
-    for c in clusters:
-        c.form_eigbasis_from_ints(h,g,max_roots=50)
-        print(" Build mats for cluster ",c.idx)
-        c.build_op_matrices()
-        c.build_local_terms(h,g)
 
     #ci_vector.expand_to_full_space()
     ci_vector.expand_each_fock_space()

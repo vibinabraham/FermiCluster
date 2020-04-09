@@ -99,8 +99,10 @@ def test_1():
     blocks = [[0,1,2],[3,4,5]]
     #blocks = [[0,1],[2,3],[4,5],[6,7]]
     n_blocks = len(blocks)
-        
-    clusters, clustered_ham = system_setup(h, g, 0.0, blocks)
+
+    ecore=0.0
+    init_fspace = ((3,3),(0,0))
+    clusters, clustered_ham, ci_vector = system_setup(h, g, ecore, blocks, init_fspace, cmf_maxiter = 0 )
         
     ci_vector = ClusteredState(clusters)
     ci_vector.init(((3,3),(0,0)))
@@ -119,7 +121,7 @@ def test_1():
     ci_vector_ref = ci_vector.copy()
     e_last = 0
     #ci_vector.print_configs()
-    ci_vector, pt_vector, e0, e2 = bc_cipsi(ci_vector_ref.copy(), clustered_ham, thresh_cipsi=1e-14, thresh_ci_clip=0, max_iter=1)
+    ci_vector, pt_vector, e0, e2 = bc_cipsi(ci_vector_ref.copy(), clustered_ham, thresh_cipsi=1e-14, thresh_ci_clip=0, max_iter=0)
     #print(ci_vector.get_vector())
     #ci_vector.print_configs()
     civec = ci_vector.get_vector()
@@ -138,6 +140,7 @@ def test_1():
 
     from pyscf import ci
     myci = ci.CISD(myhf).run()
+    assert(abs(myci.e_tot - e0-enu) < 1e-7)
     assert(abs(myci.e_tot - e0-enu) < 1e-7)
    
 

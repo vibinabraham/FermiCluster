@@ -18,11 +18,14 @@ from tools import *
 
 
 def system_setup(h, g, ecore, blocks, init_fspace,
-        max_roots   = 1000, 
-        delta_elec  = None,
-        maxiter_cmf = 10,
-        rdm_a       = None,     #initial guess density matrix for cmf (alpha)
-        rdm_b       = None      #initial guess density matrix for cmf (beta)
+        max_roots       = 1000, 
+        delta_elec      = None,
+        cmf_maxiter     = 10,
+        cmf_thresh      = 1e-8,
+        cmf_dm_guess    = None,     #initial guess density matrices  for cmf tuple(alpha, beta)
+        cmf_diis        = False,
+        cmf_diis_start  = 1,
+        cmf_max_diis    = 6
         ):
 # {{{
     
@@ -30,7 +33,11 @@ def system_setup(h, g, ecore, blocks, init_fspace,
     print("     |init_fspace    : ", init_fspace)
     print("     |max_roots      : ", max_roots)
     print("     |delta_elec     : ", delta_elec)
-    print("     |maxiter_cmf    : ", maxiter_cmf)
+    print("     |cmf_maxiter    : ", cmf_maxiter)
+    print("     |cmf_thresh     : ", cmf_thresh)
+    print("     |cmf_diis       : ", cmf_diis)
+    print("     |cmf_diis_start : ", cmf_diis_start)
+    print("     |cmf_max_diis   : ", cmf_max_diis)
     n_blocks = len(blocks)
     clusters = [Cluster(ci,c) for ci,c in enumerate(blocks)]
     
@@ -43,17 +50,19 @@ def system_setup(h, g, ecore, blocks, init_fspace,
     clustered_ham.add_1b_terms(h)
     print(" Add 2-body terms")
     clustered_ham.add_2b_terms(g)
-    
 
-    if rdm_a == None:
+
+    if cmf_dm_guess == None:
         rdm_a = np.zeros(h.size)
-    if rdm_b == None:
         rdm_b = np.zeros(h.size)
+    else:
+        rdm_a = cmf_dm_guess[0]
+        rdm_b = cmf_dm_guess[1]
     
     ci_vector = ClusteredState(clusters)
     ci_vector.init(init_fspace)
 
-    if maxiter_cmf > 0:
+    if cmf_maxiter > 0:
         e_cmf, cmf_conv, rdm_a, rdm_b = cmf(clustered_ham, ci_vector, h, g)
     
 
@@ -92,7 +101,7 @@ def bc_cipsi_tucker(ci_vector, clustered_ham,
         hshift              = 1e-8,
         pt_type             = 'en',
         nbody_limit         = 4, 
-        tucker_conv_target  = 2, 
+        tucker_conv_target  = 0, 
         nproc               = None):
     """
     Run iterations of TP-CIPSI to make the tucker decomposition self-consistent
