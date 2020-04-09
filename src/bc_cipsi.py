@@ -64,6 +64,9 @@ def system_setup(h, g, ecore, blocks, init_fspace,
                 max_diis    = cmf_max_diis,
                 thresh      = cmf_thresh,
                 max_iter    = cmf_maxiter)
+    else:
+        rdm_a = np.zeros(h.shape)
+        rdm_b = np.zeros(h.shape)
     
 
     # build cluster basis and operator matrices using CMF optimized density matrices
