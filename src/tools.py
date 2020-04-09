@@ -907,7 +907,8 @@ def matvec1_parallel3(h_in,v,thresh_search=1e-12, nproc=None, opt_einsum=True, n
     sigma.zero()
     
     def do_batch(batch):
-        sigma_out = OrderedDict() 
+        sigma_out = {} 
+        #sigma_out = OrderedDict() 
         for v_curr in batch:
             # only search from variational states with large ci coeffs
             do_parallel_work(v_curr,sigma_out)
@@ -999,12 +1000,14 @@ def matvec1_parallel3(h_in,v,thresh_search=1e-12, nproc=None, opt_einsum=True, n
                                 
                             #nonzeros_curr = []
                             #for K in range(oi.shape[0]):
-                            #    if np.amax(np.abs(oi[K,:])) > thresh_search/10:
+                            #    if np.amax(np.abs(oi[K,:])) > 1e-16:
+                            #    #if np.amax(np.abs(oi[K,:])) > thresh_search/10:
                             #        nonzeros_curr.append(K)
                             #oinz = oi[nonzeros_curr,:]
                             #mats.append(oinz)
                             #nonzeros.append(nonzeros_curr)
                             mats.append(oi)
+                            nonzeros.append(range(oi.shape[0]))
 
                         except KeyError:
                             good = False
@@ -1039,8 +1042,8 @@ def matvec1_parallel3(h_in,v,thresh_search=1e-12, nproc=None, opt_einsum=True, n
                     
                     new_configs = [[i] for i in conf_r] 
                     for cacti,cact in enumerate(term.active):
-                        #new_configs[cact] = nonzeros[cacti] 
-                        new_configs[cact] = range(mats[cacti].shape[0])
+                        new_configs[cact] = nonzeros[cacti] 
+                        #new_configs[cact] = range(mats[cacti].shape[0])
                         
                     matvec_update_with_new_configs(tmp, new_configs, configs_l, term.active, thresh_search)
                 #stop1 = time.time()
@@ -1066,7 +1069,7 @@ def matvec1_parallel3(h_in,v,thresh_search=1e-12, nproc=None, opt_einsum=True, n
     print(" Using Pathos library for parallelization. Number of workers: ", pool.ncpus, flush=True )
     # define batches
     conf_batches = []
-    batch_size = math.ceil(len(v)/pool.ncpus)
+    batch_size = math.ceil(len(v)/pool.ncpus) 
     batch = []
     print(" Form batches. Max batch size: ", batch_size)
     for i,j,k in v:
