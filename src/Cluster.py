@@ -186,7 +186,8 @@ class Cluster(object):
         H.ecore = ecore
         self.basis = {}
         self.ops['H_mf'] = {}
-       
+      
+        self.Hlocal = {}
         for na,nb in spaces:
             ci = ci_solver()
             ci.algorithm = "direct"
@@ -196,6 +197,7 @@ class Cluster(object):
             #self.basis[(na,nb)] = np.eye(ci.results_v.shape[0])
             fock = (na,nb)
             self.basis[fock] = ci.results_v
+            self.Hlocal[fock] =  Hci 
             self.ops['H_mf'][(fock,fock)] = ci.results_v.T @ Hci @ ci.results_v
     # }}}
 
@@ -424,8 +426,115 @@ class Cluster(object):
                         print(self.ops[op][fspace_delta].shape)
                         exit()
    # }}}
+   
+    def grow_basis_by_coupling(self, rdms=None):
+       # {{{
+        print("NYI")
+        exit()
+        #  Aa
+        start = time.time()
+        for fock in self.basis:
+            v1 = self.basis[fock]
+
+            dimX = v1.shape[0] - v1.shape[1] # how many vectors can we add?
+            if dimX == 0:
+                continue
+            
+            # get basis for the orthogonal compliment to our current space
+            v1 = np.eye(v1.shape[0]) - v1 @ v1.T
+            v1,s1,u1 = np.linalg.svd(v1)
+            v1 = v1[:,:dimX]
+            basis1 = {}
+            basis1[fock] = v1
+
+            print()
+            print(self.basis[fock].shape)
+            print(v1.shape)
+
+            GIipq = build_ca_ss_tdm(self.n_orb, fock, fock, self.basis, basis1, 'a')
+            
+#            if rdms != None:
+#                #first contract with density matrix diagonal
+#                print(rdms[fock])
+#                GIpq = np.einsum('Iipq,i->Ipq', GIipq, rdms[fock])
+#                G = np.einsum('Iipq,Jipq->IJ', GIipq, GIipq)
+#            
+#            else:
+#                G = np.einsum('Iipq,Jipq->IJ', GIipq, GIipq)
+#            print(G.shape)
+            
+            G = np.einsum('Iipq,Jipq->IJ', GIipq, GIipq)
+            print(G.shape)
+
+            l,U = np.linalg.eigh(G)
+            idx = l.argsort()
+            l = l[idx]
+            U = U[:,idx]
+            for ii,i in enumerate(l):
+                print(" %4i %12.8f"%(ii+1,i))
+# }}}
     
+    def grow_basis_by_energy(self, max_roots=None, max_energy=None):
+       # {{{
+        #  Aa
+        start = time.time()
+        for fock in self.basis:
+            v1 = self.basis[fock]
+
+            dimX = v1.shape[0] - v1.shape[1] # how many vectors can we add?
+            if dimX == 0:
+                continue
+            
+            # get basis for the orthogonal compliment to our current space
+            v1 = np.eye(v1.shape[0]) - v1 @ v1.T
+            v1,s1,u1 = np.linalg.svd(v1)
+            v1 = v1[:,:dimX]
+            s1 = s1[:dimX]
+
+            
+            #print()
+
+            HX = v1.T @ self.Hlocal[fock] @ v1
+
+            l,U = np.linalg.eigh(HX)
+            idx = l.argsort()
+            l = l[idx]
+            U = U[:,idx]
+            
+            if max_roots != None: 
+                if max_roots < len(l):
+                    assert(max_roots>=0)
+                    l = l[:max_roots]
+                    U = U[:,:max_roots]
+
+            if max_energy != None: 
+                nkeep = 0
+                for li in range(len(l)):
+                    if l[li] <= max_energy:
+                        nkeep += 1
+                l = l[:nkeep]
+                U = U[:,:nkeep]
+
+            U = v1@U
+            print(U)
+            
     
+            v2 = np.hstack((self.basis[fock],U))
+            self.basis[fock] = v2
+
+            assert(np.amax(v2.T @ v2 - np.eye(v2.shape[1])) < 1e-14)
+            
+            # The mean-field hamiltonian (H_mf) lives in the cluster basis while 
+            # the same operator (Hlocal) lives in the determinant basis
+            # this doesn't get updated with all the other operators, so update this quantity here
+            self.ops['H_mf'][(fock,fock)] = v2.T @ self.Hlocal[fock] @ v2 
+            
+            print(U.shape)
+            for ii,i in enumerate(l):
+                print(" %4i %12.8f"%(ii+1,i))
+# }}}
+
+
     def get_ops(self):
         return self.ops
 

@@ -767,6 +767,92 @@ def build_annihilation(no,bra_space,ket_space,basis):
     return tdm
 # }}}
 
+def build_ca_ss_tdm(no, bra_space, ket_space, ket_basis, bra_basis, spin_case):
+    """
+    Compute a(v1,v2,j) = <v1|a_j|v2>
+
+    Input: 
+        no = n_orbs
+        bra_space = (n_alpha,n_beta) for bra
+        ket_space = (n_alpha,n_beta) for ket
+        spin_case: 'a' or 'b'
+        basis = dict of basis vectors
+    """
+    # {{{ 
+    bra_a = ci_string(no, bra_space[0])
+    bra_b = ci_string(no, bra_space[1])
+    ket_a = ci_string(no, ket_space[0])
+    ket_b = ci_string(no, ket_space[1])
+   
+    assert(ket_a.no == ket_b.no) 
+    assert(bra_a.no == ket_a.no) 
+   
+    # avoid python function call overhead
+    ket_a_max = ket_a.max()
+    ket_b_max = ket_b.max()
+    bra_a_max = bra_a.max()
+    bra_b_max = bra_b.max()
+    
+    range_no = range(no)
+  
+    _abs = abs
+   
+    v1 = bra_basis[bra_space] 
+    v2 = ket_basis[ket_space] 
+
+    assert(v1.shape[0] == len(bra_a)*len(bra_b))
+    assert(v2.shape[0] == len(ket_a)*len(ket_b))
+    nv1 = v1.shape[1]
+    nv2 = v2.shape[1]
+
+    
+    #alpha term 
+    if spin_case == "a":
+        ket = cp.deepcopy(ket_a)
+        bra = cp.deepcopy(bra_a)
+    elif spin_case == "b":
+        ket = cp.deepcopy(ket_b)
+        bra = cp.deepcopy(bra_b)
+    
+    tdm_1spin = np.zeros((bra.max(),ket.max(),no,no))
+    ket.reset()
+    bra.reset()
+    for K in range(ket.max()): 
+        for p in range_no:
+            for q in range_no:
+                bra.dcopy(ket)
+                bra.a(q)
+                if bra.sign() == 0:
+                    continue
+                bra.c(p)
+                if bra.sign() == 0:
+                    continue
+                L = bra.linear_index()
+                sign = bra.sign()
+                tdm_1spin[L,K,p,q] += sign
+
+        ket.incr()
+  
+    v2.shape = (ket_a_max,ket_b_max,nv2)
+    v1.shape = (bra_a_max,bra_b_max,nv1)
+
+    
+    if spin_case == "a":
+        # v(IJs) <IJ|pq|KL> v(KLt)   = v(IJs) tdm(IKpq) v(KJt) = A(stpq)
+        tmp = np.einsum('ikpq,kjt->ipqjt',tdm_1spin,v2)
+        tdm = np.einsum('ijs,ipqjt->stpq',v1,tmp)
+    elif spin_case == "b":
+        # v(IJs) <IJ|pq|KL> v(KLt)   = v(IJs) tdm(JLpq) v(ILt) = A(stpq)
+        tmp = np.einsum('jlpq,ilt->jpqit',tdm_1spin,v2)
+        tdm = np.einsum('ijs,jpqit->stpq',v1,tmp) 
+
+    
+    v2.shape = (ket_a_max*ket_b_max,nv2)
+    v1.shape = (bra_a_max*bra_b_max,nv1)
+   
+    return tdm
+# }}}
+
 def build_ca_ss(no,bra_space,ket_space,basis,spin_case):
     """
     Compute a(v1,v2,j) = <v1|a_j|v2>

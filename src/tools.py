@@ -2303,6 +2303,33 @@ def build_brdm(ci_vector, ci_idx):
 # }}}
 
 
+def build_brdm_diagonal(ci_vector, ci_idx):
+    """
+    Build diagonal of block reduced density matrix for cluster ci_idx
+    """
+    # {{{
+    ci = ci_vector.clusters[ci_idx]
+    rdms = OrderedDict()
+    for fspace, configs in ci_vector.items():
+        #print()
+        #print("fspace:",fspace)
+        #print()
+        curr_dim = ci.basis[fspace[ci_idx]].shape[1]
+        rd = np.zeros((curr_dim))
+        for configi,coeffi in configs.items():
+            try:
+                rd[configi[ci_idx]] += coeffi*coeffi
+            except KeyError:
+                pass
+        try:
+            rdms[fspace[ci_idx]] += rd 
+        except KeyError:
+            rdms[fspace[ci_idx]] = rd 
+
+    return rdms
+# }}}
+
+
 def do_2body_search(blocks, init_fspace, h, g, max_cluster_size=4, max_iter_cmf=10, do_pt2=True):
     """
     Sort the cluster pairs based on how much correlation energy is recovered when combined
