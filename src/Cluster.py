@@ -516,7 +516,6 @@ class Cluster(object):
                 U = U[:,:nkeep]
 
             U = v1@U
-            print(U)
             
     
             v2 = np.hstack((self.basis[fock],U))
@@ -529,9 +528,9 @@ class Cluster(object):
             # this doesn't get updated with all the other operators, so update this quantity here
             self.ops['H_mf'][(fock,fock)] = v2.T @ self.Hlocal[fock] @ v2 
             
-            print(U.shape)
-            for ii,i in enumerate(l):
-                print(" %4i %12.8f"%(ii+1,i))
+            #print(U.shape)
+            #for ii,i in enumerate(l):
+            #    print(" %4i %12.8f"%(ii+1,i))
 # }}}
 
 
