@@ -69,27 +69,50 @@ def test1():
     
 
     efci, fci_dim = run_fci_pyscf(h,g,nelec,ecore=ecore)
+    print(" E(FCI): %12.8f" %efci)
+    
+    clusters, clustered_ham, ci_vector, cmf_out  = system_setup(h, g, ecore, blocks, init_fspace, max_roots = 100,  cmf_maxiter = 20 )
+    e_cmf = cmf_out[0]
+    e0 = e_cmf + clustered_ham.core_energy
+    e2a, vec2 = compute_pt2_correction(ci_vector, clustered_ham, e0, pt_type='mp')
+    e2b, vec2 = compute_pt2_correction(ci_vector, clustered_ham, e0, pt_type='en')
+    print(" PT2: MP %12.8f" %(e2a+e0))
+    print(" PT2: EN %12.8f" %(e2b+e0))
+
+    assert(abs(e2a+e0 - -2.18404569) < 1e-8)
+    assert(abs(e2b+e0 - -2.04632485) < 1e-8)
    
     clusters, clustered_ham, ci_vector, cmf_out = system_setup(h, g, ecore, blocks, init_fspace, max_roots = 4,  cmf_maxiter = 20 )
+    for ci in clusters:
+        ci.grow_basis_by_energy()
+        
+        print(" Build operator matrices for cluster ",ci.idx)
+        ci.build_op_matrices()
+        ci.build_local_terms(h,g)
+    
+    e_cmf = cmf_out[0]
+    e0 = e_cmf + clustered_ham.core_energy
+    e2a, vec2 = compute_pt2_correction(ci_vector, clustered_ham, e0, pt_type='mp')
+    e2b, vec2 = compute_pt2_correction(ci_vector, clustered_ham, e0, pt_type='en')
+    print(" PT2: MP %12.8f" %(e2a+e0))
+    print(" PT2: EN %12.8f" %(e2b+e0))
+    assert(abs(e2a+e0 - -2.18404569) < 1e-8)
+    assert(abs(e2b+e0 - -2.04632485) < 1e-8)
     
 
+    clusters, clustered_ham, ci_vector, cmf_out = system_setup(h, g, ecore, blocks, init_fspace, max_roots = 4,  cmf_maxiter = 20 )
     ci_vector, pt_vector, etci, etci2, conv = bc_cipsi_tucker(ci_vector, clustered_ham, 
                                                         thresh_cipsi    = 1e-4, 
                                                         thresh_ci_clip  = 1e-7, 
-                                                        max_tucker_iter = 2)
+                                                        max_tucker_iter = 0)
+    e0 = etci + clustered_ham.core_energy
+    e2a, vec2 = compute_pt2_correction(ci_vector, clustered_ham, e0, pt_type='mp')
+    e2b, vec2 = compute_pt2_correction(ci_vector, clustered_ham, e0, pt_type='en')
+    print(" PT2: MP %12.8f" %(e2a+e0))
+    print(" PT2: EN %12.8f" %(e2b+e0))
+    assert(abs(e2a+e0 - -2.21601639) < 1e-8)
+    assert(abs(e2b+e0 - -2.20440668) < 1e-8)
   
-    l1 = len(ci_vector)
-        #hamiltonian_file = open('hamiltonian_file', 'wb')
-        #pickle.dump(clustered_ham, hamiltonian_file)
-
-
-    #hamiltonian_file = open('hamiltonian_file', 'rb')
-    #clustered_ham = pickle.load(hamiltonian_file)
-    #clusters = clustered_ham.clusters
-    
-    #ci_vector = ClusteredState(clusters)
-    #ci_vector.init(init_fspace)
-
 
     for ci in clusters:
         ci.grow_basis_by_energy()
@@ -98,26 +121,15 @@ def test1():
         ci.build_op_matrices()
         ci.build_local_terms(h,g)
     
-    print(" Size of basis2: ",len(ci_vector))
 
-    test1 = matvec1(clustered_ham, ci_vector)
-    e1 = test1.dot(ci_vector)
-    print(" Energy of old cipsi state in new larger basis %16.12f" %e1, len(ci_vector), l1)
-    assert(abs(e1-etci) < 1e-12)
-    
-    ci_vector, pt_vector, etci, etci2, conv = bc_cipsi_tucker(ci_vector, clustered_ham, 
-                                                        thresh_cipsi    = 1e-4, 
-                                                        thresh_ci_clip  = 1e-7, 
-                                                        max_tucker_iter = 2)
-    l2 = len(ci_vector)
-    
-    print(" E(TPSCI-old)  = %12.8f" %e1)
-    print(" E(TPSCI)      = %12.8f" %etci)
-    print(" E(TPSCI2)     = %12.8f" %etci2)
-    print(" E(FCI)        = %12.8f" %(efci-ecore))
-    
-    #assert(abs(efci --2.21837081) < 1e-7)
-    assert(abs(etci --4.51129093) < 1e-7)
+    e0 = etci + clustered_ham.core_energy
+    e2a, vec2 = compute_pt2_correction(ci_vector, clustered_ham, e0, pt_type='mp')
+    e2b, vec2 = compute_pt2_correction(ci_vector, clustered_ham, e0, pt_type='en')
+    print(" PT2: MP %12.8f" %(e2a+e0))
+    print(" PT2: EN %12.8f" %(e2b+e0))
+    assert(abs(e2a+e0 - -2.21847548) < 1e-8)
+    assert(abs(e2b+e0 - -2.20027575) < 1e-8)
+
 
 if __name__== "__main__":
     test1() 

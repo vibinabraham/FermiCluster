@@ -67,7 +67,7 @@ def test_1():
         ehci, hci_dim = run_hci_pyscf(h,g,4,ecore=ecore)#,select_cutoff=2e-3,ci_cutoff=2e-3)
     if do_tci:
         
-        clusters, clustered_ham, ci_vector = system_setup(h, g, ecore, blocks, init_fspace, cmf_maxiter = 0 )
+        clusters, clustered_ham, ci_vector, cmf_out = system_setup(h, g, ecore, blocks, init_fspace, cmf_maxiter = 0 )
 
         ci_vector, pt_vector, etci, etci2, conv = bc_cipsi_tucker(ci_vector, clustered_ham, 
                                                             thresh_cipsi    = 1e-6, 
@@ -80,7 +80,7 @@ def test_1():
     print(" HCI:        %12.9f Dim:%6d"%(ehci-ecore,hci_dim))
     print(" FCI:        %12.9f Dim:%6d"%(efci-ecore,fci_dim))
     assert(abs(etci --3.081526431) < 1e-7)
-    assert(abs(etci2 --3.08154330) < 1e-7)
+    assert(abs(etci2 --3.08154435) < 1e-7)
     #assert(abs(tci_dim - 49)<1e-15)
     assert(abs(efci -ecore --3.08154574) < 1e-7)
     

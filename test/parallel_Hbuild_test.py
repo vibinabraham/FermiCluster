@@ -70,7 +70,7 @@ def test_1():
     print(" FCI energy: %12.8f" %efci)
 
     init_fspace = ((4,4),(1,1))
-    clusters, clustered_ham, ci_vector = system_setup(h, g, ecore, blocks, init_fspace,
+    clusters, clustered_ham, ci_vector, cmf_out = system_setup(h, g, ecore, blocks, init_fspace,
                                                         max_roots   = 100,
                                                         cmf_maxiter = 0
                                                         )

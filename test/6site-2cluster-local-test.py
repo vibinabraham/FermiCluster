@@ -53,7 +53,7 @@ def run(beta, U, pbc=True):
     
     init_fspace = ((2,1),(1,2))
     ecore = 0.0 
-    clusters, clustered_ham, ci_vector = system_setup(h, g, ecore, blocks, init_fspace,
+    clusters, clustered_ham, ci_vector, cmf_out = system_setup(h, g, ecore, blocks, init_fspace,
                                                                 cmf_maxiter = 10
                                                                 )
 

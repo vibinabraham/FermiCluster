@@ -118,16 +118,16 @@ def test_1():
         
         ci_vector, pt_vector, etci, etci2, conv = bc_cipsi_tucker(ci_vector, clustered_ham, 
                                                             selection       = "cipsi",
-                                                            thresh_cipsi    = 1e-6, 
+                                                            thresh_cipsi    = 1e-4, 
                                                             thresh_ci_clip  = 1e-7, 
-                                                            max_tucker_iter = 3)
+                                                            max_tucker_iter = 2)
         
         # Do exact
         if 1:
             print(" Build exact eigenstate")
             ci_vector.expand_to_full_space()
             
-            H = build_full_hamiltonian(clustered_ham, ci_vector)
+            H = build_full_hamiltonian_parallel2(clustered_ham, ci_vector)
             
             print(" Diagonalize Hamiltonian Matrix:",flush=True)
             vguess = ci_vector.get_vector()

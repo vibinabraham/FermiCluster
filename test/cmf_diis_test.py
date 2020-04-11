@@ -99,7 +99,7 @@ def test_1():
             print("%4d %8s %16.8f"%(i+1,osym[i],mo_energy[i]))
 
 
-    clusters, clustered_ham, ci_vector = system_setup(h, g, ecore, blocks, init_fspace, cmf_maxiter = 0 )
+    clusters, clustered_ham, ci_vector, cmf_out = system_setup(h, g, ecore, blocks, init_fspace, cmf_maxiter = 0 )
 
 
     energy1,t,rmda,rdmb = cmf(clustered_ham, ci_vector, h, g, max_iter=50,dm_guess=(dm_aa,dm_bb),diis=True)

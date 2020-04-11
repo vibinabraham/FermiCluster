@@ -58,7 +58,7 @@ def test_1():
 
 
     init_fspace = ((2,2),(4,4),(2,2))
-    clusters, clustered_ham, ci_vector = system_setup(h, g, ecore, blocks, init_fspace,
+    clusters, clustered_ham, ci_vector, cmf_out = system_setup(h, g, ecore, blocks, init_fspace,
                                                         max_roots   = 100,
                                                         cmf_maxiter = 0
                                                         )

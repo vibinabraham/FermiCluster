@@ -67,6 +67,8 @@ def system_setup(h, g, ecore, blocks, init_fspace,
     else:
         rdm_a = np.zeros(h.shape)
         rdm_b = np.zeros(h.shape)
+        e_cmf = 0
+        cmf_conv = False
     
 
     # build cluster basis and operator matrices using CMF optimized density matrices
@@ -86,7 +88,7 @@ def system_setup(h, g, ecore, blocks, init_fspace,
         ci.build_local_terms(h,g)
 
     
-    return clusters, clustered_ham, ci_vector
+    return clusters, clustered_ham, ci_vector, (e_cmf, rdm_a, rdm_b, cmf_conv)
 # }}}
 
 
@@ -182,6 +184,7 @@ def bc_cipsi_tucker(ci_vector, clustered_ham,
             pt_vector = ClusteredState(ci_vector.clusters)
             e_curr = e0
             e2 = 0
+            ecore = clustered_ham.core_energy
             print(" HB-TPSCI: E0 = %16.8f CI_DIM: %-12i Time spent %-12.2f" %(e0+ecore, len(ci_vector), end-start))
 
         

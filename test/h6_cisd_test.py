@@ -102,7 +102,7 @@ def test_1():
 
     ecore=0.0
     init_fspace = ((3,3),(0,0))
-    clusters, clustered_ham, ci_vector = system_setup(h, g, ecore, blocks, init_fspace, cmf_maxiter = 0 )
+    clusters, clustered_ham, ci_vector, cmf_out = system_setup(h, g, ecore, blocks, init_fspace, cmf_maxiter = 0 )
         
     ci_vector = ClusteredState(clusters)
     ci_vector.init(((3,3),(0,0)))

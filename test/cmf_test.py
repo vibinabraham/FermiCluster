@@ -91,7 +91,7 @@ def test_truncate_basis():
     
 
     
-    clusters, clustered_ham, ci_vector = system_setup(h, g, ecore, blocks, init_fspace, max_roots = 20,  cmf_maxiter = 0 )
+    clusters, clustered_ham, ci_vector, cmf_out = system_setup(h, g, ecore, blocks, init_fspace, max_roots = 20,  cmf_maxiter = 0 )
     
 
 
