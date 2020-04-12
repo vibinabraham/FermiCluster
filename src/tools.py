@@ -2470,7 +2470,10 @@ def compute_pt2_correction(ci_vector, clustered_ham, e0,
         stop = time.time()
         print(" Time spent in matvec: %12.2f" %( stop-start))
         #exit()
-        
+       
+        e0_curr = ci_vector.dot(pt_vector) 
+        print(" Zeroth-order energy: %12.8f " %e0_curr) 
+
         if profile:
             pr.disable()
             pr.print_stats(sort='time')
@@ -3136,3 +3139,4 @@ def compute_cisd_correction(ci_vector, clustered_ham, nproc=1):
     print(" CISD Energy Correction = %12.8f" %Ec)
     return Ec
 # }}}
+
