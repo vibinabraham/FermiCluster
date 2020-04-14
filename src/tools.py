@@ -298,7 +298,7 @@ def matvec1(h,v,thresh_search=1e-12, opt_einsum=True, nbody_limit=4):
     #                print(" Rearrange data for %5s :" %o, fock)
     #                ci.ops[o][fock] = np.ascontiguousarray(ci.ops[o][fock])
 
-    sigma = ClusteredState(clusters)
+    sigma = ClusteredState()
     sigma = v.copy() 
     sigma.zero()
      
@@ -509,7 +509,7 @@ def matvec1_parallel1(h_in,v,thresh_search=1e-12, nproc=None, nbody_limit=4):
     clusters = h_in.clusters
     
 
-    sigma = ClusteredState(clusters)
+    sigma = ClusteredState()
     sigma = v.copy() 
     sigma.zero()
    
@@ -678,7 +678,7 @@ def matvec1_parallel2(h_in,v,thresh_search=1e-12, nproc=None, opt_einsum=True, n
     clusters = h_in.clusters
     
 
-    sigma = ClusteredState(clusters)
+    sigma = ClusteredState()
     sigma = v.copy() 
     sigma.zero()
     
@@ -902,7 +902,7 @@ def matvec1_parallel3(h_in,v,thresh_search=1e-12, nproc=None, opt_einsum=True, n
     clusters = h_in.clusters
     
 
-    sigma = ClusteredState(clusters)
+    sigma = ClusteredState()
     sigma = v.copy() 
     sigma.zero()
     
@@ -1132,7 +1132,7 @@ def heat_bath_search(h_in,v,thresh_cipsi=None, nproc=None):
     clusters = h_in.clusters
     
 
-    sigma = ClusteredState(clusters)
+    sigma = ClusteredState()
     sigma = v.copy() 
     sigma.zero()
     
@@ -1304,7 +1304,7 @@ def build_full_hamiltonian(clustered_ham,ci_vector,iprint=0, opt_einsum=True):
     Build hamiltonian in basis in ci_vector
     """
 # {{{
-    clusters = ci_vector.clusters
+    clusters = clustered_ham.clusters
     H = np.zeros((len(ci_vector),len(ci_vector)))
     
     shift_l = 0 
@@ -1353,7 +1353,7 @@ def build_full_hamiltonian_open(clustered_ham,ci_vector,iprint=1):
 # {{{
     print("OBSOLETE: build_full_hamiltonian_open")
     exit()
-    clusters = ci_vector.clusters
+    clusters = clustered_ham.clusters
     H = np.zeros((len(ci_vector),len(ci_vector)))
     n_clusters = len(clusters)
 
@@ -1477,7 +1477,7 @@ def build_full_hamiltonian_parallel1(clustered_ham_in,ci_vector_in,iprint=1, npr
 
     clustered_ham = clustered_ham_in
     ci_vector = ci_vector_in
-    clusters = ci_vector.clusters
+    clusters = clustered_ham_in.clusters
 
     H = np.zeros((len(ci_vector),len(ci_vector)))
     n_clusters = len(clusters)
@@ -1672,8 +1672,8 @@ def build_full_hamiltonian_parallel2(clustered_ham_in,ci_vector_in,iprint=1, npr
     print(" In build_full_hamiltonian_parallel2. nproc=",nproc) 
 
     clustered_ham = clustered_ham_in
+    clusters = clustered_ham_in.clusters
     ci_vector = ci_vector_in
-    clusters = ci_vector.clusters
 
     H = np.zeros((len(ci_vector),len(ci_vector)))
     n_clusters = len(clusters)
@@ -1789,7 +1789,7 @@ def build_effective_operator(cluster_idx, clustered_ham, ci_vector,iprint=0):
         H = sum_i o_i h_i
     """
 # {{{
-    clusters = ci_vector.clusters
+    clusters = clustered_ham.clusters
     H = np.zeros((len(ci_vector),len(ci_vector)))
    
     new_op = ClusteredOperator(clustered_ham.clusters)
@@ -1834,7 +1834,7 @@ def build_hamiltonian_diagonal(clustered_ham,ci_vector):
     Build hamiltonian diagonal in basis in ci_vector
     """
 # {{{
-    clusters = ci_vector.clusters
+    clusters = clustered_ham.clusters
     Hd = np.zeros((len(ci_vector)))
     
     shift = 0 
@@ -1863,7 +1863,7 @@ def build_hamiltonian_diagonal_parallel1(clustered_ham_in, ci_vector, nproc=None
     print(" In build_hamiltonian_diagonal_parallel1. nproc=",nproc) 
 
     clustered_ham = clustered_ham_in
-    clusters = ci_vector.clusters
+    clusters = clustered_ham_in.clusters
     
     global delta_fock
     delta_fock= tuple([(0,0) for ci in range(len(clusters))])
@@ -1923,7 +1923,7 @@ def update_hamiltonian_diagonal(clustered_ham,ci_vector,Hd_vector):
     with new values.
     """
 # {{{
-    clusters = ci_vector.clusters
+    clusters = clustered_ham.clusters
     Hd = np.zeros((len(ci_vector)))
     
     shift = 0 
@@ -2090,7 +2090,7 @@ def precompute_cluster_basis_energies_old(clustered_ham):
                         ci.energies[fspace_del[0]] = e
 # }}}
 
-def build_1rdm(ci_vector):
+def build_1rdm(ci_vector, clusters):
     """
     Build 1rdm C_{I,J,K}<IJK|p'q|LMN> C_{L,M,N}
     """
@@ -2098,7 +2098,6 @@ def build_1rdm(ci_vector):
     n_orb = ci_vector.n_orb
     dm_aa = np.zeros((n_orb,n_orb))
     dm_bb = np.zeros((n_orb,n_orb))
-    clusters = ci_vector.clusters
    
     if 0:   # doesn't work anymore after removing local terms from add_1b_terms
         print(ci_vector.norm())
@@ -2269,46 +2268,45 @@ def build_1rdm(ci_vector):
 # }}}
 
 
-def build_brdm(ci_vector, ci_idx):
+def build_brdm(ci_vector, ci):
     """
-    Build block reduced density matrix for cluster ci_idx
+    Build block reduced density matrix for Cluster ci
     """
     # {{{
-    ci = ci_vector.clusters[ci_idx]
     rdms = OrderedDict()
     for fspace, configs in ci_vector.items():
         #print()
         #print("fspace:",fspace)
         #print()
-        curr_dim = ci.basis[fspace[ci_idx]].shape[1]
+        curr_dim = ci.basis[fspace[ci.idx]].shape[1]
         rdm = np.zeros((curr_dim,curr_dim))
         for configi,coeffi in configs.items():
             for cj in range(curr_dim):
                 configj = list(cp.deepcopy(configi))
-                configj[ci_idx] = cj
+                configj[ci.idx] = cj
                 configj = tuple(configj)
-                #print(configi,configj,configi[ci_idx],configj[ci_idx])
+                #print(configi,configj,configi[ci.idx],configj[ci.idx])
                 try:
-                    #print(configi,configj,configi[ci_idx],configj[ci_idx],coeffi,configs[configj])
-                    rdm[configi[ci_idx],cj] += coeffi*configs[configj]
-                    #print(configi[ci_idx],cj,rdm[configi[ci_idx],cj])
+                    #print(configi,configj,configi[ci.idx],configj[ci.idx],coeffi,configs[configj])
+                    rdm[configi[ci.idx],cj] += coeffi*configs[configj]
+                    #print(configi[ci.idx],cj,rdm[configi[ci.idx],cj])
                 except KeyError:
                     pass
         try:
-            rdms[fspace[ci_idx]] += rdm 
+            rdms[fspace[ci.idx]] += rdm 
         except KeyError:
-            rdms[fspace[ci_idx]] = rdm 
+            rdms[fspace[ci.idx]] = rdm 
 
     return rdms
 # }}}
 
 
-def build_brdm_diagonal(ci_vector, ci_idx):
+def build_brdm_diagonal(ci_vector, ci_idx, clusters):
     """
     Build diagonal of block reduced density matrix for cluster ci_idx
     """
     # {{{
-    ci = ci_vector.clusters[ci_idx]
+    ci = clusters[ci_idx]
     rdms = OrderedDict()
     for fspace, configs in ci_vector.items():
         #print()
@@ -2365,8 +2363,8 @@ def do_2body_search(blocks, init_fspace, h, g, max_cluster_size=4, max_iter_cmf=
             for ci,c in enumerate(new_blocks):
                 new_clusters.append(Cluster(ci,c))
             
-            new_ci_vector = ClusteredState(new_clusters)
-            new_ci_vector.init(new_init_fspace)
+            new_ci_vector = ClusteredState()
+            new_ci_vector.init(new_clusters,new_init_fspace)
          
             ## unless doing PT2, make sure new dimension is greater than 1
             if do_pt2 == False:
@@ -2608,8 +2606,8 @@ def run_hierarchical_sci(h,g,blocks,init_fspace,dimer_threshold,ecore):
                 s_clusters.append(Cluster(ci,c))
 
             #Cluster States initial guess
-            ci_vector = ClusteredState(s_clusters)
-            ci_vector.init((s_fspace))
+            ci_vector = ClusteredState()
+            ci_vector.init(s_clusters,(s_fspace))
             ci_vector.print_configs()
             print(" Clusters:")
             [print(ci) for ci in s_clusters]
@@ -2697,8 +2695,8 @@ def run_hierarchical_sci(h,g,blocks,init_fspace,dimer_threshold,ecore):
     print("     *====================================================================*")
 
     #Cluster States initial guess
-    ci_vector = ClusteredState(fclusters)
-    ci_vector.init((init_fspace))
+    ci_vector = ClusteredState()
+    ci_vector.init(fclusters,(init_fspace))
     print(" Clusters:")
     [print(ci) for ci in fclusters]
 
@@ -2884,7 +2882,7 @@ def build_h0(clustered_ham,ci_vector,pt_vector):
     Build hamiltonian diagonal in basis in ci_vector as difference of cluster energies as in RSPT
     """
 # {{{
-    clusters = ci_vector.clusters
+    clusters = clustered_ham.clusters
     Hd = np.zeros((len(pt_vector)))
     
     shift = 0 
@@ -3032,7 +3030,7 @@ def build_block_hamiltonian(clustered_ham,ci_vector,pt_vector,iprint=0):
     Build hamiltonian in basis of two different clustered states
     """
 # {{{
-    clusters = ci_vector.clusters
+    clusters = clustered_ham.clusters
     H0d = np.zeros((len(ci_vector),len(pt_vector)))
     
     shift_l = 0 

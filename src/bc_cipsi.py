@@ -53,8 +53,8 @@ def system_setup(h, g, ecore, blocks, init_fspace,
     clustered_ham.add_2b_terms(g)
 
 
-    ci_vector = ClusteredState(clusters)
-    ci_vector.init(init_fspace)
+    ci_vector = ClusteredState()
+    ci_vector.init(clusters, init_fspace)
 
     if cmf_maxiter > 0:
         e_cmf, cmf_conv, rdm_a, rdm_b = cmf(clustered_ham, ci_vector, h, g, 
@@ -181,7 +181,7 @@ def bc_cipsi_tucker(ci_vector, clustered_ham,
                     thresh_conv=thresh_cipsi_conv, max_iter=max_cipsi_iter,thresh_asci=thresh_asci,
                     nproc=nproc)
             end = time.time()
-            pt_vector = ClusteredState(ci_vector.clusters)
+            pt_vector = ClusteredState()
             e_curr = e0
             e2 = 0
             ecore = clustered_ham.core_energy
@@ -274,7 +274,8 @@ def bc_cipsi(ci_vector, clustered_ham,
     print("     |nproc          : ", nproc          )
 
     pt_vector = ci_vector.copy()
-    Hd_vector = ClusteredState(ci_vector.clusters)
+    #Hd_vector = ClusteredState(ci_vector.clusters)
+    Hd_vector = ClusteredState()
     e_prev = 0
     for it in range(max_iter+1):
         print()
@@ -510,7 +511,7 @@ def hb_tpsci(ci_vector, clustered_ham,
     print("     |nproc          : ", nproc          )
   
     pt_vector = ci_vector.copy()
-    Hd_vector = ClusteredState(ci_vector.clusters)
+    Hd_vector = ClusteredState()
     e_prev = 0
     for it in range(max_iter):
         print()
@@ -634,7 +635,7 @@ def hosvd(ci_vector, clustered_ham, hshift=1e-8):
         print(" Compute BRDM",flush=True)
         print(" Hshift = ",hshift)
         start = time.time()
-        rdms = build_brdm(ci_vector, ci.idx)
+        rdms = build_brdm(ci_vector, ci)
         end = time.time()
         print(" done.",flush=True)
         print(" Time spent building BRDMs: %12.2f" %(end-start))
