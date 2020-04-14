@@ -63,7 +63,7 @@ def test_1():
                                                         cmf_maxiter = 0
                                                         )
 
-    ci_vector.expand_to_full_space()
+    ci_vector.expand_to_full_space(clusters)
     print(" Length of ci vector: ", len(ci_vector), flush=True)
     #ci_vector.add_single_excitonic_states()
     #ci_vector.print_configs()
@@ -78,7 +78,7 @@ def test_1():
 
 
     print(" Length of ci vector: ", len(ci_vector))
-    Hd_vector1 = ClusteredState(ci_vector.clusters)
+    Hd_vector1 = ClusteredState()
     start = timer()
     Hd1 = update_hamiltonian_diagonal(clustered_ham, ci_vector.copy(), Hd_vector1)
     stop = timer()

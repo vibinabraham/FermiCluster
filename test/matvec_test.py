@@ -68,7 +68,7 @@ def test_1():
     init_fspace = ((2,2),(2,2),(2,2),(0,0))
     clusters, clustered_ham, ci_vector, cmf_out = system_setup(h, g, ecore, blocks, init_fspace, cmf_maxiter = 0 )
 
-    ci_vector.expand_to_full_space()
+    ci_vector.expand_to_full_space(clusters)
     
     np.random.seed(2)
     v = np.random.random([len(ci_vector)]) - .5

@@ -15,7 +15,6 @@ ttt = time.time()
 pyscf.lib.num_threads(1) #with degenerate states and multiple processors there can be issues
 np.set_printoptions(suppress=True, precision=3, linewidth=1500)
 
-
 def test_truncate_basis():
     # {{{
     ttt = time.time()
@@ -92,15 +91,15 @@ def test_truncate_basis():
     
 
     
-    clusters, clustered_ham, ci_vector = system_setup(h, g, ecore, blocks, init_fspace, max_roots = 20,  cmf_maxiter = 0 )
+    clusters, clustered_ham, ci_vector, cmf_out = system_setup(h, g, ecore, blocks, init_fspace, max_roots = 20,  cmf_maxiter = 0 )
     
 
 
-    ci_vector, pt_vector, e0, e2, t_conv = bc_cipsi_tucker(ci_vector.copy(), clustered_ham, thresh_cipsi=1e-5,
-            thresh_ci_clip=1e-6, max_tucker_iter = 20)
+    ci_vector, pt_vector, e0, e2, t_conv = bc_cipsi_tucker(ci_vector.copy(), clustered_ham, thresh_cipsi=1e-6,
+            thresh_ci_clip=1e-8, max_tucker_iter = 0)
    
 
-    assert(np.isclose(e0,-4.51144784,atol=1e-7))
+    assert(np.isclose(e0,-4.51137022,atol=1e-7))
     # }}}
 
 

@@ -110,7 +110,7 @@ def cmf(clustered_ham, ci_vector, h, g,
             print(" CMF Converged. ")
              
             # form 1rdm from reference state
-            rdm_a, rdm_b = tools.build_1rdm(ci_vector)
+            rdm_a, rdm_b = tools.build_1rdm(ci_vector, clustered_ham.clusters)
             converged = True
             break
         elif abs(e_curr-e_last) >= thresh and cmf_iter == max_iter-1:
@@ -125,7 +125,7 @@ def cmf(clustered_ham, ci_vector, h, g,
                 ###  DIIS  ###
                 # form 1rdm from reference state
                 old_dm = rdm_a.copy()
-                rdm_a, rdm_b = tools.build_1rdm(ci_vector)
+                rdm_a, rdm_b = tools.build_1rdm(ci_vector, clustered_ham.clusters)
                 dm_new = rdm_a.copy()
 
                 diis_vals_dm.append(dm_new.copy())
@@ -173,7 +173,7 @@ def cmf(clustered_ham, ci_vector, h, g,
                     #print(rdm_a)
             elif diis==False:
                 # form 1rdm from reference state
-                rdm_a, rdm_b = tools.build_1rdm(ci_vector)
+                rdm_a, rdm_b = tools.build_1rdm(ci_vector, clustered_ham.clusters)
 
             e_last = e_curr
     
@@ -288,7 +288,6 @@ def matvec1(h,v,thresh_search=1e-12, opt_einsum=True, nbody_limit=4):
     """
 # {{{
     clusters = h.clusters
-    assert(h.clusters is v.clusters)
     #print(" Ensure TDMs are still contiguous:")
     #for ci in h.clusters:
     #    print(ci)

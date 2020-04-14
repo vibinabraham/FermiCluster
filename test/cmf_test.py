@@ -95,11 +95,11 @@ def test_truncate_basis():
     
 
 
-    ci_vector, pt_vector, e0, e2, t_conv = bc_cipsi_tucker(ci_vector.copy(), clustered_ham, thresh_cipsi=1e-5,
-            thresh_ci_clip=1e-6, max_tucker_iter = 20)
+    ci_vector, pt_vector, e0, e2, t_conv = bc_cipsi_tucker(ci_vector.copy(), clustered_ham, thresh_cipsi=1e-6,
+            thresh_ci_clip=1e-8, max_tucker_iter = 0)
    
 
-    assert(np.isclose(e0,-4.51144784,atol=1e-7))
+    assert(np.isclose(e0,-4.51137022,atol=1e-7))
     # }}}
 
 

@@ -104,17 +104,17 @@ def test_1():
     init_fspace = ((3,3),(0,0))
     clusters, clustered_ham, ci_vector, cmf_out = system_setup(h, g, ecore, blocks, init_fspace, cmf_maxiter = 0 )
         
-    ci_vector = ClusteredState(clusters)
-    ci_vector.init(((3,3),(0,0)))
-    ci_vector.init(((2,2),(1,1)))
-    ci_vector.init(((1,3),(2,0)))
-    ci_vector.init(((3,1),(0,2)))
-    ci_vector.init(((3,2),(0,1)))
-    ci_vector.init(((2,3),(1,0)))
+    ci_vector = ClusteredState()
+    ci_vector.init(clusters,((3,3),(0,0)))
+    ci_vector.add_fockspace(((2,2),(1,1)))
+    ci_vector.add_fockspace(((1,3),(2,0)))
+    ci_vector.add_fockspace(((3,1),(0,2)))
+    ci_vector.add_fockspace(((3,2),(0,1)))
+    ci_vector.add_fockspace(((2,3),(1,0)))
     #ci_vector.init(((1,1),(1,1),(0,0),(0,0)))
 
     #ci_vector.expand_to_full_space()
-    ci_vector.expand_each_fock_space()
+    ci_vector.expand_each_fock_space(clusters)
 
     e_prev = 0
     thresh_conv = 1e-8

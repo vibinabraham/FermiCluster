@@ -18,7 +18,6 @@ class ClusteredState(OrderedDict):
     """
     def __init__(self):
         self.n_clusters = 0
-        #self.clusters = clusters
         self.n_orb = 0
 
         self.data = OrderedDict()
@@ -30,7 +29,6 @@ class ClusteredState(OrderedDict):
         fock_config (# of a/b electrons in each cluster)
         """
         self.n_clusters = len(clusters)
-        #self.clusters = clusters
         self.n_orb = 0
         for ci,c in enumerate(clusters):
             self.n_orb += c.n_orb

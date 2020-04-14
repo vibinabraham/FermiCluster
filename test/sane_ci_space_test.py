@@ -69,39 +69,12 @@ def test_1():
     for ci,c in enumerate(blocks):
         clusters.append(Cluster(ci,c))
 
-    ci_vector = ClusteredState(clusters)
-    ci_vector.init(((2,2),))
-    ci_vector.init(((2,1),))
-    ci_vector.init(((1,2),))
-    ci_vector.init(((3,1),))
-    ci_vector.init(((1,3),))
-    #ci_vector.init(((3,3),(2,2)))
-    #ci_vector.init(((3,3),(2,1)))
-    #ci_vector.init(((3,3),(1,2)))
-    #ci_vector.init(((1,1),(1,1),(0,0)))
-    #ci_vector.init(((1,1),(2,1),(0,0)))
-    #ci_vector.init(((1,1),(1,2),(0,0)))
-    #ci_vector.init(((2,2),(2,2),(0,0),(0,0)))
-    #ci_vector.init(((2,2),(2,2)))
-    #ci_vector.init(((1,1),(1,1),(1,1)))
-    #ci_vector.init(((2,1),(1,2)))
-    #ci_vector.init(((1,1),(1,1),(1,1),(0,0),(0,0),(0,0)))
-    #ci_vector.init(((1,1),(1,1),(1,1),(1,1)))
-    #ci_vector.init(((2,2),(2,2),(0,0),(0,0)))
-    #ci_vector.init(((1,1),(1,1)))
-    #ci_vector.init(((2,2),(2,2),(0,0)))
-    #ci_vector.init(((3,3),(0,0)))
-    #ci_vector.init(((4,4),(0,0)))
-    #ci_vector.init(((4,4),(0,0),(0,0)))
-    #ci_vector.init(((3,3),(0,0)))
-    #ci_vector.init(((1,1),(1,1),(1,1),(1,1)))
-    #ci_vector.init(((2,2),(1,1),(1,1)))
-    #ci_vector.init(((3,3),(3,3)))
-    #ci_vector.init(((4,4),(2,2),(0,0)))
-    #ci_vector.init(((2,2),(2,2),(2,2)))
-    #ci_vector.init(((4,4),(4,4),(4,4),(0,0),(0,0),(0,0)))
-    #ci_vector.init(((1,1),(1,1),(1,1),(1,1),(0,0),(0,0),(0,0),(0,0)))
-    #ci_vector.init(((2,2),(2,2),(2,2),(2,2),(2,2),(2,2)))
+    ci_vector = ClusteredState()
+    ci_vector.init(clusters,((2,2),))
+    ci_vector.add_fockspace(((2,1),))
+    ci_vector.add_fockspace(((1,2),))
+    ci_vector.add_fockspace(((3,1),))
+    ci_vector.add_fockspace(((1,3),))
 
     print(" Clusters:")
     [print(ci) for ci in clusters]
@@ -115,20 +88,15 @@ def test_1():
 
     print(" Build cluster basis")
     for ci_idx, ci in enumerate(clusters):
-        assert(ci_idx == ci.idx)
-        print(" Extract local operator for cluster",ci.idx)
-        opi = clustered_ham.extract_local_operator(ci_idx)
         print()
-        print()
-        print(" Form basis by diagonalize local Hamiltonian for cluster: ",ci_idx)
-        ci.form_eigbasis_from_local_operator(opi,max_roots=1000)
+        print(" Form basis by diagonalizing local Hamiltonian for cluster: ",ci_idx)
+        fspaces_i = ci.possible_fockspaces()
+        ci.form_fockspace_eigbasis(h, g, fspaces_i, max_roots=1000)
+        
+        print(" Build operator matrices for cluster ",ci.idx)
+        ci.build_op_matrices()
+        ci.build_local_terms(h,g)
 
-
-    #clustered_ham.add_ops_to_clusters()
-    print(" Build these local operators")
-    for c in clusters:
-        print(" Build mats for cluster ",c.idx)
-        c.build_op_matrices()
 
     #ci_vector.expand_to_full_space()
     #ci_vector.expand_each_fock_space()
@@ -146,3 +114,7 @@ def test_1():
 
     assert(abs(HH[1,1] - HH[2,2])< 1e-12)
     assert(abs(HH[3,3] - HH[4,4])< 1e-12)
+
+
+if __name__== "__main__":
+    test_1() 

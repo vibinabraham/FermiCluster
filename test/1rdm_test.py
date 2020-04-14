@@ -111,8 +111,8 @@ def test_1():
         rdm_a = np.zeros(h.size)
         rdm_b = np.zeros(h.size)
         
-        ci_vector = ClusteredState(clusters)
-        ci_vector.init(init_fspace)
+        ci_vector = ClusteredState()
+        ci_vector.init(clusters,init_fspace)
         # do this just to rotate vectors about
 
         
@@ -125,7 +125,7 @@ def test_1():
         # Do exact
         if 1:
             print(" Build exact eigenstate")
-            ci_vector.expand_to_full_space()
+            ci_vector.expand_to_full_space(clusters)
             
             H = build_full_hamiltonian_parallel2(clustered_ham, ci_vector)
             
@@ -146,7 +146,7 @@ def test_1():
             ci_vector.set_vector(v0)
         tci_dim = len(ci_vector)
 
-        rdm_a, rdm_b = tools.build_1rdm(ci_vector)
+        rdm_a, rdm_b = tools.build_1rdm(ci_vector, clusters)
 
     with np.printoptions(precision=6, suppress=True):
         print(" Difference from PYSCF density matrix")
