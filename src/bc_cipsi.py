@@ -330,6 +330,11 @@ def bc_cipsi(ci_vector, clustered_ham,
                 ci_vector.zero()
                 ci_vector.set_vector(v0)
         
+        ecore = clustered_ham.core_energy
+        print(" Core energy: %16.12f" %ecore)
+        #print(" TPSCI Iter %3i Elec Energy:  %12.8f Total Energy:  %12.8f  CI Dim: %4i "%(it, e[0].real,e[0].real+ecore,len(ci_vector)))
+        #print(" Ground state of CI:                 %12.8f  CI Dim: %4i "%(e[0].real,len(ci_vector)))
+        print(" TPSCI Iter %3i:                     %12.8f  CI Dim: %4i "%(it, e[0].real,len(ci_vector)))
         ci_vector.print()
         
         delta_e = e0 - e_prev
