@@ -427,7 +427,7 @@ def bc_cipsi(ci_vector, clustered_ham,
             #pr.disable()
             #pr.print_stats(sort='time')
             end = time.time()
-            print(" Time spent in demonimator: %12.2f" %( end - start), flush=True)
+            print(" Time spent in denomimator: %12.2f" %( end - start), flush=True)
             
             denom = 1/(e0 - Hd)
         elif pt_type == 'mp':
@@ -454,7 +454,7 @@ def bc_cipsi(ci_vector, clustered_ham,
                 denom[idx] = 1/(e0_mp - e0_X)
                 idx += 1
             end = time.time()
-            print(" Time spent in demonimator: %12.2f" %( end - start), flush=True)
+            print(" Time spent in denomimator: %12.2f" %( end - start), flush=True)
         
         pt_vector_v = pt_vector.get_vector()
         pt_vector_v.shape = (pt_vector_v.shape[0])

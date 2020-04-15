@@ -493,8 +493,7 @@ def matvec1(h,v,thresh_search=1e-12, opt_einsum=True, nbody_limit=4):
     return sigma 
 # }}}
 
-# to drop:
-def matvec1_parallel1(h_in,v,thresh_search=1e-12, nproc=None, nbody_limit=4):
+def matvec1_parallel1(h_in,v,thresh_search=1e-12, nproc=None, nbody_limit=4, opt_einsum=True):
     """
     Compute the action of H onto a sparse trial vector v
     returns a ClusteredState object. 
@@ -611,7 +610,7 @@ def matvec1_parallel1(h_in,v,thresh_search=1e-12, nproc=None, nbody_limit=4):
                     
                     
                     #tmp = oe.contract(term.contract_string_matvec, *mats, term.ints)
-                    tmp = np.einsum(term.contract_string_matvec, *mats, term.ints)
+                    tmp = np.einsum(term.contract_string_matvec, *mats, term.ints, optimize=opt_einsum)
                     
                     
                     #v_coeff = v[fock_r][conf_r]
@@ -681,7 +680,6 @@ def matvec1_parallel2(h_in,v,thresh_search=1e-12, nproc=None, opt_einsum=True, n
     sigma = v.copy() 
     sigma.zero()
     
-
     def do_batch(batch):
         sigma_out = OrderedDict() 
         for v_curr in batch:
@@ -802,12 +800,14 @@ def matvec1_parallel2(h_in,v,thresh_search=1e-12, nproc=None, opt_einsum=True, n
                     #tmp = state_sign * tmp.ravel() * v_coeff
                     tmp = state_sign * tmp.ravel() * coeff 
                     
+                    _abs = abs
+
                     new_configs = [[i] for i in conf_r] 
                     for cacti,cact in enumerate(term.active):
                         new_configs[cact] = range(mats[cacti].shape[0])
                     for sp_idx, spi in enumerate(itertools.product(*new_configs)):
                         #print(" New config: %12.8f" %tmp[sp_idx], spi)
-                        if abs(tmp[sp_idx]) > thresh_search:
+                        if _abs(tmp[sp_idx]) > thresh_search:
                             if spi not in configs_l:
                                 configs_l[spi] = tmp[sp_idx] 
                             else:
@@ -908,6 +908,67 @@ def matvec1_parallel3(h_in,v,thresh_search=1e-12, nproc=None, opt_einsum=True, n
     sigma = v.copy() 
     sigma.zero()
     
+    def matvec_update_with_new_configs2(coeff_tensor, new_configs, configs, active, thresh_search=1e-12):
+       # {{{
+        nactive = len(active) 
+       
+        _abs = abs
+    
+    
+        config_curr = [i[0] for i in new_configs]
+        count = 0
+        if nactive==2:
+    
+            for I in np.argwhere(np.abs(coeff_tensor) > thresh_search):
+                config_curr[active[0]] = I[0] 
+                config_curr[active[1]] = I[1] 
+                key = tuple(config_curr)
+                if key not in configs:
+                    configs[key] = coeff_tensor[I[0],I[1]]
+                else:
+                    configs[key] += coeff_tensor[I[0],I[1]]
+                #count += 1
+            #print(" nb2: size: %8i nonzero: %8i" %(coeff_tensor.size, count))
+    
+                        
+        elif nactive==3:
+    
+            for I in np.argwhere(np.abs(coeff_tensor) > thresh_search):
+                config_curr[active[0]] = I[0] 
+                config_curr[active[1]] = I[1] 
+                config_curr[active[2]] = I[2] 
+                key = tuple(config_curr)
+                if key not in configs:
+                    configs[key] = coeff_tensor[I[0],I[1],I[2]]
+                else:
+                    configs[key] += coeff_tensor[I[0],I[1],I[2]]
+                #count += 1
+            #print(" nb3: size: %8i nonzero: %8i" %(coeff_tensor.size, count))
+    
+        elif nactive==4:
+    
+            for I in np.argwhere(np.abs(coeff_tensor) > thresh_search):
+                config_curr[active[0]] = I[0] 
+                config_curr[active[1]] = I[1] 
+                config_curr[active[2]] = I[2] 
+                config_curr[active[3]] = I[3] 
+                key = tuple(config_curr)
+                if key not in configs:
+                    configs[key] = coeff_tensor[I[0],I[1],I[2],I[3]]
+                else:
+                    configs[key] += coeff_tensor[I[0],I[1],I[2],I[3]]
+                #count += 1
+            #print(" nb4: size: %8i nonzero: %8i" %(coeff_tensor.size, count))
+    
+        else:
+            # local terms should trigger a fail since they are handled separately 
+            print(" Wrong value in update_with_new_configs")
+            exit()
+    
+    
+        return 
+    # }}}
+
     def do_batch(batch):
         sigma_out = {} 
         #sigma_out = OrderedDict() 
@@ -1047,7 +1108,7 @@ def matvec1_parallel3(h_in,v,thresh_search=1e-12, nproc=None, opt_einsum=True, n
                         new_configs[cact] = nonzeros[cacti] 
                         #new_configs[cact] = range(mats[cacti].shape[0])
                         
-                    matvec_update_with_new_configs(tmp, new_configs, configs_l, term.active, thresh_search)
+                    matvec_update_with_new_configs2(tmp, new_configs, configs_l, term.active, thresh_search)
                 #stop1 = time.time()
                 #print(" Time spent in einsum: %12.2f: total: %12.2f: NBody: %6i" %( stop2-start2,  stop1-start1, len(term.active)))
         return sigma_out
@@ -2573,6 +2634,7 @@ def extrapolate_pt2_correction(ci_vector, clustered_ham, e0,
         thresh_search   = 0,
         pt_type         = 'en',
         scale           = 'log', 
+        matvec          = 3,
         nproc           = None): 
     # {{{
         print()
@@ -2614,7 +2676,16 @@ def extrapolate_pt2_correction(ci_vector, clustered_ham, e0,
             print(" Compute Matrix Vector Product:", flush=True)
             
             start = time.time()
-            pt_vector_curr = matvec1_parallel3(clustered_ham, asci_v, nproc=nproc, thresh_search=thresh_search)
+            if matvec == 1:
+                pt_vector_curr = matvec1_parallel1(clustered_ham, asci_v, nproc=nproc, thresh_search=thresh_search)
+            elif matvec == 2:
+                pt_vector_curr = matvec1_parallel2(clustered_ham, asci_v, nproc=nproc, thresh_search=thresh_search)
+            elif matvec == 3:
+                pt_vector_curr = matvec1_parallel3(clustered_ham, asci_v, nproc=nproc, thresh_search=thresh_search)
+            else:
+                print(" wrong matvec")
+                exit()
+            #pt_vector_curr = matvec1_parallel3(clustered_ham, asci_v, nproc=nproc, thresh_search=thresh_search)
             pt_vector.add(pt_vector_curr)
             stop = time.time()
             print(" Time spent in matvec: %12.2f" %( stop-start))
