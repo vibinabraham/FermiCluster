@@ -140,19 +140,30 @@ class ClusteredState(OrderedDict):
                 self.data[fock][config] = v[idx]
                 idx += 1
         return 
-    def clip(self,thresh):
+    def clip(self,thresh, max=None):
         """
         delete values smaller than thresh, and return the list of kept indices
+        and optionally larger than or equal to max
         """
         idx_to_keep = []
         idx = 0
-        for fockspace,configs in self.items():
-            for config,coeff in list(configs.items()):
-                if abs(coeff) < thresh:
-                    del self.data[fockspace][config]
-                else:
-                    idx_to_keep.append(idx)
-                idx += 1
+        if max==None:
+            for fockspace,configs in self.items():
+                for config,coeff in list(configs.items()):
+                    if abs(coeff) < thresh:
+                        del self.data[fockspace][config]
+                    else:
+                        idx_to_keep.append(idx)
+                    idx += 1
+        else:
+            assert( max > thresh)
+            for fockspace,configs in self.items():
+                for config,coeff in list(configs.items()):
+                    if abs(coeff) < thresh or abs(coeff) >= max:
+                        del self.data[fockspace][config]
+                    else:
+                        idx_to_keep.append(idx)
+                    idx += 1
 
         self.prune_empty_fock_spaces()
         return idx_to_keep

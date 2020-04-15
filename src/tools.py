@@ -892,7 +892,10 @@ def matvec1_parallel3(h_in,v,thresh_search=1e-12, nproc=None, opt_einsum=True, n
     print(" nbody_limit     :   ", nbody_limit)
     print(" opt_einsum      :   ", opt_einsum, flush=True)
     print(" nproc           :   ", nproc, flush=True)
-    
+  
+    if len(v) == 0:
+        print(" Empty vector!")
+        exit()  
     global h 
     global clusters
     global sigma 
@@ -2433,7 +2436,7 @@ def do_2body_search(blocks, init_fspace, h, g, max_cluster_size=4, max_iter_cmf=
 def compute_pt2_correction(ci_vector, clustered_ham, e0, 
         thresh_asci     = 0,
         thresh_search   = 0,
-        pt_type         = 'mp',
+        pt_type         = 'en',
         nbody_limit     = 4, 
         nproc           = None): 
     # {{{
@@ -2559,6 +2562,139 @@ def compute_pt2_correction(ci_vector, clustered_ham, e0,
         ecore = clustered_ham.core_energy
         print(" PT2 Energy Correction = %12.8f" %e2)
         print(" PT2 Energy Total      = %12.8f" %(e0+e2+ecore))
+
+        return e2, pt_vector
+# }}}
+
+def extrapolate_pt2_correction(ci_vector, clustered_ham, e0, 
+        nsteps          = 10,
+        start           = 1,
+        stop            = 1e-4,
+        thresh_search   = 0,
+        pt_type         = 'en',
+        scale           = 'log', 
+        nproc           = None): 
+    # {{{
+        print()
+        print(" Extrapolate PT2 Correction")
+        print("     |pt_type        : ", pt_type        )
+        print("     |thresh_search  : ", thresh_search  )
+        print("     |start          : ", start     )
+        print("     |stop           : ", stop      )
+        print("     |nsteps         : ", nsteps         )
+        print("     |scale          : ", scale        )
+   
+        print(" E0: ", e0)
+        if scale=='log':
+            stepsize = np.log((start - stop)/nsteps) 
+            #stepsize = -(np.log(start) - np.log(stop))/nsteps 
+            print(" Stepsize: ", stepsize) 
+            asci1 = start
+            asci2 = start*np.exp(stepsize)
+            steps = []
+            for asci_iter in range(nsteps):
+                steps.append((asci1, asci2))
+                asci1 *= np.exp(stepsize)
+                asci2 *= np.exp(stepsize)
+        else:
+            print("NYI")
+            exit()
+
+        
+        pt_vector = ClusteredState()
+        count = 0
+        for asci1,asci2 in steps:
+            asci_v = ci_vector.copy()
+            asci_v.clip(asci2, max=asci1)
+            count += len(asci_v)
+            print(" Collect configs between %12.2e and %12.2e: Size: %7i Norm: %12.8f" %( asci1, asci2, len(asci_v), asci_v.norm()))
+
+            print(" Compute Matrix Vector Product:", flush=True)
+            
+            start = time.time()
+            pt_vector_curr = matvec1_parallel3(clustered_ham, asci_v, nproc=nproc, thresh_search=thresh_search)
+            pt_vector.add(pt_vector_curr)
+            stop = time.time()
+            print(" Time spent in matvec: %12.2f" %( stop-start))
+          
+            e0_curr = ci_vector.dot(pt_vector) 
+            print(" Zeroth-order energy: %12.8f " %e0_curr) 
+            
+            pt_vector.prune_empty_fock_spaces()
+            
+            tmp = ci_vector.dot(pt_vector)
+            var = pt_vector.dot(pt_vector) - tmp*tmp
+            print(" Variance Subspace: %12.8f" % var,flush=True)
+            
+            print(" Remove CI space from pt_vector vector")
+            for fockspace,configs in pt_vector.items():
+                if fockspace in ci_vector.fblocks():
+                    for config,coeff in list(configs.items()):
+                        if config in ci_vector[fockspace]:
+                            del pt_vector[fockspace][config]
+            
+            
+            for fockspace,configs in ci_vector.items():
+                if fockspace in pt_vector:
+                    for config,coeff in configs.items():
+                        assert(config not in pt_vector[fockspace])
+            
+            print(" Norm of CI vector = %12.8f" %ci_vector.norm())
+            print(" Dimension of CI space: ", len(ci_vector))
+            print(" Dimension of PT space: ", len(pt_vector))
+            print(" Compute Denominator",flush=True)
+            #exit()
+            pt_vector.prune_empty_fock_spaces()
+                
+            
+            # Build Denominator
+            if pt_type == 'en':
+                start = time.time()
+                if nproc==1:
+                    Hd = update_hamiltonian_diagonal(clustered_ham, pt_vector, Hd_vector)
+                else:
+                    Hd = build_hamiltonian_diagonal_parallel1(clustered_ham, pt_vector, nproc=nproc)
+                end = time.time()
+                print(" Time spent in demonimator: %12.2f" %( end - start), flush=True)
+                
+                denom = 1/(e0 - Hd)
+            elif pt_type == 'mp':
+                start = time.time()
+                # get barycentric MP zeroth order energy
+                e0_mp = 0
+                for f,c,v in ci_vector:
+                    for ci in clustered_ham.clusters:
+                        e0_mp += ci.ops['H_mf'][(f[ci.idx],f[ci.idx])][c[ci.idx],c[ci.idx]] * v * v
+                
+                print(" Zeroth-order MP energy: %12.8f" %e0_mp, flush=True)
+            
+                #   This is not really MP once we have rotated away from the CMF basis.
+                #   H = F + (H - F), where F = sum_I F(I)
+                #
+                #   After Tucker basis, we just use the diagonal of this fock operator. 
+                #   Not ideal perhaps, but better than nothing at this stage
+                denom = np.zeros(len(pt_vector))
+                idx = 0
+                for f,c,v in pt_vector:
+                    e0_X = 0
+                    for ci in clustered_ham.clusters:
+                        e0_X += ci.ops['H_mf'][(f[ci.idx],f[ci.idx])][c[ci.idx],c[ci.idx]]
+                    denom[idx] = 1/(e0_mp - e0_X)
+                    idx += 1
+                end = time.time()
+                print(" Time spent in demonimator: %12.2f" %( end - start), flush=True)
+            
+            pt_vector_v = pt_vector.get_vector()
+            pt_vector_v.shape = (pt_vector_v.shape[0])
+            
+            e2 = np.multiply(denom,pt_vector_v)
+            e2 = np.dot(pt_vector_v,e2)
+            
+            ecore = clustered_ham.core_energy
+            print(" PT2 Energy Correction = %12.8f" %e2)
+            print(" PT2 Energy Total      = %12.8f" %(e0+e2+ecore))
+
+        assert(count == len(ci_vector))
 
         return e2, pt_vector
 # }}}

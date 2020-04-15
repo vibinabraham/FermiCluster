@@ -471,11 +471,6 @@ def bc_cipsi(ci_vector, clustered_ham,
             break
 
         print(" Choose which states to add to CI space", flush=True)
-        new_configs = pt_vector.copy()
-        new_configs.clip(thresh_cipsi)
-        #ci_vector.add(new_configs)
-        
-        new_configs.print()
         for fockspace,configs in pt_vector.items():
             for config,coeff in configs.items():
                 if coeff*coeff > thresh_cipsi:
