@@ -2608,7 +2608,9 @@ def extrapolate_pt2_correction(ci_vector, clustered_ham, e0,
             asci_v.clip(asci2, max=asci1)
             count += len(asci_v)
             print(" Collect configs between %12.2e and %12.2e: Size: %7i Norm: %12.8f" %( asci1, asci2, len(asci_v), asci_v.norm()))
-
+            
+            if len(asci_v) == 0:
+                continue
             print(" Compute Matrix Vector Product:", flush=True)
             
             start = time.time()
