@@ -1179,6 +1179,319 @@ def matvec1_parallel3(h_in,v,thresh_search=1e-12, nproc=None, opt_einsum=True, n
 # }}}
 
 
+def matvec1_parallel4(h_in,v,thresh_search=1e-12, nproc=None, opt_einsum=True, nbody_limit=4):
+    """
+    Compute the action of H onto a sparse trial vector v
+    returns a ClusteredState object. 
+    
+    use numpy to vectorize loops over result of tensor contraction (preferred) 
+    """
+# {{{
+    print(" ---------------------")
+    print(" In matvec1_parallel3:")
+    print(" thresh_search   :   ", thresh_search)
+    print(" nbody_limit     :   ", nbody_limit)
+    print(" opt_einsum      :   ", opt_einsum, flush=True)
+    print(" nproc           :   ", nproc, flush=True)
+
+
+    import ray
+    ray.init(object_store_memory=1e10)
+
+    #time.sleep(10)
+    if len(v) == 0:
+        print(" Empty vector!")
+        exit()  
+    global h 
+    global clusters
+    global sigma 
+    global clustered_ham
+    h = h_in
+    clusters = h_in.clusters
+    
+
+    sigma = ClusteredState()
+    sigma = v.copy() 
+    sigma.zero()
+    
+    def matvec_update_with_new_configs2(coeff_tensor, new_configs, configs, active, thresh_search=1e-12):
+       # {{{
+        nactive = len(active) 
+       
+        _abs = abs
+    
+    
+        config_curr = [i[0] for i in new_configs]
+        count = 0
+        if nactive==2:
+    
+            for I in np.argwhere(np.abs(coeff_tensor) > thresh_search):
+                config_curr[active[0]] = I[0] 
+                config_curr[active[1]] = I[1] 
+                key = tuple(config_curr)
+                if key not in configs:
+                    configs[key] = coeff_tensor[I[0],I[1]]
+                else:
+                    configs[key] += coeff_tensor[I[0],I[1]]
+                #count += 1
+            #print(" nb2: size: %8i nonzero: %8i" %(coeff_tensor.size, count))
+    
+                        
+        elif nactive==3:
+    
+            for I in np.argwhere(np.abs(coeff_tensor) > thresh_search):
+                config_curr[active[0]] = I[0] 
+                config_curr[active[1]] = I[1] 
+                config_curr[active[2]] = I[2] 
+                key = tuple(config_curr)
+                if key not in configs:
+                    configs[key] = coeff_tensor[I[0],I[1],I[2]]
+                else:
+                    configs[key] += coeff_tensor[I[0],I[1],I[2]]
+                #count += 1
+            #print(" nb3: size: %8i nonzero: %8i" %(coeff_tensor.size, count))
+    
+        elif nactive==4:
+    
+            for I in np.argwhere(np.abs(coeff_tensor) > thresh_search):
+                config_curr[active[0]] = I[0] 
+                config_curr[active[1]] = I[1] 
+                config_curr[active[2]] = I[2] 
+                config_curr[active[3]] = I[3] 
+                key = tuple(config_curr)
+                if key not in configs:
+                    configs[key] = coeff_tensor[I[0],I[1],I[2],I[3]]
+                else:
+                    configs[key] += coeff_tensor[I[0],I[1],I[2],I[3]]
+                #count += 1
+            #print(" nb4: size: %8i nonzero: %8i" %(coeff_tensor.size, count))
+    
+        else:
+            # local terms should trigger a fail since they are handled separately 
+            print(" Wrong value in update_with_new_configs")
+            exit()
+    
+    
+        return 
+    # }}}
+
+    @ray.remote
+    def do_batch(batch):
+        sigma_out = {} 
+        #sigma_out = OrderedDict() 
+        for v_curr in batch:
+            # only search from variational states with large ci coeffs
+            do_parallel_work(v_curr,sigma_out)
+        return sigma_out
+
+    #@profile
+    def do_parallel_work(v_curr,sigma_out):
+        fock_r = v_curr[0]
+        conf_r = v_curr[1]
+        coeff  = v_curr[2]
+       
+        #sigma_out = ClusteredState(clusters)
+        for terms in h.terms:
+            fock_l= tuple([(terms[ci][0]+fock_r[ci][0], terms[ci][1]+fock_r[ci][1]) for ci in range(len(clusters))])
+            good = True
+            for c in clusters:
+                if min(fock_l[c.idx]) < 0 or max(fock_l[c.idx]) > c.n_orb:
+                    good = False
+                    break
+            if good == False:
+                continue
+            
+            #print(fock_l, "<--", fock_r)
+            
+            #if fock_l not in sigma_out.data:
+            if fock_l not in sigma_out:
+                sigma_out[fock_l] = OrderedDict()
+            
+            configs_l = sigma_out[fock_l] 
+            
+            for term in h.terms[terms]:
+                if len(term.active) > nbody_limit:
+                    continue
+                #print()
+                #print(term)
+                #start1 = time.time()
+                
+                # do local terms separately
+                if len(term.active) == 1:
+                    #start2 = time.time()
+                    
+                    ci = term.active[0]
+                        
+                    tmp = clusters[ci].ops['H'][(fock_l[ci],fock_r[ci])][:,conf_r[ci]] * coeff 
+                    
+                    new_configs = [[i] for i in conf_r] 
+                    
+                    new_configs[ci] = range(clusters[ci].ops['H'][(fock_l[ci],fock_r[ci])].shape[0])
+                    
+                    for sp_idx, spi in enumerate(itertools.product(*new_configs)):
+                        if abs(tmp[sp_idx]) > thresh_search:
+                            if spi not in configs_l:
+                                configs_l[spi] = tmp[sp_idx] 
+                            else:
+                                configs_l[spi] += tmp[sp_idx] 
+                    #stop2 = time.time()
+
+
+                else:
+                    #print(" term: ", term)
+                    state_sign = 1
+                    for oi,o in enumerate(term.ops):
+                        if o == '':
+                            continue
+                        if len(o) == 1 or len(o) == 3:
+                            for cj in range(oi):
+                                state_sign *= (-1)**(fock_r[cj][0]+fock_r[cj][1])
+                        
+                    #print("  ", conf_r)
+                    
+                    #if abs(v[fock_r][conf_r]) < 5e-2:
+                    #    continue
+                    # get state sign 
+                    #print('state_sign ', state_sign)
+
+                    nonzeros = []
+                    opii = -1
+                    mats = []
+                    good = True
+                    for opi,op in enumerate(term.ops):
+                        if op == "":
+                            continue
+                        opii += 1
+                        #print(opi,term.active)
+                        ci = clusters[opi]
+                        #ci = clusters[term.active[opii]]
+                        try:
+                            oi = ci.ops[op][(fock_l[ci.idx],fock_r[ci.idx])][:,conf_r[ci.idx],:]
+                                
+                            #nonzeros_curr = []
+                            #for K in range(oi.shape[0]):
+                            #    if np.amax(np.abs(oi[K,:])) > 1e-16:
+                            #    #if np.amax(np.abs(oi[K,:])) > thresh_search/10:
+                            #        nonzeros_curr.append(K)
+                            #oinz = oi[nonzeros_curr,:]
+                            #mats.append(oinz)
+                            #nonzeros.append(nonzeros_curr)
+                            mats.append(oi)
+                            nonzeros.append(range(oi.shape[0]))
+
+                        except KeyError:
+                            good = False
+                            break
+                    if good == False:
+                        continue                        
+                        #break
+                   
+                    if len(mats) == 0:
+                        continue
+                    
+                    #start2 = time.time()
+                    #print()
+                    #print(term)
+                    #print('mats:', end='')
+                    #[print(m.shape,end='') for m in mats]
+                    #print('ints:', term.ints.shape)
+                    #print("contract_string       :", term.contract_string)
+                    #print("contract_string_matvec:", term.contract_string_matvec, flush=True)
+                    
+                    
+                    #tmp = oe.contract(term.contract_string_matvec, *mats, term.ints)
+                    
+
+                    tmp = np.einsum(term.contract_string_matvec, *mats, term.ints, optimize=opt_einsum)
+                    
+
+                    #stop2 = time.time()
+                    
+                    
+                    tmp = state_sign * tmp * coeff 
+                    
+                    new_configs = [[i] for i in conf_r] 
+                    for cacti,cact in enumerate(term.active):
+                        new_configs[cact] = nonzeros[cacti] 
+                        #new_configs[cact] = range(mats[cacti].shape[0])
+                        
+                    matvec_update_with_new_configs2(tmp, new_configs, configs_l, term.active, thresh_search)
+                #stop1 = time.time()
+                #print(" Time spent in einsum: %12.2f: total: %12.2f: NBody: %6i" %( stop2-start2,  stop1-start1, len(term.active)))
+        return sigma_out
+    
+    import multiprocessing as mp
+    from pathos.multiprocessing import ProcessingPool as Pool
+
+    
+    if nproc == None:
+        pool = Pool()
+    else:
+        pool = Pool(processes=nproc)
+ 
+    #print(" This is the Hamiltonian we will process:")
+    #for terms in clustered_ham.terms:
+    #    print(terms)
+    #    for term in clustered_ham.terms[terms]:
+    #        print(term)
+   
+
+    print(" Using Pathos library for parallelization. Number of workers: ", pool.ncpus, flush=True )
+    # define batches
+    conf_batches = []
+    batch_size = math.ceil(len(v)/pool.ncpus) 
+    batch = []
+    print(" Form batches. Max batch size: ", batch_size)
+    for i,j,k in v:
+
+        if len(batch) < batch_size:
+            batch.append((i,j,k))
+        else:
+            conf_batches.append(batch)
+            batch = []
+            batch.append((i,j,k))
+    if len(batch) > 0:
+        conf_batches.append(batch)
+        batch = []
+
+    tmp = 0
+    for b in conf_batches:
+        for bi in b:
+            tmp += 1
+    assert(len(v) == tmp)
+
+    #import pathos.profile as pr
+    #pr.enable_profiling()
+
+
+    futures = [do_batch.remote(i) for i in conf_batches]
+    #print(ray.get(futures))
+    out = ray.get(futures)
+
+    #out = pool.map(do_batch, conf_batches)
+    
+    #out = pool.map(do_parallel_work, v, batches=100)
+    
+    #pr.profile('cumulative', pipe=pool.pipe)(test_import, 'pox')
+    #pr.disable_profiling()
+
+    
+    pool.close()
+    pool.join()
+    pool.clear()
+    #out = list(map(do_parallel_work, v))
+    print(" This is how much memory is being used to store matvec results:    ",sys.getsizeof(out)) 
+    for o in out:
+        sigma.add(o)
+
+    sigma.clip(thresh_search)
+    sigma.prune_empty_fock_spaces()
+    print(" This is how much memory is being used to store collected results: ",sys.getsizeof(sigma.data)) 
+    print(" ---------------------")
+    return sigma 
+# }}}
+
+
 def heat_bath_search(h_in,v,thresh_cipsi=None, nproc=None):
     """
     Compute the action of H onto a sparse trial vector v
