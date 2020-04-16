@@ -1251,7 +1251,6 @@ def matvec1_parallel4(h_in,v,thresh_search=1e-12, nproc=None, opt_einsum=True, n
     
         elif nactive==4:
     
-            for I in np.argwhere(np.abs(coeff_tensor) > thresh_search):
                 config_curr[active[0]] = I[0] 
                 config_curr[active[1]] = I[1] 
                 config_curr[active[2]] = I[2] 
@@ -1276,147 +1275,140 @@ def matvec1_parallel4(h_in,v,thresh_search=1e-12, nproc=None, opt_einsum=True, n
     @ray.remote
     def do_batch(batch):
         sigma_out = {} 
+        h = ray.get(h_id)
         #sigma_out = OrderedDict() 
         for v_curr in batch:
-            # only search from variational states with large ci coeffs
-            do_parallel_work(v_curr,sigma_out)
-        return sigma_out
-
-    #@profile
-    def do_parallel_work(v_curr,sigma_out):
-        h = ray.get(h_id)
-        fock_r = v_curr[0]
-        conf_r = v_curr[1]
-        coeff  = v_curr[2]
-      
-        #sigma_out = ClusteredState(clusters)
-        for terms in h.terms:
-            fock_l= tuple([(terms[ci][0]+fock_r[ci][0], terms[ci][1]+fock_r[ci][1]) for ci in range(len(h.clusters))])
-            good = True
-            for c in h.clusters:
-                if min(fock_l[c.idx]) < 0 or max(fock_l[c.idx]) > c.n_orb:
-                    good = False
-                    break
-            if good == False:
-                continue
+            fock_r = v_curr[0]
+            conf_r = v_curr[1]
+            coeff  = v_curr[2]
             
-            #print(fock_l, "<--", fock_r)
-            
-            #if fock_l not in sigma_out.data:
-            if fock_l not in sigma_out:
-                sigma_out[fock_l] = OrderedDict()
-            
-            configs_l = sigma_out[fock_l] 
-            
-            for term in h.terms[terms]:
-                if len(term.active) > nbody_limit:
+            #sigma_out = ClusteredState(clusters)
+            for terms in h.terms:
+                fock_l= tuple([(terms[ci][0]+fock_r[ci][0], terms[ci][1]+fock_r[ci][1]) for ci in range(len(h.clusters))])
+                good = True
+                for c in h.clusters:
+                    if min(fock_l[c.idx]) < 0 or max(fock_l[c.idx]) > c.n_orb:
+                        good = False
+                        break
+                if good == False:
                     continue
-                #print()
-                #print(term)
-                #start1 = time.time()
                 
-                # do local terms separately
-                if len(term.active) == 1:
-                    #start2 = time.time()
-                    
-                    ci = term.active[0]
-                        
-                    tmp = h.clusters[ci].ops['H'][(fock_l[ci],fock_r[ci])][:,conf_r[ci]] * coeff 
-                    
-                    new_configs = [[i] for i in conf_r] 
-                    
-                    new_configs[ci] = range(h.clusters[ci].ops['H'][(fock_l[ci],fock_r[ci])].shape[0])
-                    
-                    for sp_idx, spi in enumerate(itertools.product(*new_configs)):
-                        if abs(tmp[sp_idx]) > thresh_search:
-                            if spi not in configs_l:
-                                configs_l[spi] = tmp[sp_idx] 
-                            else:
-                                configs_l[spi] += tmp[sp_idx] 
-                    #stop2 = time.time()
-
-
-                else:
-                    #print(" term: ", term)
-                    state_sign = 1
-                    for oi,o in enumerate(term.ops):
-                        if o == '':
-                            continue
-                        if len(o) == 1 or len(o) == 3:
-                            for cj in range(oi):
-                                state_sign *= (-1)**(fock_r[cj][0]+fock_r[cj][1])
-                        
-                    #print("  ", conf_r)
-                    
-                    #if abs(v[fock_r][conf_r]) < 5e-2:
-                    #    continue
-                    # get state sign 
-                    #print('state_sign ', state_sign)
-
-                    nonzeros = []
-                    opii = -1
-                    mats = []
-                    good = True
-                    for opi,op in enumerate(term.ops):
-                        if op == "":
-                            continue
-                        opii += 1
-                        #print(opi,term.active)
-                        ci = h.clusters[opi]
-                        #ci = clusters[term.active[opii]]
-                        try:
-                            oi = ci.ops[op][(fock_l[ci.idx],fock_r[ci.idx])][:,conf_r[ci.idx],:]
-                                
-                            #nonzeros_curr = []
-                            #for K in range(oi.shape[0]):
-                            #    if np.amax(np.abs(oi[K,:])) > 1e-16:
-                            #    #if np.amax(np.abs(oi[K,:])) > thresh_search/10:
-                            #        nonzeros_curr.append(K)
-                            #oinz = oi[nonzeros_curr,:]
-                            #mats.append(oinz)
-                            #nonzeros.append(nonzeros_curr)
-                            mats.append(oi)
-                            nonzeros.append(range(oi.shape[0]))
-
-                        except KeyError:
-                            good = False
-                            break
-                    if good == False:
-                        continue                        
-                        #break
-                   
-                    if len(mats) == 0:
+                #print(fock_l, "<--", fock_r)
+                
+                #if fock_l not in sigma_out.data:
+                if fock_l not in sigma_out:
+                    sigma_out[fock_l] = OrderedDict()
+                
+                configs_l = sigma_out[fock_l] 
+                
+                for term in h.terms[terms]:
+                    if len(term.active) > nbody_limit:
                         continue
-                    
-                    #start2 = time.time()
                     #print()
                     #print(term)
-                    #print('mats:', end='')
-                    #[print(m.shape,end='') for m in mats]
-                    #print('ints:', term.ints.shape)
-                    #print("contract_string       :", term.contract_string)
-                    #print("contract_string_matvec:", term.contract_string_matvec, flush=True)
+                    #start1 = time.time()
                     
-                    
-                    #tmp = oe.contract(term.contract_string_matvec, *mats, term.ints)
-                    
-
-                    tmp = np.einsum(term.contract_string_matvec, *mats, term.ints, optimize=opt_einsum)
-                    
-
-                    #stop2 = time.time()
-                    
-                    
-                    tmp = state_sign * tmp * coeff 
-                    
-                    new_configs = [[i] for i in conf_r] 
-                    for cacti,cact in enumerate(term.active):
-                        new_configs[cact] = nonzeros[cacti] 
-                        #new_configs[cact] = range(mats[cacti].shape[0])
+                    # do local terms separately
+                    if len(term.active) == 1:
+                        #start2 = time.time()
                         
-                    matvec_update_with_new_configs2(tmp, new_configs, configs_l, term.active, thresh_search)
-                #stop1 = time.time()
-                #print(" Time spent in einsum: %12.2f: total: %12.2f: NBody: %6i" %( stop2-start2,  stop1-start1, len(term.active)))
+                        ci = term.active[0]
+                            
+                        tmp = h.clusters[ci].ops['H'][(fock_l[ci],fock_r[ci])][:,conf_r[ci]] * coeff 
+                        
+                        new_configs = [[i] for i in conf_r] 
+                        
+                        new_configs[ci] = range(h.clusters[ci].ops['H'][(fock_l[ci],fock_r[ci])].shape[0])
+                        
+                        for sp_idx, spi in enumerate(itertools.product(*new_configs)):
+                            if abs(tmp[sp_idx]) > thresh_search:
+                                if spi not in configs_l:
+                                    configs_l[spi] = tmp[sp_idx] 
+                                else:
+                                    configs_l[spi] += tmp[sp_idx] 
+                        #stop2 = time.time()
+            
+            
+                    else:
+                        #print(" term: ", term)
+                        state_sign = 1
+                        for oi,o in enumerate(term.ops):
+                            if o == '':
+                                continue
+                            if len(o) == 1 or len(o) == 3:
+                                for cj in range(oi):
+                                    state_sign *= (-1)**(fock_r[cj][0]+fock_r[cj][1])
+                            
+                        #print("  ", conf_r)
+                        
+                        #if abs(v[fock_r][conf_r]) < 5e-2:
+                        #    continue
+                        # get state sign 
+                        #print('state_sign ', state_sign)
+            
+                        nonzeros = []
+                        opii = -1
+                        mats = []
+                        good = True
+                        for opi,op in enumerate(term.ops):
+                            if op == "":
+                                continue
+                            opii += 1
+                            #print(opi,term.active)
+                            ci = h.clusters[opi]
+                            #ci = clusters[term.active[opii]]
+                            try:
+                                oi = ci.ops[op][(fock_l[ci.idx],fock_r[ci.idx])][:,conf_r[ci.idx],:]
+                                    
+                                #nonzeros_curr = []
+                                #for K in range(oi.shape[0]):
+                                #    if np.amax(np.abs(oi[K,:])) > 1e-16:
+                                #    #if np.amax(np.abs(oi[K,:])) > thresh_search/10:
+                                #        nonzeros_curr.append(K)
+                                #oinz = oi[nonzeros_curr,:]
+                                #mats.append(oinz)
+                                #nonzeros.append(nonzeros_curr)
+                                mats.append(oi)
+                                nonzeros.append(range(oi.shape[0]))
+            
+                            except KeyError:
+                                good = False
+                                break
+                        if good == False:
+                            continue                        
+                            #break
+                       
+                        if len(mats) == 0:
+                            continue
+                        
+                        #start2 = time.time()
+                        #print()
+                        #print(term)
+                        #print('mats:', end='')
+                        #[print(m.shape,end='') for m in mats]
+                        #print('ints:', term.ints.shape)
+                        #print("contract_string       :", term.contract_string)
+                        #print("contract_string_matvec:", term.contract_string_matvec, flush=True)
+                        
+                        
+                        #tmp = oe.contract(term.contract_string_matvec, *mats, term.ints)
+                        
+            
+                        tmp = np.einsum(term.contract_string_matvec, *mats, term.ints, optimize=opt_einsum)
+                        
+            
+                        #stop2 = time.time()
+                        
+                        tmp = state_sign * tmp * coeff 
+                        
+                        new_configs = [[i] for i in conf_r] 
+                        for cacti,cact in enumerate(term.active):
+                            new_configs[cact] = nonzeros[cacti] 
+                            #new_configs[cact] = range(mats[cacti].shape[0])
+                            
+                        matvec_update_with_new_configs2(tmp, new_configs, configs_l, term.active, thresh_search)
+                    #stop1 = time.time()
+                    #print(" Time spent in einsum: %12.2f: total: %12.2f: NBody: %6i" %( stop2-start2,  stop1-start1, len(term.active)))
         return sigma_out
     
     # define batches
