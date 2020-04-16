@@ -1185,6 +1185,8 @@ def matvec1_parallel4(h_in,v,thresh_search=1e-12, nproc=None, opt_einsum=True, n
     returns a ClusteredState object. 
     
     use numpy to vectorize loops over result of tensor contraction (preferred) 
+
+    parallelized with Ray
     """
 # {{{
     print(" ---------------------")
@@ -1202,8 +1204,9 @@ def matvec1_parallel4(h_in,v,thresh_search=1e-12, nproc=None, opt_einsum=True, n
     if len(v) == 0:
         print(" Empty vector!")
         exit()  
-    h = h_in
+    #h = h_in
     
+    h_id        = ray.put(h_in)
 
     sigma = ClusteredState()
     sigma = v.copy() 
@@ -1270,8 +1273,6 @@ def matvec1_parallel4(h_in,v,thresh_search=1e-12, nproc=None, opt_einsum=True, n
         return 
     # }}}
 
-    h_id        = ray.put(h)
-
     @ray.remote
     def do_batch(batch):
         sigma_out = {} 
@@ -1283,11 +1284,11 @@ def matvec1_parallel4(h_in,v,thresh_search=1e-12, nproc=None, opt_einsum=True, n
 
     #@profile
     def do_parallel_work(v_curr,sigma_out):
+        h = ray.get(h_id)
         fock_r = v_curr[0]
         conf_r = v_curr[1]
         coeff  = v_curr[2]
       
-        h = ray.get(h_id)
         #sigma_out = ClusteredState(clusters)
         for terms in h.terms:
             fock_l= tuple([(terms[ci][0]+fock_r[ci][0], terms[ci][1]+fock_r[ci][1]) for ci in range(len(h.clusters))])
