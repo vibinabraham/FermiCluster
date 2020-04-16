@@ -1174,7 +1174,7 @@ def matvec1_parallel3(h_in,v,thresh_search=1e-12, nproc=None, opt_einsum=True, n
 # }}}
 
 
-def matvec1_parallel4(h_in,v,thresh_search=1e-12, nproc=None, opt_einsum=True, nbody_limit=4, shared_mem=3e9, batch_size=1):
+def matvec1_parallel4(h_in,v,thresh_search=1e-12, nproc=None, opt_einsum=True, nbody_limit=4, shared_mem=3e9, batch_size=1, screen=1e-10):
     """
     Compute the action of H onto a sparse trial vector v
     returns a ClusteredState object. 
@@ -1193,7 +1193,10 @@ def matvec1_parallel4(h_in,v,thresh_search=1e-12, nproc=None, opt_einsum=True, n
 
 
     import ray
-    ray.init(object_store_memory=shared_mem)
+    if nproc==None:
+        ray.init(object_store_memory=shared_mem)
+    else:
+        ray.init(num_cpus=nproc, object_store_memory=shared_mem)
 
     #time.sleep(10)
     if len(v) == 0:
@@ -1217,10 +1220,18 @@ def matvec1_parallel4(h_in,v,thresh_search=1e-12, nproc=None, opt_einsum=True, n
         config_curr = [i[0] for i in new_configs]
         count = 0
         if nactive==2:
-    
+   
             for I in np.argwhere(np.abs(coeff_tensor) > thresh_search):
-                config_curr[active[0]] = I[0] 
-                config_curr[active[1]] = I[1] 
+                try:
+                    config_curr[active[0]] = new_configs[active[0]][I[0]] 
+                    config_curr[active[1]] = new_configs[active[1]][I[1]] 
+                except:
+                    print()
+                    print(" Tensor: ", coeff_tensor.shape)
+                    print(" Nz Idx: ", I)
+                    print(" new_co: ", new_configs)
+                    print(" active: ", active,flush=True)
+                    exit()
                 key = tuple(config_curr)
                 if key not in configs:
                     configs[key] = coeff_tensor[I[0],I[1]]
@@ -1233,9 +1244,9 @@ def matvec1_parallel4(h_in,v,thresh_search=1e-12, nproc=None, opt_einsum=True, n
         elif nactive==3:
     
             for I in np.argwhere(np.abs(coeff_tensor) > thresh_search):
-                config_curr[active[0]] = I[0] 
-                config_curr[active[1]] = I[1] 
-                config_curr[active[2]] = I[2] 
+                config_curr[active[0]] = new_configs[active[0]][I[0]] 
+                config_curr[active[1]] = new_configs[active[1]][I[1]] 
+                config_curr[active[2]] = new_configs[active[2]][I[2]] 
                 key = tuple(config_curr)
                 if key not in configs:
                     configs[key] = coeff_tensor[I[0],I[1],I[2]]
@@ -1247,10 +1258,10 @@ def matvec1_parallel4(h_in,v,thresh_search=1e-12, nproc=None, opt_einsum=True, n
         elif nactive==4:
     
             for I in np.argwhere(np.abs(coeff_tensor) > thresh_search):
-                config_curr[active[0]] = I[0] 
-                config_curr[active[1]] = I[1] 
-                config_curr[active[2]] = I[2] 
-                config_curr[active[3]] = I[3] 
+                config_curr[active[0]] = new_configs[active[0]][I[0]] 
+                config_curr[active[1]] = new_configs[active[1]][I[1]] 
+                config_curr[active[2]] = new_configs[active[2]][I[2]] 
+                config_curr[active[3]] = new_configs[active[3]][I[3]] 
                 key = tuple(config_curr)
                 if key not in configs:
                     configs[key] = coeff_tensor[I[0],I[1],I[2],I[3]]
@@ -1341,23 +1352,36 @@ def matvec1_parallel4(h_in,v,thresh_search=1e-12, nproc=None, opt_einsum=True, n
                             ci = h.clusters[opi]
                             try:
                                 oi = ci.ops[op][(fock_l[ci.idx],fock_r[ci.idx])][:,conf_r[ci.idx],:]
-                                mats.append(oi)
-                                nonzeros.append(range(oi.shape[0]))
             
                             except KeyError:
                                 good = False
                                 break
+                            
+                            nonzeros_curr = []
+                            for K in range(oi.shape[0]):
+                                if np.amax(np.abs(oi[K,:])) > screen:
+                                #if np.amax(np.abs(oi[K,:])) > thresh_search/10:
+                                    nonzeros_curr.append(K)
+                            if len(nonzeros_curr) == 0:
+                                good = False
+                                break
+                            oinz = oi[nonzeros_curr,:]
+                            mats.append(oinz)
+                            nonzeros.append(nonzeros_curr)
+                            #mats.append(oi)
+                            #nonzeros.append(range(oi.shape[0]))
+
                         if good == False:
                             continue                        
-                            #break
                        
                         if len(mats) == 0:
                             continue
                         
-            
-                        tmp = np.einsum(term.contract_string_matvec, *mats, term.ints, optimize=opt_einsum)
+                        I = term.ints * state_sign * coeff 
+                        tmp = np.einsum(term.contract_string_matvec, *mats, I, optimize=opt_einsum)
                         
-                        tmp = state_sign * tmp * coeff 
+                        #tmp = np.einsum(term.contract_string_matvec, *mats, term.ints, optimize=opt_einsum)
+                        #tmp = state_sign * tmp * coeff 
                         
                         new_configs = [[i] for i in conf_r] 
                         for cacti,cact in enumerate(term.active):
