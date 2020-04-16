@@ -1202,11 +1202,7 @@ def matvec1_parallel4(h_in,v,thresh_search=1e-12, nproc=None, opt_einsum=True, n
     if len(v) == 0:
         print(" Empty vector!")
         exit()  
-    global h 
-    global clusters
-    global sigma 
     h = h_in
-    clusters = h_in.clusters
     
 
     sigma = ClusteredState()
@@ -1274,11 +1270,8 @@ def matvec1_parallel4(h_in,v,thresh_search=1e-12, nproc=None, opt_einsum=True, n
         return 
     # }}}
 
-    ray.put(h)
-    ray.put(sigma)
-    ray.put(clusters)
+    h_id        = ray.put(h)
 
-    time.sleep(30)
     @ray.remote
     def do_batch(batch):
         sigma_out = {} 
@@ -1293,12 +1286,13 @@ def matvec1_parallel4(h_in,v,thresh_search=1e-12, nproc=None, opt_einsum=True, n
         fock_r = v_curr[0]
         conf_r = v_curr[1]
         coeff  = v_curr[2]
-       
+      
+        h = ray.get(h_id)
         #sigma_out = ClusteredState(clusters)
         for terms in h.terms:
-            fock_l= tuple([(terms[ci][0]+fock_r[ci][0], terms[ci][1]+fock_r[ci][1]) for ci in range(len(clusters))])
+            fock_l= tuple([(terms[ci][0]+fock_r[ci][0], terms[ci][1]+fock_r[ci][1]) for ci in range(len(h.clusters))])
             good = True
-            for c in clusters:
+            for c in h.clusters:
                 if min(fock_l[c.idx]) < 0 or max(fock_l[c.idx]) > c.n_orb:
                     good = False
                     break
@@ -1326,11 +1320,11 @@ def matvec1_parallel4(h_in,v,thresh_search=1e-12, nproc=None, opt_einsum=True, n
                     
                     ci = term.active[0]
                         
-                    tmp = clusters[ci].ops['H'][(fock_l[ci],fock_r[ci])][:,conf_r[ci]] * coeff 
+                    tmp = h.clusters[ci].ops['H'][(fock_l[ci],fock_r[ci])][:,conf_r[ci]] * coeff 
                     
                     new_configs = [[i] for i in conf_r] 
                     
-                    new_configs[ci] = range(clusters[ci].ops['H'][(fock_l[ci],fock_r[ci])].shape[0])
+                    new_configs[ci] = range(h.clusters[ci].ops['H'][(fock_l[ci],fock_r[ci])].shape[0])
                     
                     for sp_idx, spi in enumerate(itertools.product(*new_configs)):
                         if abs(tmp[sp_idx]) > thresh_search:
@@ -1367,7 +1361,7 @@ def matvec1_parallel4(h_in,v,thresh_search=1e-12, nproc=None, opt_einsum=True, n
                             continue
                         opii += 1
                         #print(opi,term.active)
-                        ci = clusters[opi]
+                        ci = h.clusters[opi]
                         #ci = clusters[term.active[opii]]
                         try:
                             oi = ci.ops[op][(fock_l[ci.idx],fock_r[ci.idx])][:,conf_r[ci.idx],:]
@@ -1424,26 +1418,10 @@ def matvec1_parallel4(h_in,v,thresh_search=1e-12, nproc=None, opt_einsum=True, n
                 #print(" Time spent in einsum: %12.2f: total: %12.2f: NBody: %6i" %( stop2-start2,  stop1-start1, len(term.active)))
         return sigma_out
     
-    import multiprocessing as mp
-    from pathos.multiprocessing import ProcessingPool as Pool
-
-    
-    if nproc == None:
-        pool = Pool()
-    else:
-        pool = Pool(processes=nproc)
- 
-    #print(" This is the Hamiltonian we will process:")
-    #for terms in clustered_ham.terms:
-    #    print(terms)
-    #    for term in clustered_ham.terms[terms]:
-    #        print(term)
-   
-
-    print(" Using Pathos library for parallelization. Number of workers: ", pool.ncpus, flush=True )
     # define batches
     conf_batches = []
-    batch_size = math.ceil(len(v)/pool.ncpus) 
+    batch_size = math.ceil(1) 
+    #batch_size = math.ceil(len(v)/(2)) 
     batch = []
     print(" Form batches. Max batch size: ", batch_size)
     for i,j,k in v:
@@ -1464,33 +1442,17 @@ def matvec1_parallel4(h_in,v,thresh_search=1e-12, nproc=None, opt_einsum=True, n
             tmp += 1
     assert(len(v) == tmp)
 
-    #import pathos.profile as pr
-    #pr.enable_profiling()
 
 
     futures = [do_batch.remote(i) for i in conf_batches]
-    #print(ray.get(futures))
     out = ray.get(futures)
 
-    #out = pool.map(do_batch, conf_batches)
-    
-    #out = pool.map(do_parallel_work, v, batches=100)
-    
-    #pr.profile('cumulative', pipe=pool.pipe)(test_import, 'pox')
-    #pr.disable_profiling()
-
-    
-    pool.close()
-    pool.join()
-    pool.clear()
-    #out = list(map(do_parallel_work, v))
-    print(" This is how much memory is being used to store matvec results:    ",sys.getsizeof(out)) 
     for o in out:
         sigma.add(o)
 
+    ray.shutdown()
     sigma.clip(thresh_search)
     sigma.prune_empty_fock_spaces()
-    print(" This is how much memory is being used to store collected results: ",sys.getsizeof(sigma.data)) 
     print(" ---------------------")
     return sigma 
 # }}}
