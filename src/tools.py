@@ -2729,7 +2729,7 @@ def compute_pt2_correction(ci_vector, clustered_ham, e0,
         nbody_limit     = 4,
         matvec          = 4,
         batch_size      = 1,
-        shared_mem      = 3e9, #1GB
+        shared_mem      = 3e9, #1GB holds clustered_ham
         nproc           = None): 
     # {{{
         print()
@@ -2763,7 +2763,7 @@ def compute_pt2_correction(ci_vector, clustered_ham, e0,
         elif matvec==4:
             pt_vector = matvec1_parallel4(clustered_ham, asci_vector, nproc=nproc, thresh_search=thresh_search,
                     nbody_limit=nbody_limit,
-                    batch_size=batch_size, shared_mem=mem)
+                    batch_size=batch_size, shared_mem=shared_mem)
         stop = time.time()
         print(" Time spent in matvec: %12.2f" %( stop-start))
         #exit()

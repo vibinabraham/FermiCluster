@@ -106,7 +106,10 @@ def bc_cipsi_tucker(ci_vector, clustered_ham,
         hshift              = 1e-8,
         pt_type             = 'en',
         nbody_limit         = 4, 
-        tucker_conv_target  = 0, 
+        shared_mem          = 1e9,
+        batch_size          = 1,
+        tucker_conv_target  = 0,
+        matvec              = 4,
         nproc               = None):
     """
     Run iterations of TP-CIPSI to make the tucker decomposition self-consistent
@@ -122,6 +125,8 @@ def bc_cipsi_tucker(ci_vector, clustered_ham,
     tucker_conv_target  :   Which energy should we use to determine convergence? 
                                 0 = variational energy
                                 2 = pt2 energy
+    shared_mem          :   How much memory to allocate for shared object store for holding clustered_ham - only works with matvec4
+    matvec              :   Which version of matvec to use? [1:4]
     """
 # {{{
 
@@ -159,7 +164,10 @@ def bc_cipsi_tucker(ci_vector, clustered_ham,
                                                         thresh_conv     = thresh_cipsi_conv, 
                                                         max_iter        = max_cipsi_iter,
                                                         thresh_asci     = thresh_asci,
-                                                        nbody_limit     = nbody_limit, 
+                                                        nbody_limit     = nbody_limit,
+                                                        matvec          = matvec,
+                                                        batch_size      = batch_size,
+                                                        shared_mem      = shared_mem,
                                                         thresh_search   = thresh_search, 
                                                         nproc           = nproc)
             end = time.time()
@@ -247,6 +255,9 @@ def bc_cipsi(ci_vector, clustered_ham,
     nbody_limit     = 4, 
     pt_type         = 'en',
     thresh_search   = 0, 
+    shared_mem      = 1e9,
+    batch_size      = 1,
+    matvec          = 4,
     nproc           = None
     ):
     """
@@ -257,6 +268,8 @@ def bc_cipsi(ci_vector, clustered_ham,
     thresh_search   :   delete couplings to pspace configs
                         default: thresh_cipsi^1/2 / 1000
     nbody_limit     :   only compute up to n-body interactions when searching for new configs
+    shared_mem      :   How much memory to allocate for shared object store for holding clustered_ham - only works with matvec4
+    matvec          :   Which version of matvec to use? [1:4]
     """
 # {{{
 
@@ -363,10 +376,15 @@ def bc_cipsi(ci_vector, clustered_ham,
         if nbody_limit != 4:
             print(" Warning: nbody_limit set to %4i, resulting PT energies are meaningless" %nbody_limit)
 
-        if nproc==1:
-            pt_vector = matvec1(clustered_ham, asci_vector, thresh_search=thresh_search, nbody_limit=nbody_limit)
-        else:
-            pt_vector = matvec1_parallel4(clustered_ham, asci_vector, nproc=nproc, thresh_search=thresh_search, nbody_limit=nbody_limit)
+        if matvec==1:
+            pt_vector = matvec1_parallel1(clustered_ham, asci_vector, nproc=nproc, thresh_search=thresh_search, nbody_limit=nbody_limit)
+        elif matvec==2:
+            pt_vector = matvec1_parallel2(clustered_ham, asci_vector, nproc=nproc, thresh_search=thresh_search, nbody_limit=nbody_limit)
+        elif matvec==3:
+            pt_vector = matvec1_parallel3(clustered_ham, asci_vector, nproc=nproc, thresh_search=thresh_search, nbody_limit=nbody_limit)
+        elif matvec==4:
+            pt_vector = matvec1_parallel4(clustered_ham, asci_vector, nproc=nproc, thresh_search=thresh_search, nbody_limit=nbody_limit,
+                    shared_mem=shared_mem, batch_size=batch_size)
         stop = time.time()
         print(" Time spent in matvec: %12.2f" %( stop-start))
         #exit()
