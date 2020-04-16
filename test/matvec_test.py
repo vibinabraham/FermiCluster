@@ -85,13 +85,15 @@ def test_1():
     out_vector3 = matvec1_parallel1(clustered_ham, ci_vector).get_vector()
     out_vector4 = matvec1_parallel2(clustered_ham, ci_vector).get_vector()
     out_vector5 = matvec1_parallel3(clustered_ham, ci_vector).get_vector()
+    out_vector6 = matvec1_parallel4(clustered_ham, ci_vector).get_vector()
    
     for vi in range(len(out_vector1)):
-        print(" %12.8f %12.8f %12.8f  %12.8f  %12.8f " %(out_vector1[vi],out_vector2[vi],out_vector3[vi],out_vector4[vi],out_vector5[vi]))
+        print(" %12.8f %12.8f %12.8f  %12.8f  %12.8f  %12.8f " %(out_vector1[vi],out_vector2[vi],out_vector3[vi],out_vector4[vi],out_vector5[vi],out_vector6[vi]))
         assert(abs(out_vector1[vi]-out_vector2[vi]) < 1e-8)
         assert(abs(out_vector1[vi]-out_vector3[vi]) < 1e-8)
         assert(abs(out_vector1[vi]-out_vector4[vi]) < 1e-8)
         assert(abs(out_vector1[vi]-out_vector5[vi]) < 1e-8)
+        assert(abs(out_vector1[vi]-out_vector6[vi]) < 1e-8)
 
 # }}}
 
