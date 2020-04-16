@@ -1251,6 +1251,7 @@ def matvec1_parallel4(h_in,v,thresh_search=1e-12, nproc=None, opt_einsum=True, n
     
         elif nactive==4:
     
+            for I in np.argwhere(np.abs(coeff_tensor) > thresh_search):
                 config_curr[active[0]] = I[0] 
                 config_curr[active[1]] = I[1] 
                 config_curr[active[2]] = I[2] 
