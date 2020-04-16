@@ -1188,7 +1188,7 @@ def matvec1_parallel4(h_in,v,thresh_search=1e-12, nproc=None, opt_einsum=True, n
     """
 # {{{
     print(" ---------------------")
-    print(" In matvec1_parallel3:")
+    print(" In matvec1_parallel4:")
     print(" thresh_search   :   ", thresh_search)
     print(" nbody_limit     :   ", nbody_limit)
     print(" opt_einsum      :   ", opt_einsum, flush=True)
@@ -1196,7 +1196,7 @@ def matvec1_parallel4(h_in,v,thresh_search=1e-12, nproc=None, opt_einsum=True, n
 
 
     import ray
-    ray.init(object_store_memory=1e10)
+    ray.init(object_store_memory=12e9)
 
     #time.sleep(10)
     if len(v) == 0:
@@ -1205,7 +1205,6 @@ def matvec1_parallel4(h_in,v,thresh_search=1e-12, nproc=None, opt_einsum=True, n
     global h 
     global clusters
     global sigma 
-    global clustered_ham
     h = h_in
     clusters = h_in.clusters
     
@@ -1275,6 +1274,11 @@ def matvec1_parallel4(h_in,v,thresh_search=1e-12, nproc=None, opt_einsum=True, n
         return 
     # }}}
 
+    ray.put(h)
+    ray.put(sigma)
+    ray.put(clusters)
+
+    time.sleep(30)
     @ray.remote
     def do_batch(batch):
         sigma_out = {} 

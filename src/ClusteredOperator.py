@@ -369,7 +369,6 @@ class LocalClusteredTerm(ClusteredTerm):
 
 
 
-
 class ClusteredOperator:
     """
     Defines a fermionic operator which can act on multiple clusters
