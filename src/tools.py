@@ -1393,12 +1393,42 @@ def matvec1_parallel4(h_in,v,thresh_search=1e-12, nproc=None, opt_einsum=True, n
 
 
 
-    futures = [do_batch.remote(i) for i in conf_batches]
-    out = ray.get(futures)
+    result_ids = [do_batch.remote(i) for i in conf_batches]
 
-    for o in out:
-        sigma.add(o)
+     
+    if 0:
+        out = ray.get(result_ids)
+        for o in out:
+            sigma.add(o)
+    else:
 
+        # Combine results as soon as they finish
+        #def process_incremental(sigma, result, update,nbatches):
+        def process_incremental(sigma, result):
+            sigma.add(result)
+            result = {} # drop that memory (hopefully)
+            print(".",end='',flush=True)
+            #if update > 1:
+            #    print(".",end='',flush=True)
+            #    update = 0
+            #else:
+            #    update += 1/nbatches
+
+
+        print(" Number of configs: ", len(v))
+        print(" Number of batches: ", len(conf_batches))
+        print(" Batches complete : ", end='')
+        #print("|                                                                                                    |")
+        nbatches = len(conf_batches)
+        update = 0
+        while len(result_ids): 
+            done_id, result_ids = ray.wait(result_ids) 
+            #sigma = process_incremental(sigma, ray.get(done_id[0]))
+            process_incremental(sigma, ray.get(done_id[0]))
+            #process_incremental(sigma, ray.get(done_id[0]),update,nbatches)
+            #sigma.add(ray.get(done_id[0]))
+    
+        print()
     ray.shutdown()
     sigma.clip(thresh_search)
     sigma.prune_empty_fock_spaces()
