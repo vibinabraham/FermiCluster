@@ -2766,7 +2766,10 @@ def compute_pt2_correction(ci_vector, clustered_ham, e0,
         thresh_asci     = 0,
         thresh_search   = 0,
         pt_type         = 'en',
-        nbody_limit     = 4, 
+        nbody_limit     = 4,
+        matvec          = 4,
+        batch_size      = 1,
+        shared_mem      = 3e9, #1GB
         nproc           = None): 
     # {{{
         print()
@@ -2774,6 +2777,7 @@ def compute_pt2_correction(ci_vector, clustered_ham, e0,
         print("     |pt_type        : ", pt_type        )
         print("     |thresh_search  : ", thresh_search  )
         print("     |thresh_asci    : ", thresh_asci    )
+        print("     |matvec         : ", matvec         )
         asci_vector = ci_vector.copy()
         print(" Choose subspace from which to search for new configs. Thresh: ", thresh_asci)
         print(" CI Dim          : %8i" % len(asci_vector))
@@ -2792,10 +2796,14 @@ def compute_pt2_correction(ci_vector, clustered_ham, e0,
         if nbody_limit != 4:
             print(" Warning: nbody_limit set to %4i, resulting PT energies are meaningless" %nbody_limit)
 
-        if nproc==1:
-            pt_vector = matvec1(clustered_ham, asci_vector, thresh_search=thresh_search, nbody_limit=nbody_limit)
-        else:
+        if matvec==1:
+            pt_vector = matvec1_parallel1(clustered_ham, asci_vector, nproc=nproc, thresh_search=thresh_search, nbody_limit=nbody_limit)
+        elif matvec==3:
             pt_vector = matvec1_parallel3(clustered_ham, asci_vector, nproc=nproc, thresh_search=thresh_search, nbody_limit=nbody_limit)
+        elif matvec==4:
+            pt_vector = matvec1_parallel4(clustered_ham, asci_vector, nproc=nproc, thresh_search=thresh_search,
+                    nbody_limit=nbody_limit,
+                    batch_size=batch_size, shared_mem=mem)
         stop = time.time()
         print(" Time spent in matvec: %12.2f" %( stop-start))
         #exit()
