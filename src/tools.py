@@ -2999,6 +2999,8 @@ def extrapolate_pt2_correction(ci_vector, clustered_ham, e0,
                 pt_vector_curr = matvec1_parallel2(clustered_ham, asci_v, nproc=nproc, thresh_search=thresh_search)
             elif matvec == 3:
                 pt_vector_curr = matvec1_parallel3(clustered_ham, asci_v, nproc=nproc, thresh_search=thresh_search)
+            elif matvec == 4:
+                pt_vector_curr = matvec1_parallel4(clustered_ham, asci_v, nproc=nproc, thresh_search=thresh_search)
             else:
                 print(" wrong matvec")
                 exit()
