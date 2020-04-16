@@ -1174,7 +1174,7 @@ def matvec1_parallel3(h_in,v,thresh_search=1e-12, nproc=None, opt_einsum=True, n
 # }}}
 
 
-def matvec1_parallel4(h_in,v,thresh_search=1e-12, nproc=None, opt_einsum=True, nbody_limit=4):
+def matvec1_parallel4(h_in,v,thresh_search=1e-12, nproc=None, opt_einsum=True, nbody_limit=4, shared_mem=3e9, batch_size=1):
     """
     Compute the action of H onto a sparse trial vector v
     returns a ClusteredState object. 
@@ -1193,7 +1193,7 @@ def matvec1_parallel4(h_in,v,thresh_search=1e-12, nproc=None, opt_einsum=True, n
 
 
     import ray
-    ray.init(object_store_memory=12e9)
+    ray.init(object_store_memory=shared_mem)
 
     #time.sleep(10)
     if len(v) == 0:
@@ -1272,7 +1272,6 @@ def matvec1_parallel4(h_in,v,thresh_search=1e-12, nproc=None, opt_einsum=True, n
     def do_batch(batch):
         sigma_out = {} 
         h = ray.get(h_id)
-        #sigma_out = OrderedDict() 
         for v_curr in batch:
             fock_r = v_curr[0]
             conf_r = v_curr[1]
@@ -1300,13 +1299,9 @@ def matvec1_parallel4(h_in,v,thresh_search=1e-12, nproc=None, opt_einsum=True, n
                 for term in h.terms[terms]:
                     if len(term.active) > nbody_limit:
                         continue
-                    #print()
-                    #print(term)
-                    #start1 = time.time()
                     
                     # do local terms separately
                     if len(term.active) == 1:
-                        #start2 = time.time()
                         
                         ci = term.active[0]
                             
@@ -1322,7 +1317,6 @@ def matvec1_parallel4(h_in,v,thresh_search=1e-12, nproc=None, opt_einsum=True, n
                                     configs_l[spi] = tmp[sp_idx] 
                                 else:
                                     configs_l[spi] += tmp[sp_idx] 
-                        #stop2 = time.time()
             
             
                     else:
@@ -1335,12 +1329,6 @@ def matvec1_parallel4(h_in,v,thresh_search=1e-12, nproc=None, opt_einsum=True, n
                                 for cj in range(oi):
                                     state_sign *= (-1)**(fock_r[cj][0]+fock_r[cj][1])
                             
-                        #print("  ", conf_r)
-                        
-                        #if abs(v[fock_r][conf_r]) < 5e-2:
-                        #    continue
-                        # get state sign 
-                        #print('state_sign ', state_sign)
             
                         nonzeros = []
                         opii = -1
@@ -1350,20 +1338,9 @@ def matvec1_parallel4(h_in,v,thresh_search=1e-12, nproc=None, opt_einsum=True, n
                             if op == "":
                                 continue
                             opii += 1
-                            #print(opi,term.active)
                             ci = h.clusters[opi]
-                            #ci = clusters[term.active[opii]]
                             try:
                                 oi = ci.ops[op][(fock_l[ci.idx],fock_r[ci.idx])][:,conf_r[ci.idx],:]
-                                    
-                                #nonzeros_curr = []
-                                #for K in range(oi.shape[0]):
-                                #    if np.amax(np.abs(oi[K,:])) > 1e-16:
-                                #    #if np.amax(np.abs(oi[K,:])) > thresh_search/10:
-                                #        nonzeros_curr.append(K)
-                                #oinz = oi[nonzeros_curr,:]
-                                #mats.append(oinz)
-                                #nonzeros.append(nonzeros_curr)
                                 mats.append(oi)
                                 nonzeros.append(range(oi.shape[0]))
             
@@ -1377,23 +1354,8 @@ def matvec1_parallel4(h_in,v,thresh_search=1e-12, nproc=None, opt_einsum=True, n
                         if len(mats) == 0:
                             continue
                         
-                        #start2 = time.time()
-                        #print()
-                        #print(term)
-                        #print('mats:', end='')
-                        #[print(m.shape,end='') for m in mats]
-                        #print('ints:', term.ints.shape)
-                        #print("contract_string       :", term.contract_string)
-                        #print("contract_string_matvec:", term.contract_string_matvec, flush=True)
-                        
-                        
-                        #tmp = oe.contract(term.contract_string_matvec, *mats, term.ints)
-                        
             
                         tmp = np.einsum(term.contract_string_matvec, *mats, term.ints, optimize=opt_einsum)
-                        
-            
-                        #stop2 = time.time()
                         
                         tmp = state_sign * tmp * coeff 
                         
@@ -1403,13 +1365,11 @@ def matvec1_parallel4(h_in,v,thresh_search=1e-12, nproc=None, opt_einsum=True, n
                             #new_configs[cact] = range(mats[cacti].shape[0])
                             
                         matvec_update_with_new_configs2(tmp, new_configs, configs_l, term.active, thresh_search)
-                    #stop1 = time.time()
-                    #print(" Time spent in einsum: %12.2f: total: %12.2f: NBody: %6i" %( stop2-start2,  stop1-start1, len(term.active)))
         return sigma_out
     
     # define batches
     conf_batches = []
-    batch_size = math.ceil(1) 
+    batch_size = min(batch_size,len(v))  
     #batch_size = math.ceil(len(v)/(2)) 
     batch = []
     print(" Form batches. Max batch size: ", batch_size)
