@@ -1210,7 +1210,7 @@ def matvec1_parallel4(h_in,v,thresh_search=1e-12, nproc=None, opt_einsum=True, n
     sigma = v.copy() 
     sigma.zero()
     
-    def matvec_update_with_new_configs1(coeff_tensor, new_configs, configs, active, thresh_search=1e-12):
+    def matvec_update_with_new_configs2(coeff_tensor, new_configs, configs, active, thresh_search=1e-12):
        # {{{
         nactive = len(active) 
        
@@ -1274,12 +1274,14 @@ def matvec1_parallel4(h_in,v,thresh_search=1e-12, nproc=None, opt_einsum=True, n
             # local terms should trigger a fail since they are handled separately 
             print(" Wrong value in update_with_new_configs")
             exit()
-    
+   
+        #print(" Size of ndarray:   ", sys.getsizeof(coeff_tensor))
+        #print(" Size of dictionary:", sys.getsizeof(configs))
     
         return 
     # }}}
 
-    def matvec_update_with_new_configs2(coeff_tensor, new_configs, configs, active, thresh_search=1e-12):
+    def matvec_update_with_new_configs1(coeff_tensor, new_configs, configs, active, thresh_search=1e-12):
        # {{{
         nactive = len(active) 
        
@@ -1386,7 +1388,8 @@ def matvec1_parallel4(h_in,v,thresh_search=1e-12, nproc=None, opt_einsum=True, n
                 
                 #if fock_l not in sigma_out.data:
                 if fock_l not in sigma_out:
-                    sigma_out[fock_l] = OrderedDict()
+                    sigma_out[fock_l] = {} 
+                    #sigma_out[fock_l] = OrderedDict()
                 
                 configs_l = sigma_out[fock_l] 
                 
@@ -1472,6 +1475,7 @@ def matvec1_parallel4(h_in,v,thresh_search=1e-12, nproc=None, opt_einsum=True, n
                             #new_configs[cact] = range(mats[cacti].shape[0])
                             
                         matvec_update_with_new_configs2(tmp, new_configs, configs_l, term.active, thresh_search)
+            #print(" Size of sigma_out:", sys.getsizeof(sigma_out))
         return sigma_out
     
     # define batches
