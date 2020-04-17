@@ -1210,7 +1210,7 @@ def matvec1_parallel4(h_in,v,thresh_search=1e-12, nproc=None, opt_einsum=True, n
     sigma = v.copy() 
     sigma.zero()
     
-    def matvec_update_with_new_configs2(coeff_tensor, new_configs, configs, active, thresh_search=1e-12):
+    def matvec_update_with_new_configs1(coeff_tensor, new_configs, configs, active, thresh_search=1e-12):
        # {{{
         nactive = len(active) 
        
@@ -1268,6 +1268,89 @@ def matvec1_parallel4(h_in,v,thresh_search=1e-12, nproc=None, opt_einsum=True, n
                 else:
                     configs[key] += coeff_tensor[I[0],I[1],I[2],I[3]]
                 #count += 1
+            #print(" nb4: size: %8i nonzero: %8i" %(coeff_tensor.size, count))
+    
+        else:
+            # local terms should trigger a fail since they are handled separately 
+            print(" Wrong value in update_with_new_configs")
+            exit()
+    
+    
+        return 
+    # }}}
+
+    def matvec_update_with_new_configs2(coeff_tensor, new_configs, configs, active, thresh_search=1e-12):
+       # {{{
+        nactive = len(active) 
+       
+        _abs = abs
+   
+        assert(len(active) == len(coeff_tensor.shape))
+    
+        config_curr = [i[0] for i in new_configs]
+        count = 0
+        if nactive==2:
+        
+            _range0 = range(coeff_tensor.shape[0])
+            _range1 = range(coeff_tensor.shape[1])
+            for I0 in _range0:
+                for I1 in _range1:
+                    try:
+                        config_curr[active[0]] = new_configs[active[0]][I0] 
+                        config_curr[active[1]] = new_configs[active[1]][I1] 
+                    except:
+                        print()
+                        print(" Tensor: ", coeff_tensor.shape)
+                        print(" Nz Idx: ", I0,I1)
+                        print(" new_co: ", new_configs)
+                        print(" active: ", active,flush=True)
+                        exit()
+                    key = tuple(config_curr)
+                    if key not in configs:
+                        configs[key] = coeff_tensor[I0,I1]
+                    else:
+                        configs[key] += coeff_tensor[I0,I1]
+                    #count += 1
+            #print(" nb2: size: %8i nonzero: %8i" %(coeff_tensor.size, count))
+    
+                        
+        elif nactive==3:
+    
+            _range0 = range(coeff_tensor.shape[0])
+            _range1 = range(coeff_tensor.shape[1])
+            _range2 = range(coeff_tensor.shape[2])
+            for I0 in _range0:
+                for I1 in _range1:
+                    for I2 in _range2:
+                        config_curr[active[0]] = new_configs[active[0]][I0] 
+                        config_curr[active[1]] = new_configs[active[1]][I1] 
+                        config_curr[active[2]] = new_configs[active[2]][I2] 
+                        key = tuple(config_curr)
+                        if key not in configs:
+                            configs[key] = coeff_tensor[I0,I1,I2]
+                        else:
+                            configs[key] += coeff_tensor[I0,I1,I2]
+    
+        elif nactive==4:
+    
+            _range0 = range(coeff_tensor.shape[0])
+            _range1 = range(coeff_tensor.shape[1])
+            _range2 = range(coeff_tensor.shape[2])
+            _range3 = range(coeff_tensor.shape[3])
+            for I0 in _range0:
+                for I1 in _range1:
+                    for I2 in _range2:
+                        for I3 in _range3:
+                            config_curr[active[0]] = new_configs[active[0]][I0] 
+                            config_curr[active[1]] = new_configs[active[1]][I1] 
+                            config_curr[active[2]] = new_configs[active[2]][I2] 
+                            config_curr[active[3]] = new_configs[active[3]][I3] 
+                            key = tuple(config_curr)
+                            if key not in configs:
+                                configs[key] = coeff_tensor[I0,I1,I2,I3]
+                            else:
+                                configs[key] += coeff_tensor[I0,I1,I2,I3]
+                            #count += 1
             #print(" nb4: size: %8i nonzero: %8i" %(coeff_tensor.size, count))
     
         else:
