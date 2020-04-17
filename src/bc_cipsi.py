@@ -109,7 +109,7 @@ def bc_cipsi_tucker(ci_vector, clustered_ham,
         shared_mem          = 1e9,
         batch_size          = 1,
         tucker_conv_target  = 0,
-        matvec              = 4,
+        matvec              = 5,
         nproc               = None):
     """
     Run iterations of TP-CIPSI to make the tucker decomposition self-consistent
@@ -257,7 +257,7 @@ def bc_cipsi(ci_vector, clustered_ham,
     thresh_search   = 0, 
     shared_mem      = 1e9,
     batch_size      = 1,
-    matvec          = 4,
+    matvec          = 5,
     nproc           = None
     ):
     """
@@ -384,6 +384,9 @@ def bc_cipsi(ci_vector, clustered_ham,
             pt_vector = matvec1_parallel3(clustered_ham, asci_vector, nproc=nproc, thresh_search=thresh_search, nbody_limit=nbody_limit)
         elif matvec==4:
             pt_vector = matvec1_parallel4(clustered_ham, asci_vector, nproc=nproc, thresh_search=thresh_search, nbody_limit=nbody_limit,
+                    shared_mem=shared_mem, batch_size=batch_size)
+        elif matvec==5:
+            pt_vector = matvec1_parallel5(clustered_ham, asci_vector, nproc=nproc, thresh_search=thresh_search, nbody_limit=nbody_limit,
                     shared_mem=shared_mem, batch_size=batch_size)
         stop = time.time()
         print(" Time spent in matvec: %12.2f" %( stop-start))
