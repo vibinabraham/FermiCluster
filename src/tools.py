@@ -1528,7 +1528,7 @@ def matvec1_parallel4(h_in,v,thresh_search=1e-12, nproc=None, opt_einsum=True, n
 
         print(" Number of configs: ", len(v))
         print(" Number of batches: ", len(conf_batches))
-        print(" Batches complete : ", end='')
+        print(" Batches complete : " )
         #print("|                                                                                                    |")
         nbatches = len(conf_batches)
         update = 0

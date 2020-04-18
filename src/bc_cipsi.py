@@ -185,9 +185,14 @@ def bc_cipsi_tucker(ci_vector, clustered_ham,
         elif selection == "heatbath":
             start = time.time()
             ci_vector, e0 = hb_tpsci(ci_vector_ref.copy(), clustered_ham, 
-                    thresh_cipsi=thresh_cipsi, thresh_ci_clip=thresh_ci_clip, nbody_limit=nbody_limit, 
-                    thresh_conv=thresh_cipsi_conv, max_iter=max_cipsi_iter,thresh_asci=thresh_asci,
-                    nproc=nproc)
+                                            thresh_cipsi    = thresh_cipsi, 
+                                            thresh_ci_clip  = thresh_ci_clip, 
+                                            nbody_limit     = nbody_limit, 
+                                            thresh_conv     = thresh_cipsi_conv, 
+                                            max_iter        = max_cipsi_iter,
+                                            thresh_asci     = thresh_asci,
+                                            thresh_search   = thresh_search,
+                                            nproc           = nproc)
             end = time.time()
             pt_vector = ClusteredState()
             e_curr = e0
@@ -507,13 +512,17 @@ def bc_cipsi(ci_vector, clustered_ham,
 
 
 def hb_tpsci(ci_vector, clustered_ham, 
-        thresh_cipsi=1e-4, 
-        thresh_ci_clip=1e-5, 
-        thresh_conv=1e-8, 
-        max_iter=30, 
-        n_roots=1, 
-        thresh_asci=0,
-        nbody_limit=4, 
+        thresh_cipsi    = 1e-4, 
+        thresh_ci_clip  = 1e-5, 
+        thresh_conv     = 1e-8, 
+        max_iter        = 30, 
+        n_roots         = 1, 
+        thresh_asci     = 0,
+        nbody_limit     = 4, 
+        thresh_search   = 0, 
+        shared_mem      = 1e9,
+        batch_size      = 1,
+        matvec          = 4,
         nproc=None):
 # {{{
     
@@ -586,15 +595,25 @@ def hb_tpsci(ci_vector, clustered_ham,
         
         ci_vector.print()
         
+        asci_vector = ci_vector.copy()
+        print(" Choose subspace from which to search for new configs. Thresh: ", thresh_asci)
+        print(" CI Dim          : %8i" % len(asci_vector))
+        kept_indices = asci_vector.clip(thresh_asci)
+        print(" Search Dim      : %8i Norm: %12.8f" %( len(asci_vector), asci_vector.norm()))
+        #asci_vector.normalize()
+        
         print(" Perform Heat-Bath selection to find new configurations:",flush=True)
         start=time.time()
-        if nproc==1:
-            pt_vector = matvec1(clustered_ham, ci_vector, thresh_search=thresh_search, nbody_limit=nbody_limit)
-        else:
-            pt_vector = matvec1_parallel3(clustered_ham, ci_vector, 
-                                            nproc=nproc, 
-                                            thresh_search=thresh_cipsi, 
-                                            nbody_limit=nbody_limit)
+        if matvec==1:
+            pt_vector = matvec1_parallel1(clustered_ham, asci_vector, nproc=nproc, thresh_search=thresh_search, nbody_limit=nbody_limit)
+        elif matvec==2:
+            pt_vector = matvec1_parallel2(clustered_ham, asci_vector, nproc=nproc, thresh_search=thresh_search, nbody_limit=nbody_limit)
+        elif matvec==3:
+            pt_vector = matvec1_parallel3(clustered_ham, asci_vector, nproc=nproc, thresh_search=thresh_search, nbody_limit=nbody_limit)
+        elif matvec==4:
+            pt_vector = matvec1_parallel4(clustered_ham, asci_vector, nproc=nproc, thresh_search=thresh_search, nbody_limit=nbody_limit,
+                    shared_mem=shared_mem, batch_size=batch_size)
+        
         #pt_vector = heat_bath_search(clustered_ham, ci_vector, thresh_cipsi=thresh_cipsi, nproc=nproc)
         stop=time.time()
         print(" Number of new configurations found         : ", len(pt_vector))
