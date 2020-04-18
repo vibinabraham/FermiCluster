@@ -185,14 +185,17 @@ def bc_cipsi_tucker(ci_vector, clustered_ham,
         elif selection == "heatbath":
             start = time.time()
             ci_vector, e0 = hb_tpsci(ci_vector_ref.copy(), clustered_ham, 
-                                            thresh_cipsi    = thresh_cipsi, 
-                                            thresh_ci_clip  = thresh_ci_clip, 
-                                            nbody_limit     = nbody_limit, 
-                                            thresh_conv     = thresh_cipsi_conv, 
-                                            max_iter        = max_cipsi_iter,
-                                            thresh_asci     = thresh_asci,
-                                            thresh_search   = thresh_search,
-                                            nproc           = nproc)
+                                                        thresh_cipsi    = thresh_cipsi, 
+                                                        thresh_ci_clip  = thresh_ci_clip, 
+                                                        thresh_conv     = thresh_cipsi_conv, 
+                                                        max_iter        = max_cipsi_iter,
+                                                        thresh_asci     = thresh_asci,
+                                                        nbody_limit     = nbody_limit,
+                                                        matvec          = matvec,
+                                                        batch_size      = batch_size,
+                                                        shared_mem      = shared_mem,
+                                                        thresh_search   = thresh_search, 
+                                                        nproc           = nproc)
             end = time.time()
             pt_vector = ClusteredState()
             e_curr = e0
