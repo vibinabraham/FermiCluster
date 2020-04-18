@@ -110,6 +110,7 @@ def bc_cipsi_tucker(ci_vector, clustered_ham,
         batch_size          = 1,
         tucker_conv_target  = 0,
         matvec              = 4,
+        chk_file            = None,
         nproc               = None):
     """
     Run iterations of TP-CIPSI to make the tucker decomposition self-consistent
@@ -242,11 +243,16 @@ def bc_cipsi_tucker(ci_vector, clustered_ham,
                         ci.ops[o][fock] = np.ascontiguousarray(ci.ops[o][fock])
         stop = time.time()
         print(" Time spent making operators contiguous: %12.2f" %( stop-start))
-        
-        print(" Saving Hamiltonian to disk",flush=True)
-        hamiltonian_file = open('hamiltonian_file_tucker', 'wb')
-        pickle.dump(clustered_ham, hamiltonian_file)
-        print(" Done.",flush=True)
+       
+        if chk_file != None:
+            print(" Saving Hamiltonian to disk",flush=True)
+            file = open("%s_ham"%chk_file, 'wb')
+            pickle.dump(clustered_ham, file)
+            print(" Done.",flush=True)
+            #print(" Saving wavefunction to disk",flush=True)
+            #file = open("%s_vec"%chk_file, 'wb')
+            #pickle.dump(ci_vector, file)
+            print(" Done.",flush=True)
 
 
     return ci_vector, pt_vector, e0, e2, t_conv
