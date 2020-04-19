@@ -120,10 +120,14 @@ class Cluster(object):
         h = np.zeros([self.n_orb]*2)
         f = np.zeros([self.n_orb]*2)
         v = np.zeros([self.n_orb]*4)
-        
+        da = np.zeros([self.n_orb]*2)
+        db = np.zeros([self.n_orb]*2)
+       
         for pidx,p in enumerate(self.orb_list):
             for qidx,q in enumerate(self.orb_list):
                 h[pidx,qidx] = hin[p,q]
+                da[pidx,qidx] = rdm1_a[p,q]
+                db[pidx,qidx] = rdm1_b[p,q]
         
         for pidx,p in enumerate(self.orb_list):
             for qidx,q in enumerate(self.orb_list):
@@ -136,14 +140,21 @@ class Cluster(object):
             print(" Compute single particle embedding potential")
             denv_a = 1*rdm1_a
             denv_b = 1*rdm1_b
+            dact_a = 0*rdm1_a
+            dact_b = 0*rdm1_b
             for pidx,p in enumerate(self.orb_list):
                 for qidx,q in enumerate(range(rdm1_a.shape[0])):
                     denv_a[p,q] = 0
                     denv_b[p,q] = 0
                     denv_a[q,p] = 0
                     denv_b[q,p] = 0
+                    
+                    dact_a[p,q] = rdm1_a[p,q] 
+                    dact_b[p,q] = rdm1_b[p,q] 
+                    dact_a[q,p] = rdm1_a[q,p]
+                    dact_b[q,p] = rdm1_b[q,p]
            
-            if iprint>0:
+            if iprint>1:
                 print(" Environment 1RDM:")
                 print_mat(denv_a+denv_b)
             print(" Trace of env 1RDM: %12.8f" %np.trace(denv_a + denv_b))
@@ -161,32 +172,44 @@ class Cluster(object):
             #e += np.einsum('pqrs,pq,rs->',vin,d,d)
            
             e = e1 + .5*e2
-            print(" E: %12.8f" %(e+ecore))
+            if iprint>1:
+                print(" E1              : % 12.8f" %(e1))
+                print(" E2              : % 12.8f" %(e2))
+            print(" E(mean-field)   : % 12.8f" %(e+ecore))
            
-            fa =  hin*0 
-            fb =  hin*0
-            fa += np.einsum('pqrs,pq->rs',vin,denv_a)
-            fa += np.einsum('pqrs,pq->rs',vin,denv_b)
-            fa -= np.einsum('pqrs,ps->qr',vin,denv_a)
-            fb += np.einsum('pqrs,pq->rs',vin,denv_b)
-            fb += np.einsum('pqrs,pq->rs',vin,denv_a)
-            fb -= np.einsum('pqrs,ps->qr',vin,denv_b)
+            ga =  np.zeros(hin.shape) 
+            gb =  np.zeros(hin.shape) 
+            ga += np.einsum('pqrs,pq->rs',vin,(denv_a+denv_b))
+            ga -= np.einsum('pqrs,ps->qr',vin,denv_a)
+            
+            gb += np.einsum('pqrs,pq->rs',vin,(denv_a+denv_b))
+            gb -= np.einsum('pqrs,ps->qr',vin,denv_b)
 
-        
+            De = denv_a + denv_b
+            Fa = hin + .5*ga
+            Fb = hin + .5*gb
+            F = hin + .25*(ga + gb)
+            Eenv = np.trace(De @ F) 
+            if iprint>1:
+                print(" ----")
+                print(" Eenv            : % 12.8f" %(Eenv)) 
+       
+            f = np.zeros([self.n_orb]*2)
             for pidx,p in enumerate(self.orb_list):
                 for qidx,q in enumerate(self.orb_list):
-                    f[pidx,qidx] = .5*(fa[p,q] + fb[p,q])
-           
+                    f[pidx,qidx] =  F[p,q]
 
         H = Hamiltonian()
         H.S = np.eye(h.shape[0])
         H.C = H.S
-        H.t = h + f
+        H.t = 2*f-h
         H.V = v
         H.ecore = ecore
         self.basis = {}
         self.ops['H_mf'] = {}
       
+        #print(np.trace(da))
+        #print(np.trace(db))
         self.Hlocal = {}
         for na,nb in spaces:
             ci = ci_solver()
@@ -195,6 +218,9 @@ class Cluster(object):
             print(ci)
             Hci = ci.run()
             #self.basis[(na,nb)] = np.eye(ci.results_v.shape[0])
+            if iprint>0:
+                for i,ei in enumerate(ci.results_e):
+                    print(" Local State %5i: %12.8f Total: %12.8f" %(i,ei,ei + ecore+Eenv))
             fock = (na,nb)
             self.basis[fock] = ci.results_v
             self.Hlocal[fock] =  Hci 

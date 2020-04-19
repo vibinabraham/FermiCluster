@@ -175,7 +175,7 @@ class PyscfHelper(object):
         else: 
             print("Error:NO orbital basis defined")
 
-        molden.from_mo(mol, 'h8.molden', C)
+        molden.from_mo(mol, 'orbitals.molden', C)
 
         if cas == True:
             print(C.shape)

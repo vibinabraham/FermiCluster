@@ -90,12 +90,14 @@ def cmf(clustered_ham, ci_vector, h, g,
         
         print(" Build cluster basis and operators")
         for ci_idx, ci in enumerate(clusters):
-            print(ci)
+            print(" ",ci)
             assert(ci_idx == ci.idx)
-            if cmf_iter > 0:
-                ci.form_fockspace_eigbasis(h, g, [fspace[ci_idx]], max_roots=1, rdm1_a=rdm_a, rdm1_b=rdm_b)
-            else:
-                ci.form_fockspace_eigbasis(h, g, [fspace[ci_idx]], max_roots=1)
+            ci.form_fockspace_eigbasis(h, g, [fspace[ci_idx]], 
+                    max_roots=1, 
+                    ecore=ecore,
+                    rdm1_a=rdm_a, 
+                    rdm1_b=rdm_b, 
+                    iprint=1)
         
             print(" Build new operators for cluster ",ci.idx)
             ci.build_op_matrices(iprint=0)

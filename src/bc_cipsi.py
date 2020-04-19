@@ -35,7 +35,7 @@ def system_setup(h, g, ecore, blocks, init_fspace,
     print("     |delta_elec     : ", delta_elec)
     print("     |cmf_diis       : ", cmf_diis)
     print("     |cmf_maxiter    : ", cmf_maxiter)
-    print("     |cmf_dm_guess   : ", cmf_dm_guess)
+    print("     |cmf_dm_guess   : ", cmf_dm_guess != None)
     print("     |cmf_thresh     : ", cmf_thresh)
     print("     |cmf_diis_start : ", cmf_diis_start)
     print("     |cmf_max_diis   : ", cmf_max_diis)
