@@ -28,7 +28,8 @@ class PyscfHelper(object):
         self.J      = None
         self.K      = None
 
-    def init(self,molecule,charge,spin,basis_set,orb_basis='scf',cas=False,cas_nstart=None,cas_nstop=None,cas_nel=None,loc_nstart=None,loc_nstop=None):
+    def init(self,molecule,charge,spin,basis_set,orb_basis='scf',cas=False,cas_nstart=None,cas_nstop=None,cas_nel=None,loc_nstart=None,loc_nstop=None,
+            scf_conv_tol=1e-10):
     # {{{
         import pyscf
         from pyscf import gto, scf, ao2mo, molden, lo
@@ -54,7 +55,7 @@ class PyscfHelper(object):
         #SCF 
 
         #mf = scf.RHF(mol).run(init_guess='atom')
-        mf = scf.RHF(mol).run()
+        mf = scf.RHF(mol).run(conv_tol=scf_conv_tol)
         #C = mf.mo_coeff #MO coeffs
         enu = mf.energy_nuc()
         
