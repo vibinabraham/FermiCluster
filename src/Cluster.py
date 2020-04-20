@@ -220,7 +220,7 @@ class Cluster(object):
             #self.basis[(na,nb)] = np.eye(ci.results_v.shape[0])
             if iprint>0:
                 for i,ei in enumerate(ci.results_e):
-                    print(" Local State %5i: %12.8f Total: %12.8f" %(i,ei,ei + ecore+Eenv))
+                    print(" Local State %5i: Local E: %12.8f Embedded E: %12.8f Total E: %12.8f" %(i, ei, ei+Eenv, ei+ecore+Eenv))
             fock = (na,nb)
             self.basis[fock] = ci.results_v
             self.Hlocal[fock] =  Hci 
