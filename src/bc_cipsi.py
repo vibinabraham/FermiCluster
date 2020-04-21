@@ -407,7 +407,7 @@ def bc_cipsi(ci_vector, clustered_ham,
         # Compute the energy of the zeroth-order energy using matvec. 
         # This gives us some indication how accurate the approximations 
         # (asci_vector, and thresh_search) are
-        e0_curr = ci_vector.dot(pt_vector) 
+        e0_curr = ci_vector.dot(pt_vector)/asci_vector.dot(asci_vector) 
         print(" Zeroth-order energy: %12.8f Error in E0: %12.8f" %(e0_curr, e0_curr - e0)) 
 
         if profile:
