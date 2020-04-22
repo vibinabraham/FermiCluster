@@ -207,6 +207,7 @@ class ClusteredTerm:
         mats = []
         # state sign is always 1 here, since an even number of creation/annihilation operators can only 
         # contribute to diagonal
+        
         state_sign = 1
         n_active = 0
         for oi,o in enumerate(self.ops):
@@ -327,7 +328,7 @@ class LocalClusteredTerm(ClusteredTerm):
         super().__init__(delta, ops, np.empty([]), clusters)
 
     
-    def matrix_element(self,fock_bra,bra,fock_ket,ket):
+    def matrix_element(self,fock_bra,bra,fock_ket,ket,opt_einsum=None):
         """
         Compute the matrix element between <fock1,config1|H|fock2,config2>
         where fock is the 'fock-block' of bra. This is just a specification
@@ -362,7 +363,7 @@ class LocalClusteredTerm(ClusteredTerm):
         return self.clusters[ci].ops['H'][(fock_bra[ci],fock_ket[ci])][bra[ci],ket[ci]]
 # }}}
     
-    def diag_matrix_element(self,fock,config):
+    def diag_matrix_element(self,fock,config,opt_einsum=None):
         return self.matrix_element(fock,config,fock,config) 
 
 

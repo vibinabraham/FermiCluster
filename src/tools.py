@@ -2314,7 +2314,7 @@ def build_hamiltonian_diagonal_parallel1(clustered_ham_in, ci_vector, nproc=None
         
         for term in terms:
             #tmp += term.matrix_element(fockspace,config,fockspace,config)
-            tmp += term.diag_matrix_element(fockspace,config)
+            tmp += term.diag_matrix_element(fockspace,config,opt_einsum=False)
         return tmp
 
     import multiprocessing as mp
