@@ -94,8 +94,6 @@ def run(nproc=None):
 def test_1():
     run(nproc=None)
 
-def test_2():
-    run(nproc=1)
 
 if __name__== "__main__":
     test_1() 
