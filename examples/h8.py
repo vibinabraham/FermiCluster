@@ -30,12 +30,10 @@ r0 = 2.00
 molecule = '''
 H   0   0   0
 H   0   0   1
-H   0   0   2
 H   0   0   3
-H   0   0   6
-H   0   0   7
-H   0   0   8
-H   0   0   9
+H   0   0   4
+H   0   2   3
+H   0   2   4
 '''.format(r0,r1)
 charge = 0
 spin  = 0
@@ -44,15 +42,11 @@ basis_set = 'sto-3g'
 ###     TPSCI BASIS INPUT
 orb_basis = 'lowdin'
 cas = False
-cas_nel = 8
+cas_nel = 6
 
 ###     TPSCI CLUSTER INPUT
-blocks = [[0,1,2,3],[4,5,6,7]]
-init_fspace = ((2, 2), (2, 2))
-blocks = [[0,1,2,3],[4,5,6,7],[8,9,10,11]]
-init_fspace = ((2, 2), (2, 2), (2, 2))
-blocks = [[0,1],[2,3],[4,5],[6,7]]
-init_fspace = ((1, 1), (1, 1),(1, 1),(1,1))
+blocks = [[0,1],[2,3],[4,5]]
+init_fspace = ((1, 1), (1, 1), (1, 1))
 
 nelec = tuple([sum(x) for x in zip(*init_fspace)])
 if cas == True:
