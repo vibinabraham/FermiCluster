@@ -37,17 +37,14 @@ def test_1():
     orb_basis = 'boys'
     orb_basis = 'scf'
     cas = True
-    cas_nstart = 2
+    cas_nstart = 0
     cas_nstop = 10
-    cas_nel = 10
+    cas_nel = 14
 
     ###     TPSCI CLUSTER INPUT
     #blocks = [[0,1,2,7],[3,6],[4,5]]
    
-    if orb_basis == 'boys':
-        blocks = [[0,2,3,4],[1,5,6,7]]
-    elif orb_basis == 'scf':
-        blocks = [[0,1,2,3],[4,5,6,7]]
+    blocks = [[0,1],[2,3,4,5],[6,7,8,9]]
 
     #Integrals from pyscf
     pmol = PyscfHelper()
@@ -60,125 +57,33 @@ def test_1():
 
 
 
-    #cluster using hcore
-    #idx = e1_order(h,cut_off = 1e-4)
-    #h,g = reorder_integrals(idx,h,g)
+    init_fspace = ((2,2),(4,4),(2,2))
+    clusters, clustered_ham, ci_vector, cmf_out = system_setup(h, g, ecore, blocks, init_fspace,
+                                                        max_roots   = 100,
+                                                        cmf_maxiter = 0
+                                                        )
 
-        
-    #efci, fci_dim = run_fci_pyscf(h,g,cas_nel,ecore=ecore)
-    #print(" FCI energy: %12.8f" %efci)
-
-    clusters = []
-
-    for ci,c in enumerate(blocks):
-        clusters.append(Cluster(ci,c))
-
-    ci_vector = ClusteredState(clusters)
-    if orb_basis == 'boys':
-        ci_vector.init(((3,2),(2,3)))
-        ci_vector.add_fockspace(((2,3),(3,2)))
-        ci_vector.add_fockspace(((1,4),(4,1)))
-        ci_vector.add_fockspace(((4,1),(1,4)))
-    elif orb_basis == 'scf':
-        ci_vector.init(((4,4),(1,1)))
-        ci_vector.init(((4,3),(1,2)))
-        ci_vector.init(((3,4),(2,1)))
-
-    #ci_vector.add_fockspace(((2,2),(3,3)))
-    #ci_vector.add_fockspace(((3,3),(2,2)))
-
-    print(" Clusters:")
-    [print(ci) for ci in clusters]
-
-    clustered_ham = ClusteredOperator(clusters)
-    print(" Add 1-body terms")
-    clustered_ham.add_1b_terms(h)
-    print(" Add 2-body terms")
-    clustered_ham.add_2b_terms(g)
-
-    print(" Build cluster basis")
-    for ci_idx, ci in enumerate(clusters):
-        assert(ci_idx == ci.idx)
-        print(" Extract local operator for cluster",ci.idx)
-        opi = clustered_ham.extract_local_operator(ci_idx)
-        print()
-        print()
-        print(" Form basis by diagonalize local Hamiltonian for cluster: ",ci_idx)
-        ci.form_eigbasis_from_local_operator(opi,max_roots=1000)
-
-
-    #clustered_ham.add_ops_to_clusters()
-    print(" Build these local operators")
-    for c in clusters:
-        print(" Build mats for cluster ",c.idx)
-        c.build_op_matrices()
-
-    ci_vector.expand_to_full_space()
-    ci_vector.expand_each_fock_space()
+    ci_vector.expand_to_full_space(clusters)
+    print(" Length of ci vector: ", len(ci_vector), flush=True)
     #ci_vector.add_single_excitonic_states()
     #ci_vector.print_configs()
     edps = build_hamiltonian_diagonal(clustered_ham,ci_vector)
     #print("init DPS %16.8f"%(edps+ecore))
+    
+    start = timer()
+    #Hd2 = build_hamiltonian_diagonal_parallel1(clustered_ham, pt_vector, nproc=1)
+    Hd2 = build_hamiltonian_diagonal_parallel1(clustered_ham, ci_vector.copy())
+    stop = timer()
+    print(" Denomiator Time lapse: ",(stop-start))
 
-    if 0:
-        print(" Build Hamiltonian. Space = ", len(ci_vector), flush=True)
-        start = timer()
-        H = build_full_hamiltonian_parallel1(clustered_ham, ci_vector)
-        stop = timer()
-        print(" Time lapse: ",(stop-start))
-        
-        n_roots=1
-        print(" Diagonalize Hamiltonian Matrix:",flush=True)
-        e,v = scipy.sparse.linalg.eigsh(H,n_roots,which='SA')
-        idx = e.argsort()
-        e = e[idx]
-        v = v[:,idx]
-        v0 = v[:,0]
-        e0 = e[0]
-        print(" Ground state of CI:                 %12.8f  CI Dim: %4i "%(ecore+e0.real,len(ci_vector)))
-        
-        
-        ci_vector.zero()
-        ci_vector.set_vector(v0)
-        
-        
-        print(" Compute Matrix Vector Product:", flush=True)
-        
-        start = timer()
-        pt_vector = matvec_parallel1(clustered_ham, ci_vector)
-        stop = timer()
-        print(" Time lapse: ",(stop-start))
-        
-        pt_vector.prune_empty_fock_spaces()
-        
-        print(" Remove CI space from pt_vector vector")
-        for fockspace,configs in pt_vector.items():
-            if fockspace in ci_vector.fblocks():
-                for config,coeff in list(configs.items()):
-                    if config in ci_vector[fockspace]:
-                        del pt_vector[fockspace][config]
-        
-        pt_vector.prune_empty_fock_spaces()
-
-    else:
-        pt_vector = ci_vector
 
     print(" Length of ci vector: ", len(ci_vector))
-    precompute_cluster_basis_energies(clustered_ham)
-    Hd_vector1 = ClusteredState(ci_vector.clusters)
+    Hd_vector1 = ClusteredState()
     start = timer()
-    Hd1 = update_hamiltonian_diagonal(clustered_ham, pt_vector, Hd_vector1)
+    Hd1 = update_hamiltonian_diagonal(clustered_ham, ci_vector.copy(), Hd_vector1)
     stop = timer()
     print(" Denomiator Time lapse: ",(stop-start))
     
-    pt_vector.prune_empty_fock_spaces()
-
-    print(" Length of ci vector: ", len(ci_vector))
-    start = timer()
-    #Hd2 = build_hamiltonian_diagonal_parallel1(clustered_ham, pt_vector, nproc=1)
-    Hd2 = build_hamiltonian_diagonal_parallel1(clustered_ham, pt_vector)
-    stop = timer()
-    print(" Denomiator Time lapse: ",(stop-start))
 
     #assert(len(Hd_vector2) == len(Hd_vector1))
     for a in range(len(Hd_vector1)):

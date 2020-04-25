@@ -15,8 +15,9 @@ ttt = time.time()
 pyscf.lib.num_threads(1) #with degenerate states and multiple processors there can be issues
 np.set_printoptions(suppress=True, precision=3, linewidth=1500)
 
-def test_truncate_basis():
-    # {{{
+
+def test():
+    
     ttt = time.time()
 
     ###     PYSCF INPUT
@@ -44,8 +45,8 @@ def test_truncate_basis():
     #cas_nel = 10
 
     ###     TPSCI CLUSTER INPUT
-    blocks = [[0,1,2,3],[4,5],[6,7]]
-    init_fspace = ((1, 1), (1, 0), (0, 1))
+    blocks = [[0,1,2,3],[4,5,6,7]]
+    init_fspace = ((1, 1), (1, 1))
     
     
     nelec = tuple([sum(x) for x in zip(*init_fspace)])
@@ -65,41 +66,58 @@ def test_truncate_basis():
     n_orb = pmol.n_orb
 
     print(" Ecore: %12.8f" %ecore)
-
-    do_fci = 0
-
-    if do_fci:
-        #efci, fci_dim = run_fci_pyscf(h,g,nelec,ecore=ecore, max_cycle=200, conv_tol=12)
-        from pyscf import fci
-        #efci, ci = fci.direct_spin1.kernel(h, g, h.shape[0], nelec,ecore=ecore, verbose=5) #DO NOT USE 
-        cisolver = fci.direct_spin1.FCI()
-        cisolver.max_cycle = 200 
-        cisolver.conv_tol = 1e-14 
-        efci, ci = cisolver.kernel(h, g, h.shape[1], nelec, ecore=ecore,nroots=1,verbose=100)
-        fci_dim = ci.shape[0]*ci.shape[1]
-        d1 = cisolver.make_rdm1(ci, h.shape[1], nelec)
-        print(" PYSCF 1RDM: ")
-        occs = np.linalg.eig(d1)[0]
-        [print("%4i %12.8f"%(i,occs[i])) for i in range(len(occs))]
-        with np.printoptions(precision=6, suppress=True):
-            print(d1)
-        print(" FCI:        %12.8f Dim:%6d"%(efci,fci_dim))
     
-
-    
-    clusters, clustered_ham, ci_vector, cmf_out = system_setup(h, g, ecore, blocks, init_fspace, cmf_maxiter = 20 ,
-            cmf_thresh=1e-12)
    
-    ci_vector.expand_to_random_space(clusters, thresh=.2)
-    print(len(ci_vector))
-    H = build_full_hamiltonian_parallel2(clustered_ham, ci_vector)
-    e,v = np.linalg.eigh(H)
+    clusters, clustered_ham, ci_vector, cmf_out = system_setup(h, g, ecore, blocks, init_fspace, max_roots = 20,  cmf_maxiter = 0 )
+    
+    # rotate the cluster states randomly
+    np.random.seed(2)
+    for ci in clusters:
+        rotations = {}
+        for fock in ci.basis:
+            dim = ci.basis[fock].shape[1]
+            G = np.random.random((dim,dim))
+            U = scipy.linalg.expm(G-G.T)
+            rotations[fock] = U
+        
+        ci.rotate_basis(rotations)
 
-    e = e[0]
-    print(e)
-    assert(np.isclose(e,-4.289958228357164,atol=1e-12))
-    # }}}
+    ci_vector.expand_to_random_space(clusters,thresh=.2)
+
+    filename = open('hamiltonian_file_test', 'wb')
+    pickle.dump(clustered_ham, filename)
+    filename.close()
+    
+    filename = open('state_file_test', 'wb')
+    pickle.dump(ci_vector, filename)
+    filename.close()
+   
+
+    H = build_full_hamiltonian_parallel2(clustered_ham, ci_vector)
+    v = ci_vector.get_vector()
+    eref = v.T @ H @ v
+    eref = eref[0,0]
+    print(" Computed energy : %16.14f " %eref)
+    
+
+    filename = open('hamiltonian_file_test', 'rb')
+    clustered_ham = pickle.load(filename)
+    filename.close()
+    
+    filename = open('state_file_test', 'rb')
+    ci_vector = pickle.load(filename)
+    filename.close()
+
+    H = build_full_hamiltonian_parallel2(clustered_ham, ci_vector)
+    v = ci_vector.get_vector()
+    e = v.T @ H @ v
+
+    e = e[0,0]
+    print(" Computed energy : %16.14f " %e)
+    
+    assert(abs(e - eref) < 1e-14)
 
 
 if __name__== "__main__":
-    test_truncate_basis() 
+     
+    test() 

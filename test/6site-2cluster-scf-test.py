@@ -50,43 +50,13 @@ def run(beta, U, pbc=True):
 
     blocks = [[0,1,2],[3,4,5]]
     n_blocks = len(blocks)
-    clusters = []
+    
+    init_fspace = ((3,3),(0,0))
+    ecore = 0.0 
+    clusters, clustered_ham, ci_vector, cmf_out = system_setup(h, g, ecore, blocks, init_fspace,
+                                                                cmf_maxiter = 10
+                                                                )
 
-    for ci,c in enumerate(blocks):
-        clusters.append(Cluster(ci,c))
-
-    ci_vector = ClusteredState(clusters)
-    ci_vector.init(((3,3),(0,0)))
-
-    print(" Clusters:")
-    [print(ci) for ci in clusters]
-
-    clustered_ham = ClusteredOperator(clusters)
-    print(" Add 1-body terms")
-    clustered_ham.add_1b_terms(h)
-    print(" Add 2-body terms")
-    clustered_ham.add_2b_terms(g)
-    #clustered_ham.combine_common_terms(iprint=1)
-
-    print(" Build cluster basis")
-    for ci_idx, ci in enumerate(clusters):
-        assert(ci_idx == ci.idx)
-        print(" Extract local operator for cluster",ci.idx)
-        opi = clustered_ham.extract_local_operator(ci_idx)
-        print()
-        print()
-        print(" Form basis by diagonalize local Hamiltonian for cluster: ",ci_idx)
-        ci.form_eigbasis_from_local_operator(opi,max_roots=1000)
-
-
-    #clustered_ham.add_ops_to_clusters()
-    print(" Build these local operators")
-    for c in clusters:
-        print(" Build mats for cluster ",c.idx)
-        c.build_op_matrices()
-
-    #ci_vector.expand_to_full_space()
-    #ci_vector.expand_each_fock_space()
 
     ci_vector_ref = ci_vector.copy()
     ci_vector, pt_vector, e0, e2 = bc_cipsi(ci_vector_ref.copy(), clustered_ham, thresh_cipsi=1e-12, thresh_ci_clip=1e-12)
@@ -117,3 +87,5 @@ def test_5():
 def test_6():
     assert(run(1,.1,pbc=False))
 
+if __name__== "__main__":
+    test_1() 

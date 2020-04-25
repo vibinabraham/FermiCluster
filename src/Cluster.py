@@ -3,7 +3,7 @@ import scipy
 import itertools as it
 
 import opt_einsum as oe
-
+import time
 from ci_string import *
 from Hamiltonian import *
 from davidson import *
@@ -53,7 +53,6 @@ class Cluster(object):
         self.ops    = {}
         
         self.energies = {}                  # Diagonal of local operators
-        self.Hci = {}
 
     def __len__(self):
         return len(self.orb_list) 
@@ -65,13 +64,171 @@ class Cluster(object):
             has = "|"
         return "IDX%03i:DIM%04i:%s" %(self.idx, self.dim, has)
 
+    def possible_fockspaces(self, delta_elec=None):
+        """
+        Get list of possible fock spaces accessible to the cluster
+
+        delta_elec      :   (ref_alpha, ref_beta, delta) allows restrictions to fock spaces
+                                based on a delta from some reference occupancy (ref_alpha, ref_beta)
+        """
+        # {{{
+      
+        if delta_elec != None:
+            assert(len(delta_elec) == 3)
+            ref_a = delta_elec[0]
+            ref_b = delta_elec[1]
+            delta = delta_elec[2]
+            
+        fspaces = []
+        for na in range(self.n_orb+1):
+            for nb in range(self.n_orb+1):
+                if delta_elec != None:
+                    if abs(na-ref_a)+abs(nb-ref_b) > delta:
+                        continue
+                fspaces.append([na,nb])
+        return fspaces
+        # }}}
+    
     def add_operator(self,op):
         if op in self.ops:
             return
         else:
             self.ops[op] = {}
-    
-    def form_eigbasis_from_ints(self,hin,vin,max_roots=1000, rdm1_a=None, rdm1_b=None, ecore=0):
+
+    def form_fockspace_eigbasis(self, hin, vin, spaces, max_roots=1000, rdm1_a=None, rdm1_b=None, ecore=0, iprint=0):
+        """
+        Get matrices of local Hamiltonians embedded in the system 1rdm and diagonalize to form
+        the cluster basis vectors. This is the main step in CMF
+
+        This function creates entries in the self.ops dictionary for self.ops['H_mf']
+        This data is used to obtain the cluster 
+        energies for an MP2 like correction rather than a EN correction.
+
+        """
+# {{{
+        for f in spaces:
+            assert(len(f)==2)
+
+        if len(f) == 0:
+            print(" No spaces requested - certainly a mistake")
+            exit()
+
+        print(" Build basis vectors for the following fockspaces:")
+        for f in spaces:
+            print("    Alpha:Beta = %4i %-4i" %(f[0],f[1]))
+
+        h = np.zeros([self.n_orb]*2)
+        f = np.zeros([self.n_orb]*2)
+        v = np.zeros([self.n_orb]*4)
+        da = np.zeros([self.n_orb]*2)
+        db = np.zeros([self.n_orb]*2)
+       
+        for pidx,p in enumerate(self.orb_list):
+            for qidx,q in enumerate(self.orb_list):
+                h[pidx,qidx] = hin[p,q]
+                da[pidx,qidx] = rdm1_a[p,q]
+                db[pidx,qidx] = rdm1_b[p,q]
+        
+        for pidx,p in enumerate(self.orb_list):
+            for qidx,q in enumerate(self.orb_list):
+                for ridx,r in enumerate(self.orb_list):
+                    for sidx,s in enumerate(self.orb_list):
+                        v[pidx,qidx,ridx,sidx] = vin[p,q,r,s]
+
+
+        if rdm1_a is not None and rdm1_b is not None:
+            print(" Compute single particle embedding potential")
+            denv_a = 1*rdm1_a
+            denv_b = 1*rdm1_b
+            dact_a = 0*rdm1_a
+            dact_b = 0*rdm1_b
+            for pidx,p in enumerate(self.orb_list):
+                for qidx,q in enumerate(range(rdm1_a.shape[0])):
+                    denv_a[p,q] = 0
+                    denv_b[p,q] = 0
+                    denv_a[q,p] = 0
+                    denv_b[q,p] = 0
+                    
+                    dact_a[p,q] = rdm1_a[p,q] 
+                    dact_b[p,q] = rdm1_b[p,q] 
+                    dact_a[q,p] = rdm1_a[q,p]
+                    dact_b[q,p] = rdm1_b[q,p]
+           
+            if iprint>1:
+                print(" Environment 1RDM:")
+                print_mat(denv_a+denv_b)
+            print(" Trace of env 1RDM: %12.8f" %np.trace(denv_a + denv_b))
+            print(" Compute energy of 1rdm:")
+            e1 =  np.trace(hin @ rdm1_a )
+            e1 += np.trace(hin @ rdm1_b )
+            e2 =  np.einsum('pqrs,pq,rs->',vin,rdm1_a,rdm1_a)
+            e2 -= np.einsum('pqrs,ps,qr->',vin,rdm1_a,rdm1_a)
+            
+            e2 += np.einsum('pqrs,pq,rs->',vin,rdm1_b,rdm1_b)
+            e2 -= np.einsum('pqrs,ps,qr->',vin,rdm1_b,rdm1_b)
+            
+            e2 += np.einsum('pqrs,pq,rs->',vin,rdm1_a,rdm1_b)
+            e2 += np.einsum('pqrs,pq,rs->',vin,rdm1_b,rdm1_a)
+            #e += np.einsum('pqrs,pq,rs->',vin,d,d)
+           
+            e = e1 + .5*e2
+            if iprint>1:
+                print(" E1              : % 12.8f" %(e1))
+                print(" E2              : % 12.8f" %(e2))
+            print(" E(mean-field)   : % 12.8f" %(e+ecore))
+           
+            ga =  np.zeros(hin.shape) 
+            gb =  np.zeros(hin.shape) 
+            ga += np.einsum('pqrs,pq->rs',vin,(denv_a+denv_b))
+            ga -= np.einsum('pqrs,ps->qr',vin,denv_a)
+            
+            gb += np.einsum('pqrs,pq->rs',vin,(denv_a+denv_b))
+            gb -= np.einsum('pqrs,ps->qr',vin,denv_b)
+
+            De = denv_a + denv_b
+            Fa = hin + .5*ga
+            Fb = hin + .5*gb
+            F = hin + .25*(ga + gb)
+            Eenv = np.trace(De @ F) 
+            if iprint>1:
+                print(" ----")
+                print(" Eenv            : % 12.8f" %(Eenv)) 
+       
+            f = np.zeros([self.n_orb]*2)
+            for pidx,p in enumerate(self.orb_list):
+                for qidx,q in enumerate(self.orb_list):
+                    f[pidx,qidx] =  F[p,q]
+
+        H = Hamiltonian()
+        H.S = np.eye(h.shape[0])
+        H.C = H.S
+        H.t = 2*f-h
+        H.V = v
+        H.ecore = ecore
+        self.basis = {}
+        self.ops['H_mf'] = {}
+      
+        #print(np.trace(da))
+        #print(np.trace(db))
+        self.Hlocal = {}
+        for na,nb in spaces:
+            ci = ci_solver()
+            ci.algorithm = "direct"
+            ci.init(H,na,nb,max_roots)
+            print(ci)
+            Hci = ci.run()
+            #self.basis[(na,nb)] = np.eye(ci.results_v.shape[0])
+            if iprint>0:
+                for i,ei in enumerate(ci.results_e):
+                    print(" Local State %5i: Local E: %12.8f Embedded E: %12.8f Total E: %12.8f" %(i, ei, ei+Eenv, ei+ecore+Eenv))
+            fock = (na,nb)
+            self.basis[fock] = ci.results_v
+            self.Hlocal[fock] =  Hci 
+            self.ops['H_mf'][(fock,fock)] = ci.results_v.T @ Hci @ ci.results_v
+    # }}}
+
+    #remove:
+    def form_eigbasis_from_ints(self,hin,vin,max_roots=1000, max_elec=None, min_elec=0, rdm1_a=None, rdm1_b=None, ecore=0):
         """
         grab integrals acting locally and form eigenbasis by FCI
 
@@ -94,8 +251,7 @@ class Cluster(object):
 
 
         if rdm1_a is not None and rdm1_b is not None:
-            print(" here:")
-
+            print(" Compute single particle embedding potential")
             denv_a = 1*rdm1_a
             denv_b = 1*rdm1_b
             for pidx,p in enumerate(self.orb_list):
@@ -138,27 +294,9 @@ class Cluster(object):
                 for qidx,q in enumerate(self.orb_list):
                     f[pidx,qidx] = .5*(fa[p,q] + fb[p,q])
            
-            print(" 1 particle potential from environment")
-            print_mat(f)
-#            e = 0
-#            n_alpha = int(np.trace(d))
-#            n_beta = int(np.trace(d))
-#            for i in range(n_alpha):
-#                e += hin[i,i]
-#            for i in range(n_beta):
-#                e += hin[i,i]
-#            for i in range(n_alpha):
-#                for j in range(i,n_alpha):
-#                    e += vin[i,i,j,j] - vin[i,j,j,i]
-#            for i in range(n_beta):
-#                for j in range(i,n_beta):
-#                    e += vin[i,i,j,j] - vin[i,j,j,i]
-#            for i in range(n_alpha):
-#                for j in range(n_beta):
-#                    e += vin[i,i,j,j] 
-#            
-#            print(" E:       %12.8f" %(e))
-#            print(" E+ecore: %12.8f" %(e+ecore))
+
+        if max_elec == None:
+            max_elec == self.n_orb
 
         H = Hamiltonian()
         H.S = np.eye(h.shape[0])
@@ -169,6 +307,8 @@ class Cluster(object):
         print(" Do CI for each particle number block")
         for na in range(self.n_orb+1):
             for nb in range(self.n_orb+1):
+                if (na+nb) > max_elec or (na+nb) < min_elec:
+                    continue
                 ci = ci_solver()
                 ci.algorithm = "direct"
                 ci.init(H,na,nb,max_roots)
@@ -176,9 +316,10 @@ class Cluster(object):
                 Hci = ci.run()
                 #self.basis[(na,nb)] = np.eye(ci.results_v.shape[0])
                 self.basis[(na,nb)] = ci.results_v
-                self.Hci[(na,nb)] = Hci
+                #self.Hci[(na,nb)] = ci.results_v.T @ Hci @ ci.results_v
     # }}}
     
+    #remove:
     def form_eigbasis_from_local_operator(self,local_op,max_roots=1000,ratio = 1,s2_shift=False):
         """
         grab integrals acting locally and form eigenbasis by FCI
@@ -212,7 +353,7 @@ class Cluster(object):
                 Hci = ci.run()
                 #self.basis[(na,nb)] = np.eye(ci.results_v.shape[0])
                 self.basis[(na,nb)] = ci.results_v
-                self.Hci[(na,nb)] = Hci
+                #self.Hci[(na,nb)] = Hci
                 #print(ci.results_v)
                 if s2_shift == True:
                     S2 = form_S2(self.n_orb,na,nb)
@@ -239,6 +380,7 @@ class Cluster(object):
                     self.basis[(na,nb)] = ci.results_v[:,-max_roots:]
                     # }}}
 
+    #remove:
     def form_eigbasis_from_local_operator_nanb(self,local_op,n_max,max_roots=1000,ratio = 1):
         """
         grab integrals acting locally and form eigenbasis by FCI
@@ -272,7 +414,7 @@ class Cluster(object):
                     Hci = ci.run()
                     #self.basis[(na,nb)] = np.eye(ci.results_v.shape[0])
                     self.basis[(na,nb)] = ci.results_v
-                    self.Hci[(na,nb)] = Hci
+                    #self.Hci[(na,nb)] = Hci
 # }}}
                     
             
@@ -284,22 +426,140 @@ class Cluster(object):
 # {{{
         for fspace,mat in U.items():
             self.basis[fspace] = self.basis[fspace] @ mat
-            self.Hci[fspace] = self.basis[fspace].T @ self.Hci[fspace] @ self.basis[fspace]
+            #self.Hci[fspace] = mat.T @ self.Hci[fspace] @ mat 
+            #self.Hci[fspace] = self.basis[fspace].T @ self.Hci[fspace] @ self.basis[fspace]
         #print(" Build all operators:")
         #self.build_op_matrices()
         for op,fspace_deltas in self.ops.items():
             for fspace_delta,tdm in fspace_deltas.items():
                 fspace_l = fspace_delta[0]
                 fspace_r = fspace_delta[1]
-                if fspace_l in U:
+                #if fspace_l in U:
+                #    Ul = U[fspace_l]
+                #    self.ops[op][fspace_delta] = np.einsum('pq,pr...->qr...',Ul,self.ops[op][fspace_delta])
+                #if fspace_r in U:
+                #    Ur = U[fspace_r]
+                #    self.ops[op][fspace_delta] = np.einsum('rs,pr...->ps...',Ur,self.ops[op][fspace_delta])
+                if fspace_l in U and fspace_r in U:
                     Ul = U[fspace_l]
-                    self.ops[op][fspace_delta] = np.einsum('pq,pr...->qr...',Ul,self.ops[op][fspace_delta])
-                if fspace_r in U:
                     Ur = U[fspace_r]
-                    self.ops[op][fspace_delta] = np.einsum('rs,pr...->ps...',Ur,self.ops[op][fspace_delta])
+                    try:
+                        self.ops[op][fspace_delta] = np.einsum('pq,rs,pr...->qs...',Ul,Ur,self.ops[op][fspace_delta], optimize=True)
+                    except ValueError:
+                        print("Error: Rotate basis failed for term: ", op, " fspace_delta: ", fspace_delta) 
+                        print(Ul.shape)
+                        print(Ur.shape)
+                        print(self.ops[op][fspace_delta].shape)
+                        exit()
    # }}}
+   
+    def grow_basis_by_coupling(self, rdms=None):
+       # {{{
+        print("NYI")
+        exit()
+        #  Aa
+        start = time.time()
+        for fock in self.basis:
+            v1 = self.basis[fock]
+
+            dimX = v1.shape[0] - v1.shape[1] # how many vectors can we add?
+            if dimX == 0:
+                continue
+            
+            # get basis for the orthogonal compliment to our current space
+            v1 = np.eye(v1.shape[0]) - v1 @ v1.T
+            v1,s1,u1 = np.linalg.svd(v1)
+            v1 = v1[:,:dimX]
+            basis1 = {}
+            basis1[fock] = v1
+
+            print()
+            print(self.basis[fock].shape)
+            print(v1.shape)
+
+            GIipq = build_ca_ss_tdm(self.n_orb, fock, fock, self.basis, basis1, 'a')
+            
+#            if rdms != None:
+#                #first contract with density matrix diagonal
+#                print(rdms[fock])
+#                GIpq = np.einsum('Iipq,i->Ipq', GIipq, rdms[fock])
+#                G = np.einsum('Iipq,Jipq->IJ', GIipq, GIipq)
+#            
+#            else:
+#                G = np.einsum('Iipq,Jipq->IJ', GIipq, GIipq)
+#            print(G.shape)
+            
+            G = np.einsum('Iipq,Jipq->IJ', GIipq, GIipq)
+            print(G.shape)
+
+            l,U = np.linalg.eigh(G)
+            idx = l.argsort()
+            l = l[idx]
+            U = U[:,idx]
+            for ii,i in enumerate(l):
+                print(" %4i %12.8f"%(ii+1,i))
+# }}}
     
+    def grow_basis_by_energy(self, max_roots=None, max_energy=None):
+       # {{{
+        #  Aa
+        start = time.time()
+        for fock in self.basis:
+            v1 = self.basis[fock]
+
+            dimX = v1.shape[0] - v1.shape[1] # how many vectors can we add?
+            if dimX == 0:
+                continue
+            
+            # get basis for the orthogonal compliment to our current space
+            v1 = np.eye(v1.shape[0]) - v1 @ v1.T
+            v1,s1,u1 = np.linalg.svd(v1)
+            v1 = v1[:,:dimX]
+            s1 = s1[:dimX]
+
+            
+            #print()
+
+            HX = v1.T @ self.Hlocal[fock] @ v1
+
+            l,U = np.linalg.eigh(HX)
+            idx = l.argsort()
+            l = l[idx]
+            U = U[:,idx]
+            
+            if max_roots != None: 
+                if max_roots < len(l):
+                    assert(max_roots>=0)
+                    l = l[:max_roots]
+                    U = U[:,:max_roots]
+
+            if max_energy != None: 
+                nkeep = 0
+                for li in range(len(l)):
+                    if l[li] <= max_energy:
+                        nkeep += 1
+                l = l[:nkeep]
+                U = U[:,:nkeep]
+
+            U = v1@U
+            
     
+            v2 = np.hstack((self.basis[fock],U))
+            self.basis[fock] = v2
+
+            assert(np.amax(v2.T @ v2 - np.eye(v2.shape[1])) < 1e-14)
+            
+            # The mean-field hamiltonian (H_mf) lives in the cluster basis while 
+            # the same operator (Hlocal) lives in the determinant basis
+            # this doesn't get updated with all the other operators, so update this quantity here
+            self.ops['H_mf'][(fock,fock)] = v2.T @ self.Hlocal[fock] @ v2 
+            
+            #print(U.shape)
+            #for ii,i in enumerate(l):
+            #    print(" %4i %12.8f"%(ii+1,i))
+# }}}
+
+
     def get_ops(self):
         return self.ops
 
@@ -311,10 +571,57 @@ class Cluster(object):
         return self.ops[opstr][(fI,fJ)][I,J,:]
 
 
-    def build_op_matrices(self):
+    def build_local_terms(self,hin,vin):
+        start = time.time()
+        self.ops['H'] = {}
+        """
+        grab integrals acting locally and form precontracted operator in current eigenbasis
+        """
+# {{{
+        h = np.zeros([self.n_orb]*2)
+        f = np.zeros([self.n_orb]*2)
+        v = np.zeros([self.n_orb]*4)
+        
+        for pidx,p in enumerate(self.orb_list):
+            for qidx,q in enumerate(self.orb_list):
+                h[pidx,qidx] = hin[p,q]
+        
+        for pidx,p in enumerate(self.orb_list):
+            for qidx,q in enumerate(self.orb_list):
+                for ridx,r in enumerate(self.orb_list):
+                    for sidx,s in enumerate(self.orb_list):
+                        v[pidx,qidx,ridx,sidx] = vin[p,q,r,s]
+
+
+
+        H = Hamiltonian()
+        H.S = np.eye(h.shape[0])
+        H.C = H.S
+        H.t = h
+        H.V = v
+       
+        for fock in self.basis:
+            ci = ci_solver()
+            ci.algorithm = "direct"
+            na = fock[0]
+            nb = fock[1]
+            ci.init(H,na,nb,1)
+            #print(ci)
+            self.ops['H'][(fock,fock)] = ci.build_H_matrix(self.basis[fock])
+            #print(" GS Energy: %12.8f" %self.ops['H'][(fock,fock)][0,0])
+    # }}}
+        
+
+        stop = time.time()
+        print(" Time spent TDM 0: %12.2f" %(stop-start))
+
+
+    def build_op_matrices(self, iprint=1):
         """
         build all operators needed
         """
+# {{{
+        start = time.time()
         self.ops['A'] = {}
         self.ops['a'] = {}
         self.ops['B'] = {}
@@ -323,10 +630,10 @@ class Cluster(object):
         self.ops['Bb'] = {}
         self.ops['Ab'] = {}
         self.ops['Ba'] = {}
-        self.ops['AAaa'] = {}
-        self.ops['BBbb'] = {}
-        self.ops['ABba'] = {}
-        self.ops['BAab'] = {}
+        #self.ops['AAaa'] = {}
+        #self.ops['BBbb'] = {}
+        #self.ops['ABba'] = {}
+        #self.ops['BAab'] = {}
         self.ops['AA'] = {}
         self.ops['BB'] = {}
         self.ops['AB'] = {}
@@ -348,7 +655,11 @@ class Cluster(object):
         self.ops['Aba'] = {}
         self.ops['Bab'] = {}
 
-        #  a, A 
+        start_tot = time.time()
+
+
+        #  a, A
+        start = time.time()
         for na in range(1,self.n_orb+1):
             for nb in range(0,self.n_orb+1):
                 try:
@@ -360,8 +671,12 @@ class Cluster(object):
                 #   I did a deepcopy instead of reference. This increases memory requirements and 
                 #   basis transformation costs, but simplifies later manipulations. Later I need to 
                 #   remove the redundant storage by manually handling the transpositions from a to A
-        
+        stop = time.time()
+        if iprint>0:
+            print(" Time spent TDM 1: %12.2f" %(stop-start))
+
         #  b, B 
+        start = time.time()
         for na in range(0,self.n_orb+1):
             for nb in range(1,self.n_orb+1):
                 try:
@@ -373,25 +688,39 @@ class Cluster(object):
                 #   I did a deepcopy instead of reference. This increases memory requirements and 
                 #   basis transformation costs, but simplifies later manipulations. Later I need to 
                 #   remove the redundant storage by manually handling the transpositions from a to A
+        stop = time.time()
+        if iprint>0:
+            print(" Time spent TDM 2: %12.2f" %(stop-start))
 
         #  Aa
+        start = time.time()
         for na in range(1,self.n_orb+1):
             for nb in range(0,self.n_orb+1):
                 try:
                     self.ops['Aa'][(na,nb),(na,nb)] = build_ca_ss(self.n_orb, (na,nb),(na,nb),self.basis,'a')
                 except KeyError:
                     continue
+        stop = time.time()
+        if iprint>0:
+            print(" Time spent TDM 3: %12.2f" %(stop-start))
+        
         #  Bb
+        start = time.time()
         for na in range(0,self.n_orb+1):
             for nb in range(1,self.n_orb+1):
                 try:
                     self.ops['Bb'][(na,nb),(na,nb)] = build_ca_ss(self.n_orb, (na,nb),(na,nb),self.basis,'b')
                 except KeyError:
                     continue
+        stop = time.time()
+        if iprint>0:
+            print(" Time spent TDM 4: %12.2f" %(stop-start))
+
                
 
 
         #  Ab,Ba
+        start = time.time()
         for na in range(1,self.n_orb+1):
             for nb in range(1,self.n_orb+1):
                 try:
@@ -399,9 +728,14 @@ class Cluster(object):
                     self.ops['Ba'][(na-1,nb),(na,nb-1)] = build_ca_os(self.n_orb, (na-1,nb),(na,nb-1),self.basis,'ba')
                 except KeyError:
                     continue
+        stop = time.time()
+        if iprint>0:
+            print(" Time spent TDM 5: %12.2f" %(stop-start))
+
         
-               
+        """       
         #  AAaa,BBbb
+        start = time.time()
         for na in range(0,self.n_orb+1):
             for nb in range(0,self.n_orb+1):
                 try:
@@ -409,10 +743,15 @@ class Cluster(object):
                     self.ops['BBbb'][(na,nb),(na,nb)] = build_ccaa_ss(self.n_orb, (na,nb),(na,nb),self.basis,'b')
                 except KeyError:
                     continue
+        stop = time.time()
+        if iprint>0:
+            print(" Time spent TDM 6: %12.2f" %(stop-start))
+
 
 
         #  ABba
         #  BAab
+        start = time.time()
         for na in range(1,self.n_orb+1):
             for nb in range(1,self.n_orb+1):
                 try:
@@ -420,9 +759,14 @@ class Cluster(object):
                     self.ops['BAab'][(na,nb),(na,nb)] = build_ccaa_os(self.n_orb, (na,nb),(na,nb),self.basis,'baab')
                 except KeyError:
                     continue
+        stop = time.time()
+        if iprint>0:
+            print(" Time spent TDM 7: %12.2f" %(stop-start))
+        """
 
         
         #  AA
+        start = time.time()
         for na in range(2,self.n_orb+1):
             for nb in range(0,self.n_orb+1):
                 try:
@@ -432,7 +776,12 @@ class Cluster(object):
                     self.ops['AA'][(na,nb),(na-2,nb)] = cp.deepcopy(np.swapaxes(temp,2,3))
                 except KeyError:
                     continue
+        stop = time.time()
+        if iprint>0:
+            print(" Time spent TDM 8: %12.2f" %(stop-start))
+
         # BB
+        start = time.time()
         for na in range(0,self.n_orb+1):
             for nb in range(2,self.n_orb+1):
                 try:
@@ -442,9 +791,14 @@ class Cluster(object):
                     self.ops['BB'][(na,nb),(na,nb-2)] = cp.deepcopy(np.swapaxes(temp,2,3))
                 except KeyError:
                     continue
+        stop = time.time()
+        if iprint>0:
+            print(" Time spent TDM 9: %12.2f" %(stop-start))
+
 
 
         # Ab
+        start = time.time()
         for na in range(1,self.n_orb+1):
             for nb in range(1,self.n_orb+1):
                 try:
@@ -458,314 +812,182 @@ class Cluster(object):
                     self.ops['BA'][(na,nb),(na-1,nb-1)] = cp.deepcopy(np.swapaxes(temp,2,3))
                 except KeyError:
                     continue
+        stop = time.time()
+        if iprint>0:
+            print(" Time spent TDM10: %12.2f" %(stop-start))
+
         
                
         #  AAa #   have to fix the swapaxes
+        start = time.time()
         for na in range(2,self.n_orb+1):
             for nb in range(0,self.n_orb+1):
                 try:
                     self.ops['AAa'][(na,nb),(na-1,nb)] = build_cca_ss(self.n_orb, (na,nb),(na-1,nb),self.basis,'a')
                 except KeyError:
                     continue
+        stop = time.time()
+        if iprint>0:
+            print(" Time spent TDM11: %12.2f" %(stop-start))
+
 
         #  BBb
+        start = time.time()
         for na in range(0,self.n_orb+1):
             for nb in range(2,self.n_orb+1):
                 try:
                     self.ops['BBb'][(na,nb),(na,nb-1)] = build_cca_ss(self.n_orb, (na,nb),(na,nb-1),self.basis,'b')
                 except KeyError:
                     continue
+        stop = time.time()
+        if iprint>0:
+            print(" Time spent TDM12: %12.2f" %(stop-start))
+
 
         #  ABb
+        start = time.time()
         for na in range(1,self.n_orb+1):
             for nb in range(1,self.n_orb+1):
                 try:
                     self.ops['ABb'][(na,nb),(na-1,nb)] = build_cca_os(self.n_orb, (na,nb),(na-1,nb),self.basis,'abb')
                 except KeyError:
                     continue
+        stop = time.time()
+        if iprint>0:
+            print(" Time spent TDM13: %12.2f" %(stop-start))
+
         #  BAa
+        start = time.time()
         for na in range(1,self.n_orb+1):
             for nb in range(1,self.n_orb+1):
                 try:
                     self.ops['BAa'][(na,nb),(na,nb-1)] = build_cca_os(self.n_orb, (na,nb),(na,nb-1),self.basis,'baa')
                 except KeyError:
                     continue
+        stop = time.time()
+        if iprint>0:
+            print(" Time spent TDM14: %12.2f" %(stop-start))
+
 
         #  ABa
+        start = time.time()
         for na in range(1,self.n_orb+1):
             for nb in range(1,self.n_orb+1):
                 try:
                     self.ops['ABa'][(na,nb),(na,nb-1)] = build_cca_os(self.n_orb, (na,nb),(na,nb-1),self.basis,'aba')
                 except KeyError:
                     continue
+        stop = time.time()
+        if iprint>0:
+            print(" Time spent TDM15: %12.2f" %(stop-start))
+
         #  BAb
+        start = time.time()
         for na in range(1,self.n_orb+1):
             for nb in range(1,self.n_orb+1):
                 try:
                     self.ops['BAb'][(na,nb),(na-1,nb)] = build_cca_os(self.n_orb, (na,nb),(na-1,nb),self.basis,'bab')
                 except KeyError:
                     continue
+        stop = time.time()
+        if iprint>0:
+            print(" Time spent TDM16: %12.2f" %(stop-start))
+
 
         #  Aaa
+        start = time.time()
         for na in range(2,self.n_orb+1):
             for nb in range(0,self.n_orb+1):
                 try:
                     self.ops['Aaa'][(na-1,nb),(na,nb)] = build_caa_ss(self.n_orb, (na-1,nb),(na,nb),self.basis,'a')
                 except KeyError:
                     continue
+        stop = time.time()
+        if iprint>0:
+            print(" Time spent TDM17: %12.2f" %(stop-start))
+
         
         #  Bbb
+        start = time.time()
         for na in range(0,self.n_orb+1):
             for nb in range(2,self.n_orb+1):
                 try:
                     self.ops['Bbb'][(na,nb-1),(na,nb)] = build_caa_ss(self.n_orb, (na,nb-1),(na,nb),self.basis,'b')
                 except KeyError:
                     continue
+        stop = time.time()
+        if iprint>0:
+            print(" Time spent TDM18: %12.2f" %(stop-start))
+
         
         #  Aab
+        start = time.time()
         for na in range(1,self.n_orb+1):
             for nb in range(1,self.n_orb+1):
                 try:
                     self.ops['Aab'][(na,nb-1),(na,nb)] = build_caa_os(self.n_orb, (na,nb-1),(na,nb),self.basis,'aab')
                 except KeyError:
                     continue
+        stop = time.time()
+        if iprint>0:
+            print(" Time spent TDM19: %12.2f" %(stop-start))
+
 
         #  Bba
+        start = time.time()
         for na in range(1,self.n_orb+1):
             for nb in range(1,self.n_orb+1):
                 try:
                     self.ops['Bba'][(na-1,nb),(na,nb)] = build_caa_os(self.n_orb, (na-1,nb),(na,nb),self.basis,'bba')
                 except KeyError:
                     continue
+        stop = time.time()
+        if iprint>0:
+            print(" Time spent TDM20: %12.2f" %(stop-start))
+
 
         #  Aba
+        start = time.time()
         for na in range(1,self.n_orb+1):
             for nb in range(1,self.n_orb+1):
                 try:
                     self.ops['Aba'][(na,nb-1),(na,nb)] = build_caa_os(self.n_orb, (na,nb-1),(na,nb),self.basis,'aba')
                 except KeyError:
                     continue
+        stop = time.time()
+        if iprint>0:
+            print(" Time spent TDM21: %12.2f" %(stop-start))
+
 
         #  Bab
+        start = time.time()
         for na in range(1,self.n_orb+1):
             for nb in range(1,self.n_orb+1):
                 try:
                     self.ops['Bab'][(na-1,nb),(na,nb)] = build_caa_os(self.n_orb, (na-1,nb),(na,nb),self.basis,'bab')
                 except KeyError:
                     continue
+        stop = time.time()
+        if iprint>0:
+            print(" Time spent TDM22: %12.2f" %(stop-start))
+
         
 
-#        #  Ab
-#        for na in range(1,self.n_orb+1):
-#            for nb in range(1,self.n_orb+1):
-#                b = self.ops['b'][(na-1,nb-1),(na-1,nb)]
-#                A = self.ops['A'][(na,nb-1),(na-1,nb-1)]
-#                self.ops['Ab'][(na,nb-1),(na-1,nb)] = oe.contract('abp,bcq->acpq',A,b)
-#        
-#        #  Ba
-#        for na in range(1,self.n_orb+1):
-#            for nb in range(1,self.n_orb+1):
-#                a = self.ops['a'][(na-1,nb-1),(na,nb-1)]
-#                B = self.ops['B'][(na-1,nb),(na-1,nb-1)]
-#                self.ops['Ba'][(na-1,nb),(na,nb-1)] = oe.contract('abp,bcq->acpq',B,a)
-       
-       
-#        #  AAaa
-#        for na in range(2,self.n_orb+1):
-#            for nb in range(0,self.n_orb+1):
-#                a2 = self.ops['a'][(na-1,nb),(na,nb)]
-#                a1 = self.ops['a'][(na-2,nb),(na-1,nb)]
-#                A2 = self.ops['A'][(na-1,nb),(na-2,nb)]
-#                A1 = self.ops['A'][(na,nb),(na-1,nb)]
-#               
-#                # <IJ|p'q'rs|KL>
-#                self.ops['AAaa'][(na,nb),(na,nb)] = oe.contract('abp,bcq,cdr,des->aepqrs',A1,A2,a1,a2)
-#        #  BBbb
-#        for na in range(0,self.n_orb+1):
-#            for nb in range(2,self.n_orb+1):
-#                b2 = self.ops['b'][(na,nb-1),(na,nb)]
-#                b1 = self.ops['b'][(na,nb-2),(na,nb-1)]
-#                B2 = self.ops['B'][(na,nb-1),(na,nb-2)]
-#                B1 = self.ops['B'][(na,nb),(na,nb-1)]
-#               
-#                # <IJ|p'q'rs|KL>
-#                self.ops['BBbb'][(na,nb),(na,nb)] = oe.contract('abp,bcq,cdr,des->aepqrs',B1,B2,b1,b2)
+        if iprint>0:
+            print(" Swapping axes to get contiguous data")
+        start = time.time()
+        for o in self.ops:
+            for f in self.ops[o]:
+                self.ops[o][f] = np.ascontiguousarray(self.ops[o][f])
+                #self.ops[o][f] = np.ascontiguousarray(np.swapaxes(self.ops[o][f],0,1))
+        stop = time.time()
+        if iprint>0:
+            print(" Time spent making data contiguous: %12.2f" %(stop-start))
 
-#        #  ABba
-#        for na in range(1,self.n_orb+1):
-#            for nb in range(1,self.n_orb+1):
-#                a = self.ops['a'][(na-1,nb),(na,nb)]
-#                b = self.ops['b'][(na-1,nb-1),(na-1,nb)]
-#                B = self.ops['B'][(na-1,nb),(na-1,nb-1)]
-#                A = self.ops['A'][(na,nb),(na-1,nb)]
-#               
-#                # <IJ|p'q'rs|KL>
-#                self.ops['ABba'][(na,nb),(na,nb)] = oe.contract('abp,bcq,cdr,des->aepqrs',A,B,b,a)
-#        #  BAab
-#        for na in range(1,self.n_orb+1):
-#            for nb in range(1,self.n_orb+1):
-#                b = self.ops['b'][(na,nb-1),(na,nb)]
-#                a = self.ops['a'][(na-1,nb-1),(na,nb-1)]
-#                A = self.ops['A'][(na,nb-1),(na-1,nb-1)]
-#                B = self.ops['B'][(na,nb),(na,nb-1)]
-#               
-#                # <IJ|p'q'rs|KL>
-#                self.ops['BAab'][(na,nb),(na,nb)] = oe.contract('abp,bcq,cdr,des->aepqrs',B,A,a,b)
-       
-#        #  AA
-#        for na in range(2,self.n_orb+1):
-#            for nb in range(0,self.n_orb+1):
-#                A2 = self.ops['A'][(na-1,nb),(na-2,nb)]
-#                A1 = self.ops['A'][(na,nb),(na-1,nb)]
-#                self.ops['AA'][(na,nb),(na-2,nb)] = oe.contract('abp,bcq->acpq',A1,A2)
-        
-#        #  aa
-#        for na in range(2,self.n_orb+1):
-#            for nb in range(0,self.n_orb+1):
-#                a2 = self.ops['a'][(na-1,nb),(na,nb)]
-#                a1 = self.ops['a'][(na-2,nb),(na-1,nb)]
-#                self.ops['aa'][(na-2,nb),(na,nb)] = oe.contract('abp,bcq->acpq',a1,a2)
 
-#        #  BB
-#        for na in range(0,self.n_orb+1):
-#            for nb in range(2,self.n_orb+1):
-#                B2 = self.ops['B'][(na,nb-1),(na,nb-2)]
-#                B1 = self.ops['B'][(na,nb),(na,nb-1)]
-#                self.ops['BB'][(na,nb),(na,nb-2)] = oe.contract('abp,bcq->acpq',B1,B2)
-        
-#        #  bb
-#        for na in range(0,self.n_orb+1):
-#            for nb in range(2,self.n_orb+1):
-#                b2 = self.ops['b'][(na,nb-1),(na,nb)]
-#                b1 = self.ops['b'][(na,nb-2),(na,nb-1)]
-#                self.ops['bb'][(na,nb-2),(na,nb)] = oe.contract('abp,bcq->acpq',b1,b2)
-
-#        #  ab
-#        for na in range(1,self.n_orb+1):
-#            for nb in range(1,self.n_orb+1):
-#                b = self.ops['b'][(na,nb-1),(na,nb)]
-#                a = self.ops['a'][(na-1,nb-1),(na,nb-1)]
-#                self.ops['ab'][(na-1,nb-1),(na,nb)] = oe.contract('abp,bcq->acpq',a,b)
-#
-#        #  ba
-#        for na in range(1,self.n_orb+1):
-#            for nb in range(1,self.n_orb+1):
-#                a = self.ops['a'][(na-1,nb),(na,nb)]
-#                b = self.ops['b'][(na-1,nb-1),(na-1,nb)]
-#                self.ops['ba'][(na-1,nb-1),(na,nb)] = oe.contract('abp,bcq->acpq',b,a)
-#        
-#        #  AB
-#        for na in range(1,self.n_orb+1):
-#            for nb in range(1,self.n_orb+1):
-#                B = self.ops['B'][(na-1,nb),(na-1,nb-1)]
-#                A = self.ops['A'][(na,nb),(na-1,nb)]
-#                self.ops['AB'][(na,nb),(na-1,nb-1)] = oe.contract('abp,bcq->acpq',A,B)
-#        
-#        #  BA
-#        for na in range(1,self.n_orb+1):
-#            for nb in range(1,self.n_orb+1):
-#                A = self.ops['A'][(na,nb-1),(na-1,nb-1)]
-#                B = self.ops['B'][(na,nb),(na,nb-1)]
-#                self.ops['BA'][(na,nb),(na-1,nb-1)] = oe.contract('abp,bcq->acpq',B,A)
-       
-
-#        #  AAa
-#        for na in range(2,self.n_orb+1):
-#            for nb in range(0,self.n_orb+1):
-#                a  = self.ops['a'][(na-2,nb),(na-1,nb)]
-#                A1 = self.ops['A'][(na-1,nb),(na-2,nb)]
-#                A2 = self.ops['A'][(na,nb),(na-1,nb)]
-#                self.ops['AAa'][(na,nb),(na-1,nb)] = oe.contract('abp,bcq,cdr->adpqr',A2,A1,a)
-#        
-#        #  BBb
-#        for na in range(0,self.n_orb+1):
-#            for nb in range(2,self.n_orb+1):
-#                b  = self.ops['b'][(na,nb-2),(na,nb-1)]
-#                B1 = self.ops['B'][(na,nb-1),(na,nb-2)]
-#                B2 = self.ops['B'][(na,nb),(na,nb-1)]
-#                self.ops['BBb'][(na,nb),(na,nb-1)] = oe.contract('abp,bcq,cdr->adpqr',B2,B1,b)
-       
-#        #  ABb
-#        for na in range(1,self.n_orb+1):
-#            for nb in range(1,self.n_orb+1):
-#                b = self.ops['b'][(na-1,nb-1),(na-1,nb)]
-#                B = self.ops['B'][(na-1,nb),(na-1,nb-1)]
-#                A = self.ops['A'][(na,nb),(na-1,nb)]
-#                self.ops['ABb'][(na,nb),(na-1,nb)] = oe.contract('abp,bcq,cdr->adpqr',A,B,b)
-#
-#        #  BAa
-#        for na in range(1,self.n_orb+1):
-#            for nb in range(1,self.n_orb+1):
-#                a = self.ops['a'][(na-1,nb-1),(na,nb-1)]
-#                A = self.ops['A'][(na,nb-1),(na-1,nb-1)]
-#                B = self.ops['B'][(na,nb),(na,nb-1)]
-#                self.ops['BAa'][(na,nb),(na,nb-1)] = oe.contract('abp,bcq,cdr->adpqr',B,A,a)
-
-#        #  ABa
-#        for na in range(1,self.n_orb+1):
-#            for nb in range(1,self.n_orb+1):
-#                a = self.ops['a'][(na-1,nb-1),(na,nb-1)]
-#                B = self.ops['B'][(na-1,nb),(na-1,nb-1)]
-#                A = self.ops['A'][(na,nb),(na-1,nb)]
-#                self.ops['ABa'][(na,nb),(na,nb-1)] = oe.contract('abp,bcq,cdr->adpqr',A,B,a)
-
-#        #  BAb
-#        for na in range(1,self.n_orb+1):
-#            for nb in range(1,self.n_orb+1):
-#                b = self.ops['b'][(na-1,nb-1),(na-1,nb)]
-#                A = self.ops['A'][(na,nb-1),(na-1,nb-1)]
-#                B = self.ops['B'][(na,nb),(na,nb-1)]
-#                self.ops['BAb'][(na,nb),(na-1,nb)] = oe.contract('abp,bcq,cdr->adpqr',B,A,b)
-
-#        #  Aaa
-#        for na in range(2,self.n_orb+1):
-#            for nb in range(0,self.n_orb+1):
-#                a1 = self.ops['a'][(na-1,nb),(na,nb)]
-#                a2 = self.ops['a'][(na-2,nb),(na-1,nb)]
-#                A  = self.ops['A'][(na-1,nb),(na-2,nb)]
-#                self.ops['Aaa'][(na-1,nb),(na,nb)] = oe.contract('abp,bcq,cdr->adpqr',A,a2,a1)
-#        
-#        #  Bbb
-#        for na in range(0,self.n_orb+1):
-#            for nb in range(2,self.n_orb+1):
-#                b1 = self.ops['b'][(na,nb-1),(na,nb)]
-#                b2 = self.ops['b'][(na,nb-2),(na,nb-1)]
-#                B  = self.ops['B'][(na,nb-1),(na,nb-2)]
-#                self.ops['Bbb'][(na,nb-1),(na,nb)] = oe.contract('abp,bcq,cdr->adpqr',B,b2,b1)
-#        #  Aab
-#        for na in range(1,self.n_orb+1):
-#            for nb in range(1,self.n_orb+1):
-#                b = self.ops['b'][(na,nb-1),(na,nb)]
-#                a = self.ops['a'][(na-1,nb-1),(na,nb-1)]
-#                A = self.ops['A'][(na,nb-1),(na-1,nb-1)]
-#                self.ops['Aab'][(na,nb-1),(na,nb)] = oe.contract('abp,bcq,cdr->adpqr',A,a,b)
-#        
-#        #  Bba
-#        for na in range(1,self.n_orb+1):
-#            for nb in range(1,self.n_orb+1):
-#                a = self.ops['a'][(na-1,nb),(na,nb)]
-#                b = self.ops['b'][(na-1,nb-1),(na-1,nb)]
-#                B = self.ops['B'][(na-1,nb),(na-1,nb-1)]
-#                self.ops['Bba'][(na-1,nb),(na,nb)] = oe.contract('abp,bcq,cdr->adpqr',B,b,a)
-
-#        #  Aba
-#        for na in range(1,self.n_orb+1):
-#            for nb in range(1,self.n_orb+1):
-#                a = self.ops['a'][(na-1,nb),(na,nb)]
-#                b = self.ops['b'][(na-1,nb-1),(na-1,nb)]
-#                A = self.ops['A'][(na,nb-1),(na-1,nb-1)]
-#                self.ops['Aba'][(na,nb-1),(na,nb)] = oe.contract('abp,bcq,cdr->adpqr',A,b,a)
-       
-#        #  Bab
-#        for na in range(1,self.n_orb+1):
-#            for nb in range(1,self.n_orb+1):
-#                b = self.ops['b'][(na,nb-1),(na,nb)]
-#                a = self.ops['a'][(na-1,nb-1),(na,nb-1)]
-#                B = self.ops['B'][(na-1,nb),(na-1,nb-1)]
-#                self.ops['Bab'][(na-1,nb),(na,nb)] = oe.contract('abp,bcq,cdr->adpqr',B,a,b)
-        
-        #Add remaining operators ....
-
+        stop_tot = time.time()
+        print(" Time spent building TDMs Total %12.2f" %(stop_tot-start_tot))
+# }}}
 
 
 ###################################################################################################################
@@ -792,3 +1014,4 @@ class Cluster(object):
             Jna,Jnb = quantum numbers for bra
         """
         self.ops[string][(Ina,Inb),(Jna,Jnb)] = tens
+    

@@ -69,11 +69,16 @@ class ClusteredTerm:
         self.ints = ints
         #self.sign = 1
         self.active = [] 
-        assert(len(self.ints.shape) == 2 or len(self.ints.shape) == 4) 
-        if len(self.ints.shape) == 2:
+        
+        if len(self.ints.shape) == 0:
+            self.ints_inds = ''
+        elif len(self.ints.shape) == 2:
             self.ints_inds = 'ab'
         elif len(self.ints.shape) == 4:
             self.ints_inds = 'abcd'
+        else:
+            print(" Problem with integral tensor")
+            exit()
 
         self.contract_string = ""
         self.contract_string_matvec = ""
@@ -100,7 +105,7 @@ class ClusteredTerm:
         """
         return self.active
     
-    def matrix_element(self,fock_bra,bra,fock_ket,ket):
+    def matrix_element(self,fock_bra,bra,fock_ket,ket, opt_einsum=True):
         """
         Compute the matrix element between <fock1,config1|H|fock2,config2>
         where fock is the 'fock-block' of bra. This is just a specification
@@ -175,13 +180,13 @@ class ClusteredTerm:
         # todo:
         #    For some reason, precompiled contract expression is slower than direct einsum - figure this out
         #me = self.contract_expression(*mats) * state_sign
-        me = np.einsum(self.contract_string,*mats,self.ints) * state_sign
+        me = np.einsum(self.contract_string,*mats,self.ints, optimize=opt_einsum) * state_sign
         
         return me
 # }}}
 
 
-    def diag_matrix_element(self,fock,config):
+    def diag_matrix_element(self,fock,config, opt_einsum=True):
         """
         Compute the diagonal matrix element between <fock,config|H|fock,config>
         where fock is the fockspace of bra. This is just a specification
@@ -202,6 +207,7 @@ class ClusteredTerm:
         mats = []
         # state sign is always 1 here, since an even number of creation/annihilation operators can only 
         # contribute to diagonal
+        
         state_sign = 1
         n_active = 0
         for oi,o in enumerate(self.ops):
@@ -228,7 +234,7 @@ class ClusteredTerm:
         if len(mats) == 0:
             return 0 
         me = 0.0
-        me = np.einsum(self.contract_string,*mats,self.ints)
+        me = np.einsum(self.contract_string,*mats,self.ints, optimize=opt_einsum)
         
         return me
 # }}}
@@ -314,6 +320,54 @@ class ClusteredTerm:
 # }}}
 
 
+class LocalClusteredTerm(ClusteredTerm):
+    """
+    This is a special Clustered Term which only has operators on one cluster at a time
+    """
+    def __init__(self, delta, ops, clusters):
+        super().__init__(delta, ops, np.empty([]), clusters)
+
+    
+    def matrix_element(self,fock_bra,bra,fock_ket,ket,opt_einsum=None):
+        """
+        Compute the matrix element between <fock1,config1|H|fock2,config2>
+        where fock is the 'fock-block' of bra. This is just a specification
+        of the particle number space of each cluster. Eg., 
+        ((2,3),(4,3),(2,2)) would have 3 clusters with 2(3), 4(3), 2(2) 
+        alpha(beta) electrons, respectively. 
+        
+        For this Local term, it just needs to return the matrix element of the stored operator
+
+        Args:
+            fock_bra (tuple(tuple)): fock-block for bra
+            bra (tuple): cluster state configuration within specified fock block
+            fock_ket (tuple(tuple)): fock-block for ket 
+            ket (tuple): cluster state configuration within specified fock block
+        Returns:
+            matrix element. <IJK...|Hterm|LMN...>, where IJK, and LMN
+            are the state indices for clusters 1, 2, and 3, respectively, in the 
+            particle number blocks specified by fock_bra and fock_ket.
+        """
+        # {{{
+        for ci in range(self.n_clusters):
+            if (bra[ci]!=ket[ci]) and (ci not in self.active):
+                return 0
+     
+        assert(len(fock_bra) == len(fock_ket))
+        assert(len(fock_ket) == len(bra))
+        assert(len(bra) == len(ket))
+        assert(len(ket) == self.n_clusters)
+        assert(len(self.active) == 1)
+
+        ci = self.active[0]
+        return self.clusters[ci].ops['H'][(fock_bra[ci],fock_ket[ci])][bra[ci],ket[ci]]
+# }}}
+    
+    def diag_matrix_element(self,fock,config,opt_einsum=None):
+        return self.matrix_element(fock,config,fock,config) 
+
+
+
 
 
 class ClusteredOperator:
@@ -328,13 +382,48 @@ class ClusteredOperator:
                 with p,q,r on cluster 2, and s on cluster 4
                 ^this needs cleaned up
     """
-    def __init__(self,clusters):
+    def __init__(self,clusters, core_energy=0.0):
         self.n_clusters = len(clusters)
         self.clusters = clusters
         self.terms = OrderedDict()
+        self.local_terms = []
         self.n_orb = 0
+        self.core_energy = core_energy 
         for ci,c in enumerate(self.clusters):
             self.n_orb += c.n_orb
+
+    def add_local_terms(self, opstr="H"):
+        """
+        Add terms of the form h_{pq}\hat{a}^\dagger_p\hat{a}_q
+
+        input:
+        h is a square matrix NxN, where N is the number of spatial orbitals
+        """
+# {{{
+
+        self.local_terms = []
+        delta_tmp = []
+        ops_tmp = []
+        for ci in self.clusters:
+            delta_tmp.append([0,0])
+            ops_tmp.append("")
+        delta = tuple([tuple(i) for i in delta_tmp])
+
+        for ci in self.clusters:
+
+            ops = cp.deepcopy(ops_tmp) 
+            ops[ci.idx] += opstr 
+            
+            term = LocalClusteredTerm(delta, ops, self.clusters)
+
+            term.active = [ci.idx]
+
+            try:
+                self.terms[delta].append(term)
+            except:
+                self.terms[delta] = [term]
+
+# }}}
 
     def add_1b_terms(self,h):
         """
@@ -356,6 +445,8 @@ class ClusteredOperator:
 
         for ci in self.clusters:
             for cj in self.clusters:
+                if ci == cj:
+                    continue
                 delta_a = list(cp.deepcopy(delta_tmp)) #alpha hopping
                 delta_b = list(cp.deepcopy(delta_tmp)) #beta hopping
                 ops_a = cp.deepcopy(ops_tmp) #alpha hopping
@@ -461,6 +552,8 @@ class ClusteredOperator:
             for cj in self.clusters:
                 for ck in self.clusters:
                     for cl in self.clusters:
+                        if ci == cj and ci == ck and ci == cl:
+                            continue
                         delta_aa = list(cp.deepcopy(delta_tmp)) 
                         delta_bb = list(cp.deepcopy(delta_tmp)) 
                         delta_ab = list(cp.deepcopy(delta_tmp)) 
@@ -601,16 +694,6 @@ class ClusteredOperator:
                         term_bb.active = sorted(list(set([ci.idx,cj.idx,ck.idx,cl.idx])))
                         
                         
-                       
-                        #term_aa.sign = sign
-                        #term_ab.sign = sign
-                        #term_ba.sign = sign
-                        #term_bb.sign = sign
-                        #term_aa.ints *= sign
-                        #term_ab.ints *= sign
-                        #term_ba.ints *= sign
-                        #term_bb.ints *= sign
-                        
                         term_aa.contract_string = contract_string
                         term_ab.contract_string = contract_string
                         term_ba.contract_string = contract_string
@@ -633,12 +716,15 @@ class ClusteredOperator:
                             shapes.append(shape)
                         shapes.append(vijkl)
                         #exit()
-                        term_aa.contract_expression = oe.contract_expression(term_aa.contract_string,*shapes,constants=[len(shapes)-1])
-                        term_ab.contract_expression = oe.contract_expression(term_ab.contract_string,*shapes,constants=[len(shapes)-1])
-                        term_ba.contract_expression = oe.contract_expression(term_ba.contract_string,*shapes,constants=[len(shapes)-1])
-                        term_bb.contract_expression = oe.contract_expression(term_bb.contract_string,*shapes,constants=[len(shapes)-1])
-                        #print(term_aa.contract_expression)
-                        #print(term_bb, [ci.idx,cj.idx,ck.idx,cl.idx])
+
+                        #uncomment the following to use the optimized contraction strings in opteinsum
+                        if 0:
+                            term_aa.contract_expression = oe.contract_expression(term_aa.contract_string,*shapes,constants=[len(shapes)-1])
+                            term_ab.contract_expression = oe.contract_expression(term_ab.contract_string,*shapes,constants=[len(shapes)-1])
+                            term_ba.contract_expression = oe.contract_expression(term_ba.contract_string,*shapes,constants=[len(shapes)-1])
+                            term_bb.contract_expression = oe.contract_expression(term_bb.contract_string,*shapes,constants=[len(shapes)-1])
+                            #print(term_aa.contract_expression)
+                            #print(term_bb, [ci.idx,cj.idx,ck.idx,cl.idx])
                        
                         try:
                             self.terms[delta_aa].append(term_aa)
@@ -673,9 +759,9 @@ class ClusteredOperator:
                     print(tt)
 # }}}
 
-    def combine_common_terms(self,iprint=0):
+    def combine_common_terms(self,iprint=1):
         """
-        
+        Combine identical terms     
         """
 # {{{
         if iprint > 0:
@@ -733,6 +819,7 @@ class ClusteredOperator:
                     term.delta = [term.delta[cluster_idx]]
                     op.add_term(term)
         return op
+
     def extract_local_embedded_operator(self,cluster_idx,rdm):
         """
         Extract Local operator, considering only terms which are completely contained inside cluster,

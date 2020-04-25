@@ -17,7 +17,7 @@ ttt = time.time()
 
 
 
-def test_1(nproc):
+def run(nproc=None):
     pyscf.lib.num_threads(1)  #with degenerate states and multiple processors there can be issues
     np.set_printoptions(suppress=True, precision=3, linewidth=1500)
     n_cluster_states = 1000
@@ -63,30 +63,38 @@ def test_1(nproc):
     h,g = reorder_integrals(idx,h,g)
 
 
-    do_fci = 1
-    do_hci = 1
-    do_tci = 1
+        
+    clusters, clustered_ham, ci_vector, cmf_out = system_setup(h, g, ecore, blocks, init_fspace, 
+                        cmf_maxiter = 20,
+                        cmf_diis    = True,
+                        cmf_thresh  = 1e-14)
 
-    if do_fci:
-        efci, fci_dim = run_fci_pyscf(h,g,cas_nel,ecore=ecore)
-    if do_hci:
-        ehci, hci_dim = run_hci_pyscf(h,g,cas_nel,ecore=ecore,select_cutoff=1e-4,ci_cutoff=1e-4)
-    if do_tci:
-        ci_vector, pt_vector, etci, etci2 = run_tpsci(h,g,blocks,init_fspace,ecore=ecore,
-            thresh_ci_clip=1e-6,thresh_cipsi=1e-5,max_tucker_iter=20,hshift=1e-8, nproc=nproc)
-        ci_vector.print_configs()
-        tci_dim = len(ci_vector)
+    #hamiltonian_file = open('cmf_hamiltonian_file', 'wb')
+    #pickle.dump(clustered_ham, hamiltonian_file)
 
 
+    ci_vector, pt_vector, etci, etci2, conv = bc_cipsi_tucker(ci_vector, clustered_ham, 
+                                                        thresh_cipsi        = 1e-5, 
+                                                        thresh_ci_clip      = 1e-8, 
+                                                        max_tucker_iter     = 20,
+                                                        nproc=nproc)
+    
+    
+    tci_dim = len(ci_vector)
+
+    etci += ecore
+    etci2 += ecore
+
+    print(" ecore: ", ecore)
     print(" TCI:        %12.9f Dim:%6d"%(etci,tci_dim))
-    print(" HCI:        %12.9f Dim:%6d"%(ehci,hci_dim))
-    print(" FCI:        %12.9f Dim:%6d"%(efci,fci_dim))
-    assert(abs(etci --108.85558051)< 1e-7)
-    assert(abs(etci2 --108.85574547)< 1e-7)
-    #assert(abs(tci_dim - 67)<1e-15)
-    assert(abs(efci   --108.85574521)< 1e-7)
+    assert(abs(etci --108.85558061)< 1e-6)
+    #assert(abs(etci --108.855580011)< 1e-7)
+    #assert(tci_dim == 43)
+
+def test_1():
+    run(nproc=None)
 
 
 if __name__== "__main__":
-    #test_1(1) 
-    test_1(None) 
+    test_1() 
+    #test_2() 

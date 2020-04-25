@@ -28,7 +28,8 @@ class PyscfHelper(object):
         self.J      = None
         self.K      = None
 
-    def init(self,molecule,charge,spin,basis_set,orb_basis='scf',cas=False,cas_nstart=None,cas_nstop=None,cas_nel=None,loc_nstart=None,loc_nstop=None):
+    def init(self,molecule,charge,spin,basis_set,orb_basis='scf',cas=False,cas_nstart=None,cas_nstop=None,cas_nel=None,loc_nstart=None,loc_nstop=None,
+            scf_conv_tol=1e-14):
     # {{{
         import pyscf
         from pyscf import gto, scf, ao2mo, molden, lo
@@ -40,7 +41,6 @@ class PyscfHelper(object):
         print("                                                          ")
 
         mol = gto.Mole()
-        print("here")
         mol.atom = molecule
 
         mol.max_memory = 1000 # MB
@@ -55,10 +55,12 @@ class PyscfHelper(object):
         #SCF 
 
         #mf = scf.RHF(mol).run(init_guess='atom')
-        mf = scf.RHF(mol).run()
+        mf = scf.RHF(mol).run(conv_tol=scf_conv_tol)
         #C = mf.mo_coeff #MO coeffs
         enu = mf.energy_nuc()
-       
+        
+        print(" SCF Total energy: %12.8f" %mf.e_tot) 
+        print(" SCF Elec  energy: %12.8f" %(mf.e_tot-enu))
         print(mf.get_fock())
         print(np.linalg.eig(mf.get_fock())[0])
         
@@ -174,7 +176,7 @@ class PyscfHelper(object):
         else: 
             print("Error:NO orbital basis defined")
 
-        molden.from_mo(mol, 'h8.molden', C)
+        molden.from_mo(mol, 'orbitals.molden', C)
 
         if cas == True:
             print(C.shape)
@@ -195,6 +197,31 @@ class PyscfHelper(object):
             J,K = mf.get_jk()
             self.J = self.C.T @ J @ self.C
             self.K = self.C.T @ J @ self.C
+
+            #HF density
+            if orb_basis == 'scf':
+                #C = C[:,cas_nstart:cas_nstop]
+                D = mf.make_rdm1(mo_coeff=C)
+                S = mf.get_ovlp()
+                sal, svec = np.linalg.eigh(S)
+                idx = sal.argsort()[::-1]
+                sal = sal[idx]
+                svec = svec[:, idx]
+                sal = sal**-0.5
+                sal = np.diagflat(sal)
+                X = svec @ sal @ svec.T
+                C_ao2mo = np.linalg.inv(X) @ C
+                Cocc = C_ao2mo[:, :n_a]
+                D = Cocc @ Cocc.T
+                DMO = C_ao2mo.T   @ D @ C_ao2mo
+                
+                #only for cas space 
+                DMO = DMO[cas_nstart:cas_nstop,cas_nstart:cas_nstop]
+                self.dm_aa = DMO
+                self.dm_bb = DMO
+                print("DENSITY")
+                print(self.dm_aa.shape)
+
             if 0:
                 h = C.T.dot(mf.get_hcore()).dot(C)
                 g = ao2mo.kernel(mol,C,aosym='s4',compact=False).reshape(4*((n_orb),))
@@ -230,6 +257,26 @@ class PyscfHelper(object):
             J,K = mf.get_jk()
             self.J = self.C.T @ J @ self.C
             self.K = self.C.T @ J @ self.C
+
+            #HF density
+            if orb_basis == 'scf':
+                D = mf.make_rdm1(mo_coeff=None)
+                S = mf.get_ovlp()
+                sal, svec = np.linalg.eigh(S)
+                idx = sal.argsort()[::-1]
+                sal = sal[idx]
+                svec = svec[:, idx]
+                sal = sal**-0.5
+                sal = np.diagflat(sal)
+                X = svec @ sal @ svec.T
+                C_ao2mo = np.linalg.inv(X) @ C
+                Cocc = C_ao2mo[:, :n_a]
+                D = Cocc @ Cocc.T
+                DMO = C_ao2mo.T   @ D @ C_ao2mo
+                self.dm_aa = DMO
+                self.dm_bb = DMO
+                print("DENSITY")
+                print(self.dm_aa)
     # }}}
 
 def run_fci_pyscf( h, g, nelec, ecore=0,nroots=1, conv_tol=None, max_cycle=None):
@@ -364,7 +411,10 @@ def mulliken_ordering(mol,norb,C):
         Cocc = C[:,i].reshape(C.shape[0],1)
         temp = Cocc @ Cocc.T @ S   
         for m,lb in enumerate(mol.ao_labels()):
-            mulliken[int(lb[0]),i] += temp[m,m]
+            print(lb)
+            v1,v2,v3 = lb.split()
+            print(v1)
+            mulliken[int(v1),i] += temp[m,m]
     print(mulliken)
     return mulliken
 # }}}
@@ -400,5 +450,61 @@ def get_eff_for_casci(n_start,n_stop,h,g):
             for j in range(0,n_start):
                 eff[L,M] += 2 * g[l,m,j,j] -  g[l,j,j,m]
     return const, eff
+# }}}
+
+def ordering_diatomics(mol,C,basis_set):
+# {{{
+    ##DZ basis diatomics reordering with frozen 1s
+
+    if basis_set == '6-31g':
+        orb_type = ['s','pz','px','py']
+    elif basis_set == 'ccpvdz':
+        orb_type = ['s','pz','dz','px','dxz','py','dyz','dx2-y2','dxy']
+    else:
+        print("clustering not general yet")
+        exit()
+
+    ref = np.zeros(C.shape[1]) 
+
+    ## Find dimension of each space
+    dim_orb = []
+    for orb in orb_type:
+        print("Orb type",orb)
+        idx = 0
+        for label in mol.ao_labels():
+            if orb in label:
+                #print(label)
+                idx += 1
+
+        ##frozen 1s orbitals
+        if orb == 's':
+            idx -= 2 
+        dim_orb.append(idx)
+        print(idx)
+    
+
+    new_idx = []
+    ## Find orbitals corresponding to each orb space
+    for i,orb in enumerate(orb_type):
+        print("Orbital type:",orb)
+        from pyscf import mo_mapping
+        s_pop = mo_mapping.mo_comps(orb, mol, C)
+        #print(s_pop)
+        ref += s_pop
+        cas_list = s_pop.argsort()[-dim_orb[i]:]
+        print('cas_list', np.array(cas_list))
+        new_idx.extend(cas_list) 
+        #print(orb,' population for active space orbitals', s_pop[cas_list])
+
+    ao_labels = mol.ao_labels()
+    #idx = mol.search_ao_label(['N.*s'])
+    #for i in idx:
+    #    print(i, ao_labels[i])
+    print(ref)
+    print(new_idx)
+    for label in mol.ao_labels():
+        print(label)
+
+    return new_idx
 # }}}
 

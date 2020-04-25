@@ -1,4 +1,6 @@
 import sys, os
+sys.path.append('../')
+sys.path.append('../src/')
 import numpy as np
 import scipy
 import itertools
@@ -13,14 +15,16 @@ import pyscf
 ttt = time.time()
 
 
-def test_1():
+
+
+def run(nproc=None):
     pyscf.lib.num_threads(1)  #with degenerate states and multiple processors there can be issues
     np.set_printoptions(suppress=True, precision=3, linewidth=1500)
     n_cluster_states = 1000
 
     from pyscf import gto, scf, mcscf, ao2mo
 
-    r0 = 2.0
+    r0 = 1.5
 
     molecule= '''
     N       0.00       0.00       0.00
@@ -28,7 +32,7 @@ def test_1():
 
     charge = 0
     spin  = 0
-    basis_set = 'ccpvdz'
+    basis_set = '6-31g'
 
     ###     TPSCI BASIS INPUT
     orb_basis = 'boys'
@@ -38,8 +42,12 @@ def test_1():
     cas_nel = 10
 
     ###     TPSCI CLUSTER INPUT
+    #blocks = [[0,1],[2,3],[4,5],[6,7]]
+    #init_fspace = ((2, 2), (1, 1), (1, 1), (1, 1))
     blocks = [[0,1,2,3],[4,5],[6,7]]
     init_fspace = ((3, 3), (1, 1), (1, 1))
+
+
 
     #Integrals from pyscf
     pmol = PyscfHelper()
@@ -57,34 +65,45 @@ def test_1():
 
     do_fci = 1
     do_hci = 1
+    do_tci = 1
 
     if do_fci:
         efci, fci_dim = run_fci_pyscf(h,g,cas_nel,ecore=ecore)
     if do_hci:
         ehci, hci_dim = run_hci_pyscf(h,g,cas_nel,ecore=ecore,select_cutoff=1e-4,ci_cutoff=1e-4)
+    if do_tci:
         
-         
-    clusters, clustered_ham, ci_vector, cmf_out = system_setup(h, g, ecore, blocks, init_fspace, cmf_maxiter = 0 )
+        clusters, clustered_ham, ci_vector, cmf_out = system_setup(h, g, ecore, blocks, init_fspace, cmf_maxiter = 1 )
+        
+        
+        
+        
+        edps = build_hamiltonian_diagonal(clustered_ham,ci_vector)
+        ci_vector_ref = ci_vector.copy()
+        ci_vector, pt_vector, etci, etci2, t_conv = bc_cipsi_tucker(ci_vector_ref.copy(), clustered_ham, 
+                selection='heatbath', 
+                thresh_cipsi=1e-6, 
+                thresh_ci_clip=1e-7, 
+                max_tucker_iter=3)
+        etci += ecore
 
 
-    ci_vector, pt_vector, etci, etci2, conv = bc_cipsi_tucker(ci_vector, clustered_ham, 
-                                                        thresh_cipsi    = 1e-5, 
-                                                        thresh_ci_clip  = 1e-6, 
-                                                        max_tucker_iter = 0)
-    
-    tci_dim = len(ci_vector)
 
-    etci += ecore
-    etci2 += ecore
 
-    print(" TCI:        %12.9f Dim:%6d"%(etci,tci_dim))
+
+    print(" TCI:        %12.9f Dim:%6d"%(etci,len(ci_vector)))
     print(" HCI:        %12.9f Dim:%6d"%(ehci,hci_dim))
     print(" FCI:        %12.9f Dim:%6d"%(efci,fci_dim))
-    assert(abs(etci --108.756551406)< 1e-7)
-    assert(abs(etci2 --108.756912357)< 1e-7)
-    assert(abs(tci_dim - 106)<1e-15)
-    assert(abs(efci   --108.756976573)< 1e-7)
+    assert(abs(etci --108.855743070)< 1e-7)
+    assert(len(ci_vector) == 248)
+    assert(abs(efci   --108.85574521)< 1e-7)
 
+def test_1():
+    run(nproc=None)
+
+def test_2():
+    run(nproc=1)
 
 if __name__== "__main__":
     test_1() 
+    #test_2() 
