@@ -411,7 +411,10 @@ def mulliken_ordering(mol,norb,C):
         Cocc = C[:,i].reshape(C.shape[0],1)
         temp = Cocc @ Cocc.T @ S   
         for m,lb in enumerate(mol.ao_labels()):
-            mulliken[int(lb[0]),i] += temp[m,m]
+            print(lb)
+            v1,v2,v3 = lb.split()
+            print(v1)
+            mulliken[int(v1),i] += temp[m,m]
     print(mulliken)
     return mulliken
 # }}}

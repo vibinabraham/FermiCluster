@@ -2701,6 +2701,253 @@ def build_1rdm(ci_vector, clusters):
 
 # }}}
 
+def build_tdm(r_vector,l_vector,clustered_ham):
+    """
+    Build 1rdm C_{I,J,K}<IJK|p'q|LMN> C_{L,M,N}
+    Build gradient for the CMF state. makes sure l_vector is only 1 config. 
+    Computes Gpq =  <0|[H,p'q]|0>
+                 =  <0|p'q.H|0> 
+    We have H|0> =  matvec(l_vector)
+    """
+    # {{{
+    n_orb = l_vector.n_orb
+    dm_aa = np.zeros((n_orb,n_orb))
+    dm_bb = np.zeros((n_orb,n_orb))
+    clusters = l_vector.clusters
+
+   
+    if 0:   # doesn't work anymore after removing local terms from add_1b_terms
+        print(l_vector.norm())
+        # build 1rdm in slow (easy) way
+        dm_aa_slow = np.zeros((n_orb,n_orb))
+        for i in range(n_orb):
+            for j in range(n_orb):
+                op = ClusteredOperator(clusters)
+                h = np.zeros((n_orb,n_orb))
+                h[i,j] = 1
+                #op.add_local_terms()
+                op.add_1b_terms(h)
+                Nv = matvec1(op, l_vector, thresh_search=1e-8)
+                Nv = l_vector.dot(Nv)
+                dm_aa_slow[i,j] = Nv
+        print(" Here is the slow version:")
+        print(dm_aa_slow)
+        occs = np.linalg.eig(dm_aa_slow)[0]
+        [print("%4i %12.8f"%(i,occs[i])) for i in range(len(occs))]
+        #with np.printoptions(precision=6, suppress=True):
+        #    print(dm_aa_slow)
+        print(" Trace slow:",np.trace(dm_aa_slow))
+        exit()
+
+    # define orbital index shifts
+    tmp = 0
+    shifts = []
+    for ci in range(len(clusters)):
+        shifts.append(tmp)
+        tmp += clusters[ci].n_orb
+   
+    iprint = 1
+ 
+    # Diagonal terms
+    for fock in l_vector.fblocks():
+        for ci in clusters:
+            #if ci.idx != 1:
+            #    continue
+            #Aa terms
+            if fock[ci.idx][0] > 0:
+                if fock in r_vector.fblocks():
+                    # c(ijk...) <ijk...|p'q|lmk...> c(lmk...)
+                    # c(ijk...) <i|p'q|l> c(ljk...)
+                    for config_l in l_vector.fblock(fock):
+                        for config_r in r_vector.fblock(fock):
+                            # make sure all state indices are the same aside for clusters i and j
+                            
+                            delta_conf = [abs(config_l[i] - config_r[i]) for i in range(len(clusters))] 
+                            delta_conf[ci.idx] = 0
+                            
+                            if sum(delta_conf) == 0:
+                                pq = ci.get_op_mel('Aa', fock[ci.idx], fock[ci.idx], config_l[ci.idx], config_r[ci.idx])*l_vector[fock][config_l] * r_vector[fock][config_r]
+                                dm_aa[shifts[ci.idx]:shifts[ci.idx]+ci.n_orb, shifts[ci.idx]:shifts[ci.idx]+ci.n_orb] += pq
+ 
+            #Bb terms
+            if fock[ci.idx][1] > 0:
+                if fock in r_vector.fblocks():
+                    # c(ijk...) <ijk...|p'q|lmk...> c(lmk...)
+                    # c(ijk...) <i|p'q|l> c(ljk...)
+                    for config_l in l_vector.fblock(fock):
+                        for config_r in r_vector.fblock(fock):
+                            # make sure all state indices are the same aside for clusters i and j
+                            delta_conf = [abs(config_l[i] - config_r[i]) for i in range(len(clusters))] 
+                            delta_conf[ci.idx] = 0
+                            
+                            if sum(delta_conf) == 0:
+                                pq = ci.get_op_mel('Bb', fock[ci.idx], fock[ci.idx], config_l[ci.idx], config_r[ci.idx])*l_vector[fock][config_l] * r_vector[fock][config_r]
+                                dm_bb[shifts[ci.idx]:shifts[ci.idx]+ci.n_orb, shifts[ci.idx]:shifts[ci.idx]+ci.n_orb] += pq
+ 
+    # Off-diagonal terms
+    for fock_l in l_vector.fblocks():
+        #continue 
+        for ci in clusters:
+            for cj in clusters:
+                if cj.idx >= ci.idx:
+                    sign = -1
+                else:
+                    sign = 1
+                #    continue
+                #A,a terms
+                if fock_l[cj.idx][0] < cj.n_orb and fock_l[ci.idx][0] > 0:
+                    fock_r = list(fock_l)
+                    fock_r[ci.idx] = tuple([fock_l[ci.idx][0]-1, fock_l[ci.idx][1]])
+                    fock_r[cj.idx] = tuple([fock_l[cj.idx][0]+1, fock_l[cj.idx][1]])
+                    fock_r = tuple(fock_r)
+
+                    if fock_r in r_vector.fblocks():
+                        #print("A,a", fock_l, '-->', fock_r)
+                        # c(ijk...) <ijk...|p'q|lmk...> c(lmk...)
+                        # c(ijk...) <i|p'|l> <j|q|m> c(lmk...) (-1)^N(l)
+                        try:
+                            for config_l in l_vector.fblock(fock_l):
+                                for config_r in r_vector.fblock(fock_r):
+                                    # make sure all state indices are the same aside for clusters i and j
+                                    delta_conf = [abs(config_l[i]-config_r[i]) for i in range(len(clusters))] 
+                                    delta_conf[ci.idx] = 0
+                                    delta_conf[cj.idx] = 0
+                                    if sum(delta_conf) > 0:
+                                        continue
+                                    #print(" Here:", config_l, config_r, delta_conf)
+                                    pmat = ci.get_op_mel('A', fock_l[ci.idx], fock_r[ci.idx], config_l[ci.idx], config_r[ci.idx])
+                                    qmat = cj.get_op_mel('a', fock_l[cj.idx], fock_r[cj.idx], config_l[cj.idx], config_r[cj.idx])
+                                    pq = np.einsum('p,q->pq',pmat,qmat) * l_vector[fock_l][config_l] * r_vector[fock_r][config_r]
+                                    pq.shape = (ci.n_orb,cj.n_orb)
+                                    # get state sign
+                                    state_sign = 1
+                                    for ck in range(ci.idx):
+                                        state_sign *= (-1)**(fock_l[ck][0]+fock_l[ck][1])
+                                    for ck in range(cj.idx):
+                                        state_sign *= (-1)**(fock_l[ck][0]+fock_l[ck][1])
+                                    pq = pq * state_sign
+                                    dm_aa[shifts[ci.idx]:shifts[ci.idx]+ci.n_orb, shifts[cj.idx]:shifts[cj.idx]+cj.n_orb] += pq * sign
+                                    #dm_aa[shifts[cj.idx]:shifts[cj.idx]+cj.n_orb, shifts[ci.idx]:shifts[ci.idx]+ci.n_orb] += pq.T
+                        except KeyError:
+                            pass 
+                    
+                
+                #B,b terms
+                if fock_l[cj.idx][1] < cj.n_orb and fock_l[ci.idx][1] > 0:
+                    fock_r = list(fock_l)
+                    fock_r[ci.idx] = tuple([fock_l[ci.idx][0], fock_l[ci.idx][1]-1])
+                    fock_r[cj.idx] = tuple([fock_l[cj.idx][0], fock_l[cj.idx][1]+1])
+                    fock_r = tuple(fock_r)
+
+                    if fock_r in r_vector.fblocks():
+                        #print("A,a", fock_l, '-->', fock_r)
+                        # c(ijk...) <ijk...|p'q|lmk...> c(lmk...)
+                        # c(ijk...) <i|p'|l> <j|q|m> c(lmk...) (-1)^N(l)
+                        try:
+                            for config_l in l_vector.fblock(fock_l):
+                                for config_r in r_vector.fblock(fock_r):
+                                    # make sure all state indices are the same aside for clusters i and j
+                                    delta_conf = [abs(config_l[i]-config_r[i]) for i in range(len(clusters))] 
+                                    delta_conf[ci.idx] = 0
+                                    delta_conf[cj.idx] = 0
+                                    if sum(delta_conf) > 0:
+                                        continue
+                                    #print(" Here:", config_l, config_r, delta_conf)
+                                    pmat = ci.get_op_mel('B', fock_l[ci.idx], fock_r[ci.idx], config_l[ci.idx], config_r[ci.idx])
+                                    qmat = cj.get_op_mel('b', fock_l[cj.idx], fock_r[cj.idx], config_l[cj.idx], config_r[cj.idx])
+                                    pq = np.einsum('p,q->pq',pmat,qmat) * l_vector[fock_l][config_l] * r_vector[fock_r][config_r]
+                                    pq.shape = (ci.n_orb,cj.n_orb)
+                                    # get state sign
+                                    state_sign = 1
+                                    for ck in range(ci.idx):
+                                        state_sign *= (-1)**(fock_l[ck][0]+fock_l[ck][1])
+                                    for ck in range(cj.idx):
+                                        state_sign *= (-1)**(fock_l[ck][0]+fock_l[ck][1])
+                                    pq = pq * state_sign
+                                    dm_bb[shifts[ci.idx]:shifts[ci.idx]+ci.n_orb, shifts[cj.idx]:shifts[cj.idx]+cj.n_orb] += pq * sign
+                                    #dm_bb[shifts[cj.idx]:shifts[cj.idx]+cj.n_orb, shifts[ci.idx]:shifts[ci.idx]+ci.n_orb] += pq.T
+                        except KeyError:
+                            pass 
+                       
+
+    # density is being made in a reindexed fasion - reorder now 
+    new_index = []
+    for ci in clusters:
+        for cij in ci.orb_list:
+            new_index.append(cij)
+    new_index = np.array(new_index)
+
+    idx = new_index.argsort()
+    dm_aa = dm_aa[:,idx][idx,:]
+    dm_bb = dm_bb[:,idx][idx,:]
+                
+
+    occs = np.linalg.eig(dm_aa + dm_bb)[0]
+    print(" Eigenvalues of density matrix")
+    [print(" %4i %12.8f"%(i,occs[i])) for i in range(len(occs))]
+    print(" Trace of Pa:", np.trace(dm_aa))
+    print(" Trace of Pb:", np.trace(dm_bb))
+    #with np.printoptions(precision=6, suppress=True):
+    #    print(dm_aa + dm_bb)
+    return dm_aa, dm_bb 
+
+# }}}
+
+def compute_energy_wrt_rotation(Gpq,h,g,C,blocks,init_fspace,ecore,max_roots):
+#{{{
+    from scipy.sparse.linalg import expm
+    U = expm(Gpq)
+    print(U)
+    print(U.T @ U)
+    print(h)
+    C = C @ U
+    #molden.from_mo(mol, 'h4.molden', C)
+    h = U.T @ h @ U
+    print(h)
+    g = np.einsum("pqrs,pl->lqrs",g,U)
+    g = np.einsum("lqrs,qm->lmrs",g,U)
+    g = np.einsum("lmrs,rn->lmns",g,U)
+    g = np.einsum("lmns,so->lmno",g,U)
+
+    n_blocks = len(blocks)
+    clusters = [Cluster(ci,c) for ci,c in enumerate(blocks)]
+    
+    print(" Clusters:")
+    [print(ci) for ci in clusters]
+    
+    clustered_ham = ClusteredOperator(clusters, core_energy=ecore)
+    print(" Add 1-body terms")
+    clustered_ham.add_local_terms()
+    clustered_ham.add_1b_terms(h)
+    print(" Add 2-body terms")
+    clustered_ham.add_2b_terms(g)
+
+    ci_vector = ClusteredState(clusters)
+    ci_vector.init(init_fspace)
+
+
+    e_curr, converged, rdm_a, rdm_b = cmf(clustered_ham, ci_vector, h, g, max_iter = 20, thresh = 1e-8)
+
+
+    # build cluster basis and operator matrices using CMF optimized density matrices
+    for ci_idx, ci in enumerate(clusters):
+        #if delta_elec != None:
+        #    fspaces_i = init_fspace[ci_idx]
+        #    fspaces_i = ci.possible_fockspaces( delta_elec=(fspaces_i[0], fspaces_i[1], delta_elec) )
+        #else:
+        fspaces_i = ci.possible_fockspaces()
+    
+        print()
+        print(" Form basis by diagonalizing local Hamiltonian for cluster: ",ci_idx)
+        ci.form_fockspace_eigbasis(h, g, fspaces_i, max_roots=max_roots, rdm1_a=rdm_a, rdm1_b=rdm_b, ecore=ecore)
+        
+        print(" Build operator matrices for cluster ",ci.idx)
+        ci.build_op_matrices()
+        ci.build_local_terms(h,g)
+
+    
+    return e_curr,clusters, clustered_ham, ci_vector,h,g,C
+#}}}
 
 def build_brdm(ci_vector, ci):
     """
@@ -3728,4 +3975,313 @@ def compute_cisd_correction(ci_vector, clustered_ham, nproc=1):
     print(" CISD Energy Correction = %12.8f" %Ec)
     return Ec
 # }}}
+
+
+class CmfSolver:
+    """
+
+    """
+    def __init__(self, h1, h2, ecore, blocks, init_fspace, C):
+        self.h = h1
+        self.g = h2
+        self.ecore = ecore
+        self.C = C
+        self.blocks = blocks
+        self.init_fspace = init_fspace
+
+        self.clustered_ham = None
+        self.ci_vector = None
+        self.e = 0
+
+    def init(self):
+
+        h = self.h
+        g = self.g
+        C = self.C
+        blocks = self.blocks
+        init_fspace = self.init_fspace
+        
+        n_blocks = len(blocks)
+        clusters = [Cluster(ci,c) for ci,c in enumerate(blocks)]
+        
+        print(" Clusters:")
+        [print(ci) for ci in clusters]
+        
+        clustered_ham = ClusteredOperator(clusters, core_energy=self.ecore)
+        print(" Add 1-body terms")
+        clustered_ham.add_local_terms()
+        clustered_ham.add_1b_terms(h)
+        print(" Add 2-body terms")
+        clustered_ham.add_2b_terms(g)
+
+        ci_vector = ClusteredState(clusters)
+        ci_vector.init(init_fspace)
+
+        self.clustered_ham = clustered_ham
+        self.ci_vector = ci_vector
+
+        e_curr, converged, rdm_a, rdm_b = cmf(clustered_ham, ci_vector, h, g, max_iter = 20, thresh = 1e-8)
+
+        # build cluster basis and operator matrices using CMF optimized density matrices
+        for ci_idx, ci in enumerate(clusters):
+            #if delta_elec != None:
+            #    fspaces_i = init_fspace[ci_idx]
+            #    fspaces_i = ci.possible_fockspaces( delta_elec=(fspaces_i[0], fspaces_i[1], delta_elec) )
+            #else:
+            fspaces_i = ci.possible_fockspaces()
+        
+            print()
+            print(" Form basis by diagonalizing local Hamiltonian for cluster: ",ci_idx)
+            ci.form_fockspace_eigbasis(h, g, fspaces_i, max_roots=100, rdm1_a=rdm_a, rdm1_b=rdm_b, ecore=self.ecore)
+            
+            print(" Build operator matrices for cluster ",ci.idx)
+            ci.build_op_matrices()
+            ci.build_local_terms(h,g)
+
+    def energy_dps(self):
+        edps = build_hamiltonian_diagonal(self.clustered_ham,self.ci_vector)
+        print("EDPS %16.8f"%edps)
+        return edps
+
+    def cmf_energy(self):
+        h = self.h
+        g = self.g
+        C = self.C
+        blocks = self.blocks
+        init_fspace = self.init_fspace
+        
+        n_blocks = len(blocks)
+        clusters = [Cluster(ci,c) for ci,c in enumerate(blocks)]
+        
+        print(" Clusters:")
+        [print(ci) for ci in clusters]
+        
+        clustered_ham = ClusteredOperator(clusters, core_energy=self.ecore)
+        print(" Add 1-body terms")
+        clustered_ham.add_local_terms()
+        clustered_ham.add_1b_terms(h)
+        print(" Add 2-body terms")
+        clustered_ham.add_2b_terms(g)
+
+        ci_vector = ClusteredState(clusters)
+        ci_vector.init(init_fspace)
+
+        self.clustered_ham = clustered_ham
+        self.ci_vector = ci_vector
+
+        e_curr, converged, rdm_a, rdm_b = cmf(clustered_ham, ci_vector, h, g, max_iter = 20, thresh = 1e-8)
+
+        # build cluster basis and operator matrices using CMF optimized density matrices
+        for ci_idx, ci in enumerate(clusters):
+            #if delta_elec != None:
+            #    fspaces_i = init_fspace[ci_idx]
+            #    fspaces_i = ci.possible_fockspaces( delta_elec=(fspaces_i[0], fspaces_i[1], delta_elec) )
+            #else:
+            fspaces_i = ci.possible_fockspaces()
+        
+            print()
+            print(" Form basis by diagonalizing local Hamiltonian for cluster: ",ci_idx)
+            ci.form_fockspace_eigbasis(h, g, fspaces_i, max_roots=100, rdm1_a=rdm_a, rdm1_b=rdm_b, ecore=self.ecore)
+            
+            print(" Build operator matrices for cluster ",ci.idx)
+            ci.build_op_matrices()
+            ci.build_local_terms(h,g)
+        return e_curr
+
+    def energy(self,Kpq):
+
+        print("NormGrad",np.linalg.norm(Kpq))
+        Kpq = Kpq.reshape(self.h.shape[0],self.h.shape[1])
+        print("Gpq")
+        print(Kpq)
+
+        h = self.h
+        g = self.g
+        C = self.C
+        blocks = self.blocks
+        init_fspace = self.init_fspace
+        clustered_ham = self.clustered_ham
+        ci_vector = self.ci_vector
+
+
+        from scipy.sparse.linalg import expm
+        U = expm(Kpq)
+        print(U)
+        print(U.T @ U)
+        print(h)
+        C = C @ U
+        #molden.from_mo(mol, 'h4.molden', C)
+        h = U.T @ h @ U
+        print(h)
+        g = np.einsum("pqrs,pl->lqrs",g,U)
+        g = np.einsum("lqrs,qm->lmrs",g,U)
+        g = np.einsum("lmrs,rn->lmns",g,U)
+        g = np.einsum("lmns,so->lmno",g,U)
+
+        n_blocks = len(blocks)
+        clusters = [Cluster(ci,c) for ci,c in enumerate(blocks)]
+        
+        print(" Clusters:")
+        [print(ci) for ci in clusters]
+        
+        clustered_ham = ClusteredOperator(clusters, core_energy=self.ecore)
+        print(" Add 1-body terms")
+        clustered_ham.add_local_terms()
+        clustered_ham.add_1b_terms(h)
+        print(" Add 2-body terms")
+        clustered_ham.add_2b_terms(g)
+
+        ci_vector = ClusteredState(clusters)
+        ci_vector.init(init_fspace)
+
+        e_curr, converged, rdm_a, rdm_b = cmf(clustered_ham, ci_vector, h, g, max_iter = 20, thresh = 1e-8)
+
+        # build cluster basis and operator matrices using CMF optimized density matrices
+        for ci_idx, ci in enumerate(clusters):
+            #if delta_elec != None:
+            #    fspaces_i = init_fspace[ci_idx]
+            #    fspaces_i = ci.possible_fockspaces( delta_elec=(fspaces_i[0], fspaces_i[1], delta_elec) )
+            #else:
+            fspaces_i = ci.possible_fockspaces()
+        
+            print()
+            print(" Form basis by diagonalizing local Hamiltonian for cluster: ",ci_idx)
+            ci.form_fockspace_eigbasis(h, g, fspaces_i, max_roots=100, rdm1_a=rdm_a, rdm1_b=rdm_b, ecore=self.ecore)
+            
+            print(" Build operator matrices for cluster ",ci.idx)
+            ci.build_op_matrices()
+            ci.build_local_terms(h,g)
+
+        self.e = e_curr
+
+        return e_curr
+
+
+
+    def rotate(self,Kpq):
+        
+        Kpq = Kpq.reshape(self.h.shape[0],self.h.shape[1])
+
+        h = self.h
+        g = self.g
+        C = self.C
+        blocks = self.blocks
+        init_fspace = self.init_fspace
+        clustered_ham = self.clustered_ham
+        ci_vector = self.ci_vector
+
+
+        from scipy.sparse.linalg import expm
+        U = expm(Kpq)
+        print(U)
+        print(U.T @ U)
+        print(h)
+        C = C @ U
+        #molden.from_mo(mol, 'h4.molden', C)
+        h = U.T @ h @ U
+        print(h)
+        g = np.einsum("pqrs,pl->lqrs",g,U)
+        g = np.einsum("lqrs,qm->lmrs",g,U)
+        g = np.einsum("lmrs,rn->lmns",g,U)
+        g = np.einsum("lmns,so->lmno",g,U)
+
+        n_blocks = len(blocks)
+        clusters = [Cluster(ci,c) for ci,c in enumerate(blocks)]
+        
+        print(" Clusters:")
+        [print(ci) for ci in clusters]
+        
+        clustered_ham = ClusteredOperator(clusters, core_energy=self.ecore)
+        print(" Add 1-body terms")
+        clustered_ham.add_local_terms()
+        clustered_ham.add_1b_terms(h)
+        print(" Add 2-body terms")
+        clustered_ham.add_2b_terms(g)
+
+        ci_vector = ClusteredState(clusters)
+        ci_vector.init(init_fspace)
+
+        self.h = h
+        self.g = g
+        self.C = C
+        self.clustered_ham = clustered_ham
+        self.ci_vector = ci_vector
+
+
+    def grad(self,Kpq):
+
+        Kpq = Kpq.reshape(self.h.shape[0],self.h.shape[1])
+
+        h = self.h
+        g = self.g
+        C = self.C
+        blocks = self.blocks
+        init_fspace = self.init_fspace
+        clustered_ham = self.clustered_ham
+        ci_vector = self.ci_vector
+
+
+        from scipy.sparse.linalg import expm
+        U = expm(Kpq)
+        print(U)
+        print(U.T @ U)
+        print(h)
+        C = C @ U
+        #molden.from_mo(mol, 'h4.molden', C)
+        h = U.T @ h @ U
+        print(h)
+        g = np.einsum("pqrs,pl->lqrs",g,U)
+        g = np.einsum("lqrs,qm->lmrs",g,U)
+        g = np.einsum("lmrs,rn->lmns",g,U)
+        g = np.einsum("lmns,so->lmno",g,U)
+
+        n_blocks = len(blocks)
+        clusters = [Cluster(ci,c) for ci,c in enumerate(blocks)]
+        
+        print(" Clusters:")
+        [print(ci) for ci in clusters]
+        
+        clustered_ham = ClusteredOperator(clusters, core_energy=self.ecore)
+        print(" Add 1-body terms")
+        clustered_ham.add_local_terms()
+        clustered_ham.add_1b_terms(h)
+        print(" Add 2-body terms")
+        clustered_ham.add_2b_terms(g)
+
+        ci_vector = ClusteredState(clusters)
+        ci_vector.init(init_fspace)
+
+        e_curr, converged, rdm_a, rdm_b = cmf(clustered_ham, ci_vector, h, g, max_iter = 20, thresh = 1e-8)
+
+        # build cluster basis and operator matrices using CMF optimized density matrices
+        for ci_idx, ci in enumerate(clusters):
+            #if delta_elec != None:
+            #    fspaces_i = init_fspace[ci_idx]
+            #    fspaces_i = ci.possible_fockspaces( delta_elec=(fspaces_i[0], fspaces_i[1], delta_elec) )
+            #else:
+            fspaces_i = ci.possible_fockspaces()
+        
+            print()
+            print(" Form basis by diagonalizing local Hamiltonian for cluster: ",ci_idx)
+            ci.form_fockspace_eigbasis(h, g, fspaces_i, max_roots=100, rdm1_a=rdm_a, rdm1_b=rdm_b, ecore=self.ecore)
+            
+            print(" Build operator matrices for cluster ",ci.idx)
+            ci.build_op_matrices()
+            ci.build_local_terms(h,g)
+
+
+
+
+        h1_vector = matvec1(clustered_ham, ci_vector, thresh_search=0, nbody_limit=3)
+        h1_vector.print_configs()
+        rdm_a1, rdm_b1 = build_tdm(ci_vector,h1_vector,clustered_ham)
+        rdm_a2, rdm_b2 = build_tdm(h1_vector,ci_vector,clustered_ham)
+        print("Gradient")
+        Gpq = rdm_a1+rdm_b1-rdm_a2-rdm_b2
+        print(Gpq)
+        print("NormGrad1",np.linalg.norm(Gpq))
+
+        #print("CurrCMF:%12.8f       Grad:%12.8f    dE:%10.6f"%(e_curr,np.linalg.norm(grad),e_curr-self.e))
+        #print("CurrCMF:%12.8f       Grad:%12.8f   "%(e_curr,np.linalg.norm(Gpq)))
+        return Gpq.ravel()
 
