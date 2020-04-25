@@ -87,6 +87,62 @@ def ordering_diatomics_cr(mol,C):
     return new_idx
 # }}}
     
+    
+def ordering_diatomics_cr2(mol,C):
+# {{{
+    ##DZ basis diatomics reordering with frozen 1s
+
+    orb_type = ['3px','3py','3dxy','3dx2-y2','4s','3dz2','5s','4dz2','3pz','4px','4py','4dxy','4dx2-y2','4px','4py']
+    ref = np.zeros(C.shape[1]) 
+
+    ## Find dimension of each space
+    dim_orb = []
+    for orb in orb_type:
+        print("Orb type",orb)
+        idx = 0
+        for label in mol.ao_labels():
+            if orb in label:
+                #print(label)
+                idx += 1
+
+        ##frozen 1s orbitals
+        if orb == 's':
+            idx -= 6 
+        elif orb == 'px':
+            idx -=2
+        elif orb == 'py':
+            idx -=2
+        elif orb == 'pz':
+            idx -=2
+        dim_orb.append(idx)
+        print(idx)
+    
+
+    new_idx = []
+    ## Find orbitals corresponding to each orb space
+    for i,orb in enumerate(orb_type):
+        print("Orbital type:",orb)
+        from pyscf import mo_mapping
+        s_pop = mo_mapping.mo_comps(orb, mol, C)
+        print(s_pop)
+        ref += s_pop
+        cas_list = s_pop.argsort()[-dim_orb[i]:]
+        print('cas_list', np.array(cas_list))
+        new_idx.extend(cas_list) 
+        #print(orb,' population for active space orbitals', s_pop[cas_list])
+
+    ao_labels = mol.ao_labels()
+    #idx = mol.search_ao_label(['N.*s'])
+    #for i in idx:
+    #    print(i, ao_labels[i])
+    print(ref)
+    print(new_idx)
+    for label in mol.ao_labels():
+        print(label)
+
+    return new_idx
+# }}}
+
 # basis is SVP read comments by alex thom paper DOI:10.1021/acs.jctc.9b01023
 from pyscf import gto
 basis_set={'Cr': gto.parse(''' 
@@ -135,6 +191,9 @@ END''')}
 init_fspace = ((1, 1),(3, 3),(3, 3),(3, 3), (1, 1), (1, 1))
 blocks = [range(0,4),range(4,10),range(10,16),range(16,22),range(22,26),range(26,30)]
 
+init_fspace = ((4, 8),(2, 2),(2, 2),(1, 1), (0, 0), (0, 0), (0, 0))
+blocks = [range(0,4),range(4,8),range(8,12),range(12,18),range(18,22),range(22,26),range(26,30)]
+
 # Integrals from pyscf
 #Integrals from pyscf
 pmol = PyscfHelper()
@@ -149,7 +208,7 @@ print("Ecore:%16.8f"%ecore)
 C = pmol.C
 K = pmol.K
 mol = pmol.mol
-mo_energy = pmol.mf.mo_energy
+mo_energy = pmol.mf.mo_energy[cas_nstart:cas_nstop]
 dm_aa = pmol.dm_aa
 dm_bb = pmol.dm_bb
 
@@ -167,6 +226,7 @@ if do_hci:
 idx = ordering_diatomics_cr(mol,C)
 h,g = reorder_integrals(idx,h,g)
 C = C[:,idx]
+
 mo_energy = mo_energy[idx]
 dm_aa = dm_aa[:,idx] 
 dm_aa = dm_aa[idx,:]

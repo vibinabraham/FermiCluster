@@ -2278,17 +2278,18 @@ def build_block_hamiltonian(clustered_ham,ci_vector,pt_vector,iprint=0):
                     shift_r += len(configs_r) 
                     continue 
 
+                print("FOCK",fock_r)
                 for config_ri, config_r in enumerate(configs_r):        
                     idx_r = shift_r + config_ri
 
 
-                    #print("FOC",fock_l,fock_r)
                     #print("con",config_l,config_r)
                     #print(shift_r,config_ri)
                     #print("idx",idx_l,idx_r)
                     for term in terms:
                         me = term.matrix_element(fock_l,config_l,fock_r,config_r)
                         H0d[idx_l,idx_r] += me
+                    print("%16.8f"%H0d[idx_l,idx_r])
                     
 
                 shift_r += len(configs_r) 
@@ -2579,9 +2580,9 @@ def expand_doubles(ci_vector):
 
 # }}}
 
-def truncated_pt2(clustered_ham,ci_vector,pt_vector,method = 'mp2'):
+def truncated_pt2(clustered_ham,ci_vector,pt_vector,method = 'mp2',pt_order = 500):
 # {{{
-    """ method: mp2,mplcc2,en2,enlcc"""
+    """ method: mp2,mplcc2,en2,enlcc2"""
 
     clusters = clustered_ham.clusters
 
@@ -2599,7 +2600,6 @@ def truncated_pt2(clustered_ham,ci_vector,pt_vector,method = 'mp2'):
 
     pt_dim = len(pt_vector)
     ci_dim = len(ci_vector)
-    pt_order = 500
     
     
     for fockspace,configs in ci_vector.items():
@@ -2612,23 +2612,26 @@ def truncated_pt2(clustered_ham,ci_vector,pt_vector,method = 'mp2'):
     H00 = build_full_hamiltonian(clustered_ham,ci_vector,iprint=0)
     Hdd = build_full_hamiltonian(clustered_ham,pt_vector,iprint=0)
     print(H00)
+    print(Hdd)
+    Hdd2 = 1.0* Hdd
     E0,V0 = np.linalg.eigh(H00)
     E0 = E0[ts]
 
-    if method == 'en2' or method == 'enlcc':
+    if method == 'en2' or method == 'enlcc2':
         Hd = build_hamiltonian_diagonal(clustered_ham,pt_vector)
         np.fill_diagonal(Hdd,0)
 
-    elif method == 'mp2' or method == 'mplcc':
+    elif method == 'mp2' or method == 'mplcc2':
         Hd = build_h0(clustered_ham, ci_vector, pt_vector)
-        Hd += 10
         for i in range(0,Hdd.shape[0]):
-            Hdd[i,i] -= (Hd[i] + 10)
+            Hdd[i,i] -= (Hd[i])
     else:
         print("Method not found")
 
     print("E0 %16.8f"%E0)
     print(Hdd)
+    print("D  block")
+    print(Hdd2)
     
     R0 = 1/(E0 - Hd)
     print(R0)
@@ -2655,11 +2658,14 @@ def truncated_pt2(clustered_ham,ci_vector,pt_vector,method = 'mp2'):
     E_corr = E_mpn[0] 
     print(" %6i  %16.8f  %16.8f "%(2,E_mpn[0],E_corr))
 
-    if method == 'enlcc' or method == 'mplcc':
+    if method == 'enlcc2' or method == 'mplcc2':
 
+        pt_vector.print_configs()
         Eold = E_corr
         for i in range(1,pt_order-1):
             h1 = Hdd @ v_n[:,i-1]
+            #pt_vector.set_vector(h1)
+            #pt_vector.print_configs()
 
             v_n[:,i] = h1.reshape(pt_dim)
             #for k in range(0,i):

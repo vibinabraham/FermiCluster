@@ -143,8 +143,8 @@ def reorder_integrals(idx,h,g):
     return h,g
 # }}}
 
-local = False
 local = True
+local = False
 if local:
     cl_c = mf.mo_coeff[:, focc_list]
     cl_a = lo.Boys(mol, mf.mo_coeff[:, cas_list]).kernel(verbose=4)
@@ -189,7 +189,7 @@ molden.from_mo(mol, 'h8.molden', C)
 #g = ao2mo.kernel(mol,C,aosym='s4',compact=False).reshape(4*((h.shape[0]),))
 print("ecore %16.8f"%ecore)
 
-do_hci = 0
+do_hci = 1
 do_fci = 0
 
 if do_fci:
