@@ -57,18 +57,25 @@ def test_1():
 
     do_fci = 1
     do_hci = 1
-    do_tci = 1
 
     if do_fci:
         efci, fci_dim = run_fci_pyscf(h,g,cas_nel,ecore=ecore)
     if do_hci:
         ehci, hci_dim = run_hci_pyscf(h,g,cas_nel,ecore=ecore,select_cutoff=1e-4,ci_cutoff=1e-4)
-    if do_tci:
-        ci_vector, pt_vector, etci, etci2 = run_tpsci(h,g,blocks,init_fspace,ecore=ecore,
-            thresh_ci_clip=1e-5,thresh_cipsi=1e-5,max_tucker_iter=0,hshift=1e-8)
-        ci_vector.print_configs()
-        tci_dim = len(ci_vector)
+        
+         
+    clusters, clustered_ham, ci_vector, cmf_out = system_setup(h, g, ecore, blocks, init_fspace, cmf_maxiter = 0 )
 
+
+    ci_vector, pt_vector, etci, etci2, conv = bc_cipsi_tucker(ci_vector, clustered_ham, 
+                                                        thresh_cipsi    = 1e-5, 
+                                                        thresh_ci_clip  = 1e-6, 
+                                                        max_tucker_iter = 0)
+    
+    tci_dim = len(ci_vector)
+
+    etci += ecore
+    etci2 += ecore
 
     print(" TCI:        %12.9f Dim:%6d"%(etci,tci_dim))
     print(" HCI:        %12.9f Dim:%6d"%(ehci,hci_dim))

@@ -264,15 +264,13 @@ def run():
     ci_vector = ClusteredState(clusters)
     ci_vector.init(init_fspace)
 
-    ci_vector, pt_vector, etci, etci2, t_conv = bc_cipsi_tucker(ci_vector.copy(), clustered_ham,
-                        pt_type         = 'mp',
-                        thresh_cipsi    = 1e-3,
-                        thresh_ci_clip  = 1e-5,
-                        max_tucker_iter = 4,
-                        thresh_asci     = 1e-2,
-                        nbody_limit     = 4,
-                        thresh_search   = 1e-5,
-                        nproc           = None)
+    ci_vector, pt_vector, etci, etci2, t_conv = bc_cipsi_tucker(ci_vector.copy(), clustered_ham, selection='heatbath',
+                        thresh_cipsi    =   1e-2,
+                        thresh_asci     =   1e-3,
+                        thresh_ci_clip  =   1e-6,
+                        max_tucker_iter =   5,
+                        nbody_limit     =   4,
+                        nproc=None)
 
     tci_dim = len(ci_vector)
     ci_vector.print()
@@ -286,5 +284,5 @@ def run():
 
 
 if __name__== "__main__":
-    generate_hamiltonian()
+    #generate_hamiltonian()
     run()

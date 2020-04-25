@@ -99,27 +99,11 @@ def test_1():
             print("%4d %8s %16.8f"%(i+1,osym[i],mo_energy[i]))
 
 
-    clusters = []
-    for ci,c in enumerate(blocks):
-        clusters.append(Cluster(ci,c))
-
-    ci_vector = ClusteredState(clusters)
-    ci_vector.init(init_fspace)
+    clusters, clustered_ham, ci_vector, cmf_out = system_setup(h, g, ecore, blocks, init_fspace, cmf_maxiter = 0 )
 
 
-    print(" Clusters:")
-    [print(ci) for ci in clusters]
-
-    clustered_ham = ClusteredOperator(clusters)
-    print(" Add 1-body terms")
-    clustered_ham.add_1b_terms(h)
-    print(" Add 2-body terms")
-    clustered_ham.add_2b_terms(g)
-    #clustered_ham.combine_common_terms(iprint=1)
-
-
-    energy1,t = cmf(clustered_ham, ci_vector, h, g, max_iter=50,max_nroots=2,dm_guess=(dm_aa,dm_bb),diis=True)
-    energy2,t = cmf(clustered_ham, ci_vector, h, g, max_iter=50,max_nroots=2,dm_guess=None,diis=False)
+    energy1,t,rmda,rdmb = cmf(clustered_ham, ci_vector, h, g, max_iter=50,dm_guess=(dm_aa,dm_bb),diis=True)
+    energy2,t,rdma,rdmb = cmf(clustered_ham, ci_vector, h, g, max_iter=50,dm_guess=None,diis=False)
     assert(np.abs(energy1-energy2)<1e-6)
     
 if __name__== "__main__":

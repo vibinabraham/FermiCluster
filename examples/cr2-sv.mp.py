@@ -1,3 +1,9 @@
+import os
+os.environ["OMP_NUM_THREADS"]           = "1" # export OMP_NUM_THREADS=4
+os.environ["OPENBLAS_NUM_THREADS"]      = "1" # export OPENBLAS_NUM_THREADS=4 
+os.environ["MKL_NUM_THREADS"]           = "1" # export MKL_NUM_THREADS=6
+os.environ["VECLIB_MAXIMUM_THREADS"]    = "1" # export VECLIB_MAXIMUM_THREADS=4
+os.environ["NUMEXPR_NUM_THREADS"]       = "1" # export NUMEXPR_NUM_THREADS=6
 import numpy as np
 import scipy
 import itertools
@@ -16,7 +22,7 @@ pyscf.lib.num_threads(1)  #with degenerate states and multiple processors there 
 
 
 
-def generate_hamiltonian():
+def run():
     ###     PYSCF INPUT
     r0 = 1.50
     molecule = '''
@@ -157,14 +163,8 @@ def generate_hamiltonian():
     dm_aa = pmol.dm_aa
     dm_bb = pmol.dm_bb
 
-    do_fci = 0
-    do_hci = 0
     do_tci = 1
 
-    if do_fci:
-        efci, fci_dim = run_fci_pyscf(h,g,nelec,ecore=ecore)
-    if do_hci:
-        ehci, hci_dim = run_hci_pyscf(h,g,nelec,ecore=ecore,select_cutoff=5e-4,ci_cutoff=5e-4)
 
     #cluster using hcore
 
@@ -193,65 +193,17 @@ def generate_hamiltonian():
             print("%4d %8s %16.8f"%(i+1,osym[i],mo_energy[i]))
 
 
+    
+    clusters, clustered_ham, ci_vector = system_setup(h, g, ecore, blocks, init_fspace, 
+                                                        cmf_maxiter     = 20,
+                                                        cmf_dm_guess    = (dm_aa, dm_bb),
+                                                        cmf_diis        = True,
+                                                        max_roots       = 100,
+                                                        delta_elec      = 3
+                                                        )
 
 
-    clusters = []
 
-    for ci,c in enumerate(blocks):
-        clusters.append(Cluster(ci,c))
-
-    print(" Clusters:")
-    [print(ci) for ci in clusters]
-
-    clustered_ham = ClusteredOperator(clusters, core_energy=ecore)
-    print(" Add 1-body terms")
-    clustered_ham.add_local_terms()
-    clustered_ham.add_1b_terms(h)
-    print(" Add 2-body terms")
-    clustered_ham.add_2b_terms(g)
-
-    # intial state
-    ci_vector = ClusteredState(clusters)
-    ci_vector.init(init_fspace)
-    ci_vector.print()
-
-    # do cmf
-    do_cmf = 1
-    if do_cmf:
-        # Get CMF reference
-        e_cmf, cmf_conv, rdm_a, rdm_b = cmf(clustered_ham, ci_vector, h, g, max_iter=10, dm_guess=(dm_aa, dm_bb), diis=True)
-
-    print(" Final CMF Total Energy %12.8f" %(e_cmf + ecore))
-
-    # build cluster basis and operator matrices using CMF optimized density matrices
-    for ci_idx, ci in enumerate(clusters):
-        print(ci)
-        fspaces_i = init_fspace[ci_idx]
-        delta_e = 2
-        fspaces_i = ci.possible_fockspaces( delta_elec=(fspaces_i[0], fspaces_i[1], delta_e) )
-
-
-        print()
-        print(" Form basis by diagonalizing local Hamiltonian for cluster: ",ci_idx)
-
-        ci.form_fockspace_eigbasis(h, g, fspaces_i, max_roots=100, rdm1_a=rdm_a, rdm1_b=rdm_b)
-
-
-        print(" Build mats for cluster ",ci.idx)
-        ci.build_op_matrices()
-        ci.build_local_terms(h,g)
-
-
-    hamiltonian_file = open('hamiltonian_file', 'wb')
-    pickle.dump(clustered_ham, hamiltonian_file)
-
-    print(" Done.")
-
-def run():
-    hamiltonian_file = open('hamiltonian_file', 'rb')
-    clustered_ham = pickle.load(hamiltonian_file)
-
-    clusters = clustered_ham.clusters
 
     ndata = 0
     for ci in clusters:
@@ -261,18 +213,54 @@ def run():
     print(" Amount of data stored in TDMs: %12.2f Gb" %(ndata * 1e-9))
 
     init_fspace = ((1, 1),(3, 3),(3, 3),(3, 3), (1, 1), (1, 1))
-    ci_vector = ClusteredState(clusters)
-    ci_vector.init(init_fspace)
 
     ci_vector, pt_vector, etci, etci2, t_conv = bc_cipsi_tucker(ci_vector.copy(), clustered_ham,
-                        pt_type         = 'mp',
-                        thresh_cipsi    = 1e-3,
-                        thresh_ci_clip  = 1e-5,
-                        max_tucker_iter = 4,
-                        thresh_asci     = 1e-2,
-                        nbody_limit     = 4,
-                        thresh_search   = 1e-5,
-                        nproc           = None)
+                        pt_type             = 'mp',
+                        thresh_cipsi        = 1e-3,
+                        thresh_ci_clip      = 1e-6,
+                        max_tucker_iter     = 4,
+                        nbody_limit         = 4,
+                        thresh_search       = 1e-3,
+                        thresh_asci         = 1e-2,
+                        tucker_state_clip   = 100,  #don't use any pt for tucker 
+                        tucker_conv_target  = 0,    #converge variational energy
+                        nproc               = None)
+
+    ci_vector, pt_vector, etci, etci2, t_conv = bc_cipsi_tucker(ci_vector.copy(), clustered_ham,
+                        pt_type             = 'mp',
+                        thresh_cipsi        = 1e-5,
+                        thresh_ci_clip      = 1e-7,
+                        max_tucker_iter     = 2,
+                        nbody_limit         = 4,
+                        thresh_search       = 1e-4,
+                        thresh_asci         = 1e-2,
+                        tucker_state_clip   = 100,  #don't use any pt for tucker 
+                        tucker_conv_target  = 0,    #converge variational energy
+                        nproc               = None)
+    
+    ci_vector, pt_vector, etci, etci2, t_conv = bc_cipsi_tucker(ci_vector.copy(), clustered_ham,
+                        pt_type             = 'mp',
+                        thresh_cipsi        = 1e-6,
+                        thresh_ci_clip      = 1e-8,
+                        max_tucker_iter     = 2,
+                        nbody_limit         = 4,
+                        thresh_search       = 1e-4,
+                        thresh_asci         = 1e-2,
+                        tucker_state_clip   = 100,  #don't use any pt for tucker 
+                        tucker_conv_target  = 0,    #converge variational energy
+                        nproc               = None)
+    
+    ci_vector, pt_vector, etci, etci2, t_conv = bc_cipsi_tucker(ci_vector.copy(), clustered_ham,
+                        pt_type             = 'mp',
+                        thresh_cipsi        = 1e-7,
+                        thresh_ci_clip      = 1e-9,
+                        max_tucker_iter     = 4,
+                        nbody_limit         = 4,
+                        thresh_search       = 1e-4,
+                        thresh_asci         = 1e-2,
+                        tucker_state_clip   = 100,  #don't use any pt for tucker 
+                        tucker_conv_target  = 0,    #converge variational energy
+                        nproc               = None)
 
     tci_dim = len(ci_vector)
     ci_vector.print()
@@ -286,5 +274,4 @@ def run():
 
 
 if __name__== "__main__":
-    generate_hamiltonian()
     run()

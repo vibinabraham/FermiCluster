@@ -71,29 +71,8 @@ def test_1():
     if do_tci:
         n_blocks = len(blocks)
 
-        clusters = []
+        clusters, clustered_ham, ci_vector, cmf_out = system_setup(h, g, ecore, blocks, init_fspace, cmf_maxiter = 20 )
 
-        for ci,c in enumerate(blocks):
-            clusters.append(Cluster(ci,c))
-
-        ci_vector = ClusteredState(clusters)
-        ci_vector.init(init_fspace)
-
-        print(" Clusters:")
-        [print(ci) for ci in clusters]
-
-        clustered_ham = ClusteredOperator(clusters)
-        print(" Add 1-body terms")
-        clustered_ham.add_1b_terms(h)
-        print(" Add 2-body terms")
-        clustered_ham.add_2b_terms(g)
-        #clustered_ham.combine_common_terms(iprint=1)
-
-
-        do_cmf = 1
-        if do_cmf:
-            # Get CMF reference
-            e0,tm = cmf(clustered_ham, ci_vector, h, g, max_iter=20,max_nroots=2,dm_guess=None)
 
         #ci_vector.expand_to_full_space()
         #ci_vector.expand_each_fock_space()

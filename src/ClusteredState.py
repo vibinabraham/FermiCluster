@@ -16,23 +16,26 @@ class ClusteredState(OrderedDict):
                                 ^local state labels
                                              ^global state labels
     """
-    def __init__(self,clusters):
-        self.n_clusters = len(clusters)
-        self.clusters = clusters
+    def __init__(self):
+        self.n_clusters = 0
         self.n_orb = 0
-        for ci,c in enumerate(self.clusters):
-            self.n_orb += c.n_orb
 
         self.data = OrderedDict()
-        self.dummy_index = 0  # this shouldn't really be used
 
-        #self._len = 0
     
-    def init(self,fock_config):
+    def init(self,clusters,fock_config):
         """
         Initialize to ground state of specified
         fock_config (# of a/b electrons in each cluster)
         """
+        self.n_clusters = len(clusters)
+        self.n_orb = 0
+        for ci,c in enumerate(clusters):
+            self.n_orb += c.n_orb
+
+        self.data = OrderedDict()
+
+        #self._len = 0
         assert(len(fock_config)==self.n_clusters)
         self[fock_config] = OrderedDict()
        
@@ -103,9 +106,9 @@ class ClusteredState(OrderedDict):
         """
         Create a deep copy of this state
         """
-        new = ClusteredState(self.clusters)
-        new.data = cp.deepcopy(self.data)
-        return new
+        #new = ClusteredState(self.clusters)
+        #new.data = cp.deepcopy(self.data)
+        return cp.deepcopy(self) 
     def get_vector(self):
         """
         return a ndarray vector for the state
@@ -137,27 +140,38 @@ class ClusteredState(OrderedDict):
                 self.data[fock][config] = v[idx]
                 idx += 1
         return 
-    def clip(self,thresh):
+    def clip(self,thresh, max=None):
         """
         delete values smaller than thresh, and return the list of kept indices
+        and optionally larger than or equal to max
         """
         idx_to_keep = []
         idx = 0
-        for fockspace,configs in self.items():
-            for config,coeff in list(configs.items()):
-                if abs(coeff) < thresh:
-                    del self.data[fockspace][config]
-                else:
-                    idx_to_keep.append(idx)
-                idx += 1
+        if max==None:
+            for fockspace,configs in self.items():
+                for config,coeff in list(configs.items()):
+                    if abs(coeff) < thresh:
+                        del self.data[fockspace][config]
+                    else:
+                        idx_to_keep.append(idx)
+                    idx += 1
+        else:
+            assert( max > thresh)
+            for fockspace,configs in self.items():
+                for config,coeff in list(configs.items()):
+                    if abs(coeff) < thresh or abs(coeff) >= max:
+                        del self.data[fockspace][config]
+                    else:
+                        idx_to_keep.append(idx)
+                    idx += 1
 
         self.prune_empty_fock_spaces()
         return idx_to_keep
 
-    def add_single_excitonic_states(self):
+    def add_single_excitonic_states(self,clusters):
         for fspace in self.data.keys():
-            config = [0]*len(self.clusters)
-            for ci in self.clusters:
+            config = [0]*self.n_clusters
+            for ci in clusters:
                 fock_i = fspace[ci.idx]
                 new_config = cp.deepcopy(config)
                 for cii in range(ci.basis[fock_i].shape[1]):
@@ -189,21 +203,21 @@ class ClusteredState(OrderedDict):
         if block not in self.data:
             self.data[block] = OrderedDict()
 
-    def compute_max_fock_space_dim(self,fspace):
+    def compute_max_fock_space_dim(self,fspace,clusters):
         """
         Compute the max number of configurations in a given fock space
         """
         # {{{
         print(fspace)
         dim = 1
-        for c in self.clusters:
+        for c in clusters:
             print(c.basis)
             # get number of vectors for current fock space
             dim *= c.basis[fspace[c.idx]].shape[1]
         return dim
 # }}}
     
-    def expand_each_fock_space(self):
+    def expand_each_fock_space(self,clusters):
         """
         expand basis to full space
         """
@@ -212,7 +226,7 @@ class ClusteredState(OrderedDict):
         # create full space for each fock block defined
         for fblock,configs in self.items():
             dims = []
-            for c in self.clusters:
+            for c in clusters:
                 # get number of vectors for current fock space
                 dims.append(range(c.basis[fblock[c.idx]].shape[1]))
             for newconfig_idx, newconfig in enumerate(itertools.product(*dims)):
@@ -220,13 +234,13 @@ class ClusteredState(OrderedDict):
         return
 # }}}
 
-    def expand_to_full_space(self):
+    def expand_to_full_space(self,clusters):
         """
-        expand basis to full space
+        expand basis to full space defined by cluster basis
         """
         # {{{
         # do something here
-        #for c in self.clusters:
+        #for c in clusters:
         print("\n Expand to full space")
         ns = []
         na = 0
@@ -237,11 +251,10 @@ class ClusteredState(OrderedDict):
                 nb += c[1]
             break
     
-        for c in self.clusters:
+        for c in clusters:
             nsi = []
-            for nai in range(c.n_orb+1):
-                for nbi in range(c.n_orb+1):
-                    nsi.append((nai,nbi))
+            for fspace in c.basis:
+                nsi.append(fspace)
             ns.append(nsi)
         for newfock in itertools.product(*ns):
             nacurr = 0
@@ -257,11 +270,62 @@ class ClusteredState(OrderedDict):
         # create full space for each fock block defined
         for fblock,configs in self.items():
             dims = []
-            for c in self.clusters:
+            for c in clusters:
+                #print(c, fblock)
                 # get number of vectors for current fock space
                 dims.append(range(c.basis[fblock[c.idx]].shape[1]))
             for newconfig_idx, newconfig in enumerate(itertools.product(*dims)):
                 self[fblock][newconfig] = 0 
+        return
+# }}}
+
+    def expand_to_random_space(self,clusters,seed=2,thresh=.1):
+        """
+        expand basis to random space defined by cluster basis
+        """
+        # {{{
+        # do something here
+        #for c in clusters:
+        print("\n Expand to random space")
+        ns = []
+        na = 0
+        nb = 0
+        np.random.seed(seed)
+        for fblock,configs in self.items():
+            for c in fblock:
+                na += c[0]
+                nb += c[1]
+            break
+    
+        for c in clusters:
+            nsi = []
+            for fspace in c.basis:
+                nsi.append(fspace)
+            ns.append(nsi)
+        for newfock in itertools.product(*ns):
+            nacurr = 0
+            nbcurr = 0
+            for c in newfock:
+                nacurr += c[0]
+                nbcurr += c[1]
+            if nacurr == na and nbcurr == nb:
+                self.add_fockspace(newfock) 
+    
+    
+        print("\n Make each Fock-Block the full space")
+        # create full space for each fock block defined
+        for fblock,configs in self.items():
+            dims = []
+            for c in clusters:
+                #print(c, fblock)
+                # get number of vectors for current fock space
+                dims.append(range(c.basis[fblock[c.idx]].shape[1]))
+                
+            for newconfig_idx, newconfig in enumerate(itertools.product(*dims)):
+                if np.random.rand() < thresh:
+                    self[fblock][newconfig] = 0 
+        self.prune_empty_fock_spaces()
+        print(" Size of random basis:", len(self))
         return
 # }}}
 
@@ -354,23 +418,35 @@ class ClusteredState(OrderedDict):
                 self[fockspace][config] = coeff/norm
         return
 
-    def print(self):
+    def print(self, thresh=1e-3):
         """ Pretty print """
-        print(" Total Length %5i:" %len(self))
+        print(" --------------------------------------------------")
+        print(" ---------- Fockspaces in state ------: Dim = %5i"%len(self))
+        print(" --------------------------------------------------")
+        print(" Printing contributions greater than: ", thresh)
+        print()
+        print(" %-20s%-20s%-20s"%("Weight", "# Configs", "Fock space")) 
+        print(" %-20s%-20s%-20s"%("-------", "---------", "----------")) 
         for f in self.data:
-            print(" Dim %4i fock_space: "%len(self.data[f]), f)
+            prob = 0
+            for config, coeff in self.data[f].items():
+                prob += coeff*coeff 
+            if prob > thresh:
+                print(" %-20.3f%-20i%-s"%(prob,len(self.data[f]), f))
+            #print(" Dim %4i  Weight %8.1f  fock_space: "%(len(self.data[f]),prob*100), f)
             #for config, value in self.data[f].items():
             #    print("%20s"%str(config),end="")
             #    #print_row(value)
             #    print(" ",value)
-    
+        print(" --------------------------------------------------")
+        
     def print_configs(self):
         """ Pretty print """
         for f in self.data:
             if len(self.data[f]) == 0:
                 continue
             print(" Dim %4i fock_space: "%len(self.data[f]),end='')
-            [print(" Cluster %-2i(%ia:%ib) "%(fii,fi[0],fi[1]),end='') for fii,fi in enumerate(f)] 
+            [print(" Cluster %-2i(%i:%i) "%(fii,fi[0],fi[1]),end='') for fii,fi in enumerate(f)] 
             print()
             for config, value in self.data[f].items():
                 print("%20s"%str(config),end="")

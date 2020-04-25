@@ -28,7 +28,8 @@ class PyscfHelper(object):
         self.J      = None
         self.K      = None
 
-    def init(self,molecule,charge,spin,basis_set,orb_basis='scf',cas=False,cas_nstart=None,cas_nstop=None,cas_nel=None,loc_nstart=None,loc_nstop=None):
+    def init(self,molecule,charge,spin,basis_set,orb_basis='scf',cas=False,cas_nstart=None,cas_nstop=None,cas_nel=None,loc_nstart=None,loc_nstop=None,
+            scf_conv_tol=1e-14):
     # {{{
         import pyscf
         from pyscf import gto, scf, ao2mo, molden, lo
@@ -54,7 +55,7 @@ class PyscfHelper(object):
         #SCF 
 
         #mf = scf.RHF(mol).run(init_guess='atom')
-        mf = scf.RHF(mol).run()
+        mf = scf.RHF(mol).run(conv_tol=scf_conv_tol)
         #C = mf.mo_coeff #MO coeffs
         enu = mf.energy_nuc()
         
@@ -175,7 +176,7 @@ class PyscfHelper(object):
         else: 
             print("Error:NO orbital basis defined")
 
-        molden.from_mo(mol, 'h8.molden', C)
+        molden.from_mo(mol, 'orbitals.molden', C)
 
         if cas == True:
             print(C.shape)
@@ -410,7 +411,10 @@ def mulliken_ordering(mol,norb,C):
         Cocc = C[:,i].reshape(C.shape[0],1)
         temp = Cocc @ Cocc.T @ S   
         for m,lb in enumerate(mol.ao_labels()):
-            mulliken[int(lb[0]),i] += temp[m,m]
+            print(lb)
+            v1,v2,v3 = lb.split()
+            print(v1)
+            mulliken[int(v1),i] += temp[m,m]
     print(mulliken)
     return mulliken
 # }}}

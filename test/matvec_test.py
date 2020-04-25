@@ -64,61 +64,36 @@ def test_1():
     #efci, fci_dim = run_fci_pyscf(h,g,cas_nel,ecore=ecore)
     #print(" FCI energy: %12.8f" %efci)
 
-    clusters = []
+        
+    init_fspace = ((2,2),(2,2),(2,2),(0,0))
+    clusters, clustered_ham, ci_vector, cmf_out = system_setup(h, g, ecore, blocks, init_fspace, cmf_maxiter = 0 )
 
-    for ci,c in enumerate(blocks):
-        clusters.append(Cluster(ci,c))
+    ci_vector.expand_to_full_space(clusters)
+    
+    np.random.seed(2)
+    v = np.random.random([len(ci_vector)]) - .5
+    v = v / (v.dot(v))
+    ci_vector.set_vector(v)
 
-
-    print(" Clusters:")
-    [print(ci) for ci in clusters]
-
-    clustered_ham = ClusteredOperator(clusters)
-    print(" Add 1-body terms")
-    clustered_ham.add_1b_terms(h)
-    print(" Add 2-body terms")
-    clustered_ham.add_2b_terms(g)
-
-    print(" Build cluster basis")
-    for ci_idx, ci in enumerate(clusters):
-        assert(ci_idx == ci.idx)
-        print(" Extract local operator for cluster",ci.idx)
-        opi = clustered_ham.extract_local_operator(ci_idx)
-        print()
-        print()
-        print(" Form basis by diagonalize local Hamiltonian for cluster: ",ci_idx)
-        ci.form_eigbasis_from_local_operator(opi,max_roots=1000)
-
-
-    #clustered_ham.add_ops_to_clusters()
-    print(" Build these local operators")
-    for c in clusters:
-        print(" Build mats for cluster ",c.idx)
-        c.build_op_matrices()
-    for c in clusters:
-        print(c)
-    ci_vector = ClusteredState(clusters)
-    ci_vector.init(((2,2),(2,2),(2,2),(0,0)))
-    ci_vector.print_configs()
-    ci_vector.expand_to_full_space()
-
-    edps = build_hamiltonian_diagonal(clustered_ham,ci_vector)
 
     print(" Build Hamiltonian. Space = ", len(ci_vector), flush=True)
     H = build_full_hamiltonian_parallel1(clustered_ham, ci_vector)
 
-    v = np.random.random([len(ci_vector)]) - .5
-    v = v / (v.dot(v))
 
-    test_vector = ci_vector.copy()
-    test_vector.set_vector(v)
-    
     out_vector1 = H @ v
-    out_vector2 = matvec1(clustered_ham, test_vector).get_vector()
-    
+    out_vector2 = matvec1(clustered_ham, ci_vector).get_vector()
+    out_vector3 = matvec1_parallel1(clustered_ham, ci_vector).get_vector()
+    out_vector4 = matvec1_parallel2(clustered_ham, ci_vector).get_vector()
+    out_vector5 = matvec1_parallel3(clustered_ham, ci_vector).get_vector()
+    out_vector6 = matvec1_parallel4(clustered_ham, ci_vector).get_vector()
+   
     for vi in range(len(out_vector1)):
-        print(" %12.8f %12.8f %12.8f " %(out_vector1[vi],out_vector2[vi],out_vector1[vi]-out_vector2[vi]))
+        print(" %12.8f %12.8f %12.8f  %12.8f  %12.8f  %12.8f " %(out_vector1[vi],out_vector2[vi],out_vector3[vi],out_vector4[vi],out_vector5[vi],out_vector6[vi]))
         assert(abs(out_vector1[vi]-out_vector2[vi]) < 1e-8)
+        assert(abs(out_vector1[vi]-out_vector3[vi]) < 1e-8)
+        assert(abs(out_vector1[vi]-out_vector4[vi]) < 1e-8)
+        assert(abs(out_vector1[vi]-out_vector5[vi]) < 1e-8)
+        assert(abs(out_vector1[vi]-out_vector6[vi]) < 1e-8)
 
 # }}}
 
