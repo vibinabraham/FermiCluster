@@ -227,60 +227,60 @@ if local:
 do_tci = 1
 if do_tci:
 
-    clusters, clustered_ham, ci_vector = system_setup(h, g, ecore, blocks, init_fspace, 
-                                                        cmf_maxiter     = 20,
-                                                        cmf_dm_guess    = None,
-                                                        cmf_diis        = False,
-                                                        max_roots       = 100,
-                                                        delta_elec      = 4
-                                                        )
+    #clusters, clustered_ham, ci_vector = system_setup(h, g, ecore, blocks, init_fspace, 
+    #                                                    cmf_maxiter     = 20,
+    #                                                    cmf_dm_guess    = None,
+    #                                                    cmf_diis        = False,
+    #                                                    max_roots       = 100,
+    #                                                    delta_elec      = 4
+    #                                                    )
 
-    edps = build_hamiltonian_diagonal(clustered_ham,ci_vector)
-    print("EDPS: %16.8f"%edps)
-    #rdm_a1, rdm_b1 = build_1rdm(ci_vector)
-    #print(rdm_a1)
+    #edps = build_hamiltonian_diagonal(clustered_ham,ci_vector)
+    #print("EDPS: %16.8f"%edps)
 
     from scipy import optimize   
-    #xopt = optimize.minimize(compute_energy_wrt_rotation,,method='bfgs',jac=fp,options={'disp':1})
-    #res = opt.minimize(fun=regularized_cost,
-    #                   x0=theta,
-    #                   args=(X, y, l),
-    #                   method='TNC',
-    #                   jac=regularized_gradient,
-    #                   options={'disp': True})
 
-    
-    for git in range(0,11):
+    oocmf = CmfSolver(h, g, ecore, blocks, init_fspace,C)
+    oocmf.init()
 
-        pt_vector = matvec1(clustered_ham, ci_vector, thresh_search=1e-8, nbody_limit=2)
-        rdm_a1, rdm_b1 = build_tdm(ci_vector,pt_vector,clustered_ham)
-        rdm_a2, rdm_b2 = build_tdm(pt_vector,ci_vector,clustered_ham)
-        print("Gradient")
-        Gpq = rdm_a1+rdm_b1-rdm_a2-rdm_b2
-        print(Gpq)
-        e_curr,clusters, clustered_ham, ci_vector,h,g,C = compute_energy_wrt_rotation(-0.2 * Gpq,h,g,C,blocks,init_fspace,ecore,100)
-        print("CurrCMF: %16.8f"%e_curr)
+    x = np.zeros_like(h)
+    #x = oocmf.grad(x)
+
+    #Gpq = -Gpq.ravel()
+
+
+    #edps = oocmf.energy_dps()
+    opt_result = scipy.optimize.minimize(oocmf.energy, x, jac=oocmf.grad, method = 'BFGS')
+    exit()
+    #opt_result = scipy.optimize.minimize(oocmf.energy, x, jac='3-point', method = 'BFGS')
+    ##opt_result = scipy.optimize.fmin_cg(oocmf.energy, x)
+    edps = oocmf.energy_dps()
+    for git in range(0,20):
+        grad = oocmf.grad(x)
+        x = -np.linalg.norm(grad) * grad
+        #if np.linalg.norm(grad) < 1e-2:
+        #    x *= 5
+        oocmf.rotate(x)
+        e_curr = oocmf.cmf_energy()
+        print("CurrCMF:%12.8f       Grad:%12.8f    dE:%10.6f"%(e_curr,np.linalg.norm(grad),e_curr-edps))
         if abs(e_curr - edps) < 1e-7:
             print("Converged E%16.8f"%e_curr)
             break
         else:
             edps = e_curr
 
-    for git in range(0,30):
-
-        pt_vector = matvec1(clustered_ham, ci_vector, thresh_search=1e-8, nbody_limit=2)
-        rdm_a1, rdm_b1 = build_tdm(ci_vector,pt_vector,clustered_ham)
-        rdm_a2, rdm_b2 = build_tdm(pt_vector,ci_vector,clustered_ham)
-        print("Gradient")
-        Gpq = rdm_a1+rdm_b1-rdm_a2-rdm_b2
-        print(Gpq)
-        e_curr,clusters, clustered_ham, ci_vector,h,g,C = compute_energy_wrt_rotation(-0.001 * Gpq,h,g,C,blocks,init_fspace,ecore,100)
-        print("CurrCMF: %16.8f"%e_curr)
-        if abs(e_curr - edps) < 1e-7:
-            #print("Converged E%16.8f"%e_curr)
-            print("CurrCMF converged: %16.8f"%e_curr)
+    for git in range(0,40):
+        grad = oocmf.grad(x)
+        x = -np.linalg.norm(grad) * grad
+        #if np.linalg.norm(grad) < 1e-2:
+        #    x *= 5
+        oocmf.rotate(x)
+        e_curr = oocmf.cmf_energy()
+        print("CurrCMF:%12.8f       Grad:%12.8f     dE:%10.6f"%(e_curr,np.linalg.norm(grad),e_curr-edps))
+        if abs(np.linalg.norm(grad)) < 1e-5:
+            print("Converged E%16.8f"%e_curr)
             break
         else:
             edps = e_curr
 
-
+    exit()
