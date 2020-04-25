@@ -2713,7 +2713,7 @@ def build_tdm(r_vector,l_vector,clustered_ham):
     n_orb = l_vector.n_orb
     dm_aa = np.zeros((n_orb,n_orb))
     dm_bb = np.zeros((n_orb,n_orb))
-    clusters = l_vector.clusters
+    clusters = clustered_ham.clusters
 
    
     if 0:   # doesn't work anymore after removing local terms from add_1b_terms

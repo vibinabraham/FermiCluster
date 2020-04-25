@@ -75,7 +75,7 @@ def test_1():
 
     if do_tci:
 
-        clusters, clustered_ham, ci_vector = system_setup(h, g, ecore, blocks, init_fspace, 
+        clusters, clustered_ham, ci_vector, cmf_out = system_setup(h, g, ecore, blocks, init_fspace, 
                                                             cmf_maxiter     = 20,
                                                             cmf_dm_guess    = None,
                                                             cmf_diis        = False,
@@ -84,7 +84,7 @@ def test_1():
                                                             )
 
         print(" Build exact eigenstate")
-        ci_vector.expand_to_full_space()
+        ci_vector.expand_to_full_space(clusters)
         pt_vector = ci_vector.copy()
         H = build_full_hamiltonian(clustered_ham, ci_vector)
         print(" Diagonalize Hamiltonian Matrix:",flush=True)
@@ -128,10 +128,14 @@ def test_1():
         #print(t)
         tdm = cisolver.trans_rdm1(ci[state_i], ci[state_j], h.shape[0], nelec=nelec, link_index=None)
         print("E i j %4d %4d   %16.8f %16.8f"%(state_i,state_j,efci[state_i],efci[state_j]))
-        print(tdm.T)
+        print(tdm)
         print("Difference")
         print(tdm - rdm_a1 - rdm_b1)
-    assert(np.allclose(rdm_a1 + rdm_b1, tdm, atol=1e-7))
+    
+    try:
+        assert(np.allclose(rdm_a1 + rdm_b1, tdm, atol=1e-7))
+    except:
+        assert(np.allclose(rdm_a1 + rdm_b1, -1*tdm, atol=1e-7))
     
 if __name__== "__main__":
     test_1() 
