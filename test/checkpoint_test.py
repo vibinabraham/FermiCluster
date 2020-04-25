@@ -16,7 +16,7 @@ pyscf.lib.num_threads(1) #with degenerate states and multiple processors there c
 np.set_printoptions(suppress=True, precision=3, linewidth=1500)
 
 
-def test_save():
+def test():
     
     ttt = time.time()
 
@@ -68,15 +68,21 @@ def test_save():
     print(" Ecore: %12.8f" %ecore)
     
    
-    clusters, clustered_ham, ci_vector, cmf_out = system_setup(h, g, ecore, blocks, init_fspace, max_roots = 4,  cmf_maxiter = 20 )
+    clusters, clustered_ham, ci_vector, cmf_out = system_setup(h, g, ecore, blocks, init_fspace, max_roots = 20,  cmf_maxiter = 0 )
     
+    # rotate the cluster states randomly
+    np.random.seed(2)
+    for ci in clusters:
+        rotations = {}
+        for fock in ci.basis:
+            dim = ci.basis[fock].shape[1]
+            G = np.random.random((dim,dim))
+            U = scipy.linalg.expm(G-G.T)
+            rotations[fock] = U
+        
+        ci.rotate_basis(rotations)
 
-    ci_vector, pt_vector, etci, etci2, conv = bc_cipsi_tucker(ci_vector, clustered_ham, 
-                                                        thresh_cipsi    = 1e-4, 
-                                                        thresh_ci_clip  = 1e-7, 
-                                                        max_tucker_iter = 2)
-  
-
+    ci_vector.expand_to_random_space(clusters,thresh=.2)
 
     filename = open('hamiltonian_file_test', 'wb')
     pickle.dump(clustered_ham, filename)
@@ -85,14 +91,15 @@ def test_save():
     filename = open('state_file_test', 'wb')
     pickle.dump(ci_vector, filename)
     filename.close()
+   
 
-    np.save('ints_h.npy', h)
-    np.save('ints_g.npy', g)
-    print(" Computed energy : %16.14f " %etci)
+    H = build_full_hamiltonian_parallel2(clustered_ham, ci_vector)
+    v = ci_vector.get_vector()
+    eref = v.T @ H @ v
+    eref = eref[0,0]
+    print(" Computed energy : %16.14f " %eref)
     
 
-
-def test_load():
     filename = open('hamiltonian_file_test', 'rb')
     clustered_ham = pickle.load(filename)
     filename.close()
@@ -101,18 +108,16 @@ def test_load():
     ci_vector = pickle.load(filename)
     filename.close()
 
-    h = np.load('ints_h.npy')
-    g = np.load('ints_g.npy')
-    
-    H = build_full_hamiltonian_parallel1(clustered_ham, ci_vector)
+    H = build_full_hamiltonian_parallel2(clustered_ham, ci_vector)
     v = ci_vector.get_vector()
     e = v.T @ H @ v
 
+    e = e[0,0]
     print(" Computed energy : %16.14f " %e)
     
-    assert(abs(e - -4.50903278169150) < 1e-12)
+    assert(abs(e - eref) < 1e-14)
 
 
 if __name__== "__main__":
-    test_save() 
-    test_load() 
+     
+    test() 

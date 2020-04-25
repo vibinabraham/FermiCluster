@@ -44,8 +44,8 @@ def test_truncate_basis():
     #cas_nel = 10
 
     ###     TPSCI CLUSTER INPUT
-    blocks = [[0,1,2,3],[4,5,6,7]]
-    init_fspace = ((1, 1), (1, 1))
+    blocks = [[0,1,2,3],[4,5],[6,7]]
+    init_fspace = ((1, 1), (1, 0), (0, 1))
     
     
     nelec = tuple([sum(x) for x in zip(*init_fspace)])
@@ -65,10 +65,6 @@ def test_truncate_basis():
     n_orb = pmol.n_orb
 
     print(" Ecore: %12.8f" %ecore)
-    
-    #cluster using hcore
-    #idx = e1_order(h,cut_off = 1e-2)
-    #h,g = reorder_integrals(idx,h,g)
 
     do_fci = 0
 
@@ -91,15 +87,17 @@ def test_truncate_basis():
     
 
     
-    clusters, clustered_ham, ci_vector, cmf_out = system_setup(h, g, ecore, blocks, init_fspace, max_roots = 20,  cmf_maxiter = 0 )
-    
-
-
-    ci_vector, pt_vector, e0, e2, t_conv = bc_cipsi_tucker(ci_vector.copy(), clustered_ham, thresh_cipsi=1e-6,
-            thresh_ci_clip=1e-8, max_tucker_iter = 0)
+    clusters, clustered_ham, ci_vector, cmf_out = system_setup(h, g, ecore, blocks, init_fspace, cmf_maxiter = 20 ,
+            cmf_thresh=1e-12)
    
+    ci_vector.expand_to_random_space(clusters, thresh=.2)
+    print(len(ci_vector))
+    H = build_full_hamiltonian_parallel2(clustered_ham, ci_vector)
+    e,v = np.linalg.eigh(H)
 
-    assert(np.isclose(e0,-4.51137022,atol=1e-7))
+    e = e[0]
+    print(e)
+    assert(np.isclose(e,-4.289958228357164,atol=1e-12))
     # }}}
 
 

@@ -279,6 +279,56 @@ class ClusteredState(OrderedDict):
         return
 # }}}
 
+    def expand_to_random_space(self,clusters,seed=2,thresh=.1):
+        """
+        expand basis to random space defined by cluster basis
+        """
+        # {{{
+        # do something here
+        #for c in clusters:
+        print("\n Expand to random space")
+        ns = []
+        na = 0
+        nb = 0
+        np.random.seed(seed)
+        for fblock,configs in self.items():
+            for c in fblock:
+                na += c[0]
+                nb += c[1]
+            break
+    
+        for c in clusters:
+            nsi = []
+            for fspace in c.basis:
+                nsi.append(fspace)
+            ns.append(nsi)
+        for newfock in itertools.product(*ns):
+            nacurr = 0
+            nbcurr = 0
+            for c in newfock:
+                nacurr += c[0]
+                nbcurr += c[1]
+            if nacurr == na and nbcurr == nb:
+                self.add_fockspace(newfock) 
+    
+    
+        print("\n Make each Fock-Block the full space")
+        # create full space for each fock block defined
+        for fblock,configs in self.items():
+            dims = []
+            for c in clusters:
+                #print(c, fblock)
+                # get number of vectors for current fock space
+                dims.append(range(c.basis[fblock[c.idx]].shape[1]))
+                
+            for newconfig_idx, newconfig in enumerate(itertools.product(*dims)):
+                if np.random.rand() < thresh:
+                    self[fblock][newconfig] = 0 
+        self.prune_empty_fock_spaces()
+        print(" Size of random basis:", len(self))
+        return
+# }}}
+
     def randomize_vector(self,seed=None):
         """
         randomize coefficients in defined space 

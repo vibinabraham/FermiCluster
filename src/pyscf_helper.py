@@ -29,7 +29,7 @@ class PyscfHelper(object):
         self.K      = None
 
     def init(self,molecule,charge,spin,basis_set,orb_basis='scf',cas=False,cas_nstart=None,cas_nstop=None,cas_nel=None,loc_nstart=None,loc_nstop=None,
-            scf_conv_tol=1e-10):
+            scf_conv_tol=1e-14):
     # {{{
         import pyscf
         from pyscf import gto, scf, ao2mo, molden, lo

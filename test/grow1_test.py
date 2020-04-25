@@ -68,56 +68,48 @@ def test1():
     print(" Ecore: %12.8f" %ecore)
     
 
-    efci, fci_dim = run_fci_pyscf(h,g,nelec,ecore=ecore)
+    #efci, fci_dim = run_fci_pyscf(h,g,nelec,ecore=ecore)
    
-    clusters, clustered_ham, ci_vector, cmf_out = system_setup(h, g, ecore, blocks, init_fspace, max_roots = 4,  cmf_maxiter = 20 )
+    clusters, clustered_ham, ci_vector, cmf_out = system_setup(h, g, ecore, blocks, init_fspace, max_roots = 2,  cmf_maxiter = 20 )
     
 
-    ci_vector, pt_vector, etci, etci2, conv = bc_cipsi_tucker(ci_vector, clustered_ham, 
-                                                        thresh_cipsi    = 1e-4, 
-                                                        thresh_ci_clip  = 1e-7, 
-                                                        max_tucker_iter = 2)
-  
-    l1 = len(ci_vector)
-        #hamiltonian_file = open('hamiltonian_file', 'wb')
-        #pickle.dump(clustered_ham, hamiltonian_file)
-
-
-    #hamiltonian_file = open('hamiltonian_file', 'rb')
-    #clustered_ham = pickle.load(hamiltonian_file)
-    #clusters = clustered_ham.clusters
-    
-    #ci_vector = ClusteredState(clusters)
-    #ci_vector.init(init_fspace)
+    print(" Build exact eigenstate")
+    ci_vector.expand_to_full_space(clusters)
+    print(" Size of basis1: ",len(ci_vector))
+    H = build_full_hamiltonian_parallel2(clustered_ham, ci_vector)
+    print(" Diagonalize Hamiltonian Matrix:",flush=True)
+    e,v = np.linalg.eigh(H)
+    idx = e.argsort()
+    e = e[idx]
+    v = v[:,idx]
+    v0 = v[:,0]
+    e0 = e[0]
+    print(" Ground state of CI:                 %12.8f  CI Dim: %4i "%(e[0].real,len(ci_vector)))
 
 
     for ci in clusters:
-        ci.grow_basis_by_energy()
+        ci.grow_basis_by_energy(max_roots=5)
         
         print(" Build operator matrices for cluster ",ci.idx)
         ci.build_op_matrices()
         ci.build_local_terms(h,g)
-    
+    print(" Build exact eigenstate")
+    ci_vector.expand_to_full_space(clusters)
     print(" Size of basis2: ",len(ci_vector))
-
-    test1 = matvec1(clustered_ham, ci_vector)
-    e1 = test1.dot(ci_vector)
-    print(" Energy of old cipsi state in new larger basis %16.12f" %e1, len(ci_vector), l1)
-    assert(abs(e1-etci) < 1e-12)
+    H = build_full_hamiltonian_parallel2(clustered_ham, ci_vector)
+    print(" Diagonalize Hamiltonian Matrix:",flush=True)
+    e,v = np.linalg.eigh(H)
+    idx = e.argsort()
+    e = e[idx]
+    v = v[:,idx]
+    v0 = v[:,0]
+    e0 = e[0]
+    print(" Ground state of CI:                 %12.8f  CI Dim: %4i "%(e[0].real,len(ci_vector)))
     
-    ci_vector, pt_vector, etci, etci2, conv = bc_cipsi_tucker(ci_vector, clustered_ham, 
-                                                        thresh_cipsi    = 1e-4, 
-                                                        thresh_ci_clip  = 1e-7, 
-                                                        max_tucker_iter = 2)
-    l2 = len(ci_vector)
     
-    print(" E(TPSCI-old)  = %12.8f" %e1)
-    print(" E(TPSCI)      = %12.8f" %etci)
-    print(" E(TPSCI2)     = %12.8f" %etci2)
-    print(" E(FCI)        = %12.8f" %(efci-ecore))
+    #print(" E(FCI)        = %12.8f" %(efci-ecore))
     
-    #assert(abs(efci --2.21837081) < 1e-7)
-    assert(abs(etci --4.51129093) < 1e-7)
+    assert(abs(e0 --4.51053645) < 1e-7)
 
 if __name__== "__main__":
     test1() 

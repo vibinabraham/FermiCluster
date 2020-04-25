@@ -70,18 +70,19 @@ def test_1():
         clusters, clustered_ham, ci_vector, cmf_out = system_setup(h, g, ecore, blocks, init_fspace, cmf_maxiter = 0 )
 
         ci_vector, pt_vector, etci, etci2, conv = bc_cipsi_tucker(ci_vector, clustered_ham, 
-                                                            thresh_cipsi    = 1e-6, 
+                                                            thresh_cipsi    = 1e-4, 
                                                             thresh_ci_clip  = 1e-7, 
-                                                            max_tucker_iter = 20)
+                                                            matvec          = 1,
+                                                            max_tucker_iter = 2)
         
         tci_dim = len(ci_vector)
 
     print(" TCI:        %12.9f Dim:%6d"%(etci,tci_dim))
     print(" HCI:        %12.9f Dim:%6d"%(ehci-ecore,hci_dim))
     print(" FCI:        %12.9f Dim:%6d"%(efci-ecore,fci_dim))
-    assert(abs(etci --3.081526431) < 1e-7)
-    assert(abs(etci2 --3.08154435) < 1e-7)
-    #assert(abs(tci_dim - 49)<1e-15)
+    assert(abs(etci --3.08117519) < 1e-8)
+    assert(abs(etci2 --3.08150341) < 1e-8)
+    assert(tci_dim == 9)
     assert(abs(efci -ecore --3.08154574) < 1e-7)
     
 if __name__== "__main__":

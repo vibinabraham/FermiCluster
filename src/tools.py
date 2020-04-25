@@ -2911,8 +2911,8 @@ def compute_pt2_correction(ci_vector, clustered_ham, e0,
         print(" Time spent in matvec: %12.2f" %( stop-start))
         #exit()
        
-        e0_curr = ci_vector.dot(pt_vector) 
-        print(" Zeroth-order energy: %12.8f " %e0_curr) 
+        e0_curr = ci_vector.dot(pt_vector)/asci_vector.dot(asci_vector) 
+        print(" Zeroth-order energy: %12.8f Error in E0: %12.8f" %(e0_curr, e0_curr - e0)) 
 
         if profile:
             pr.disable()
@@ -3024,6 +3024,8 @@ def extrapolate_pt2_correction(ci_vector, clustered_ham, e0,
         print("     |stop           : ", stop      )
         print("     |nsteps         : ", nsteps         )
         print("     |scale          : ", scale        )
+        print(" NYI!")
+        exit()
    
         print(" E0: ", e0)
         if scale=='log':
