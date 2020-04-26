@@ -16,7 +16,7 @@ from Cluster import *
 from ClusteredOperator import *
 from ClusteredState import *
 from tools import *
-from bc_cipsi import *
+from tpsci import *
 import pyscf
 ttt = time.time()
 
@@ -121,7 +121,7 @@ def test_1():
     ci_vector_ref = ci_vector.copy()
     e_last = 0
     #ci_vector.print_configs()
-    ci_vector, pt_vector, e0, e2 = bc_cipsi(ci_vector_ref.copy(), clustered_ham, thresh_cipsi=1e-14, thresh_ci_clip=0, max_iter=0)
+    ci_vector, pt_vector, e0, e2 = tp_cipsi(ci_vector_ref.copy(), clustered_ham, thresh_cipsi=1e-14, thresh_ci_clip=0, max_iter=0)
     #print(ci_vector.get_vector())
     #ci_vector.print_configs()
     civec = ci_vector.get_vector()

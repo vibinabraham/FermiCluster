@@ -614,8 +614,8 @@ def run_hierarchical_sci(h,g,blocks,init_fspace,dimer_threshold,ecore):
     print(" Add 2-body terms")
     clustered_ham.add_2b_terms(g)
 
-    ci_vector, pt_vector, etci, etci2,l  = bc_cipsi_tucker(ci_vector.copy(), clustered_ham,thresh_cipsi=1e-6, thresh_ci_clip=5e-4,asci_clip=0)
-    #ci_vector, pt_vector, etci, etci2  = bc_cipsi(ci_vector.copy(), clustered_ham,thresh_cipsi=1e-10, thresh_ci_clip=5e-6,asci_clip=0.01)
+    ci_vector, pt_vector, etci, etci2,l  = tpsci_tucker(ci_vector.copy(), clustered_ham,thresh_cipsi=1e-6, thresh_ci_clip=5e-4,asci_clip=0)
+    #ci_vector, pt_vector, etci, etci2  = tp_cipsi(ci_vector.copy(), clustered_ham,thresh_cipsi=1e-10, thresh_ci_clip=5e-6,asci_clip=0.01)
 
     print(" TPSCI:          %12.8f      Dim:%6d" % (etci+ecore, len(ci_vector)))
     print(" TPSCI(2):       %12.8f      Dim:%6d" % (etci2+ecore,len(pt_vector)))

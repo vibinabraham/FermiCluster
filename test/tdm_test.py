@@ -7,7 +7,7 @@ import copy as cp
 import sys
 
 from tpsci import *
-from bc_cipsi import *
+from tpsci import *
 from pyscf_helper import *
 import pyscf
 ttt = time.time()

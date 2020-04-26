@@ -73,7 +73,7 @@ def run(nproc=None):
     #pickle.dump(clustered_ham, hamiltonian_file)
 
 
-    ci_vector, pt_vector, etci, etci2, conv = bc_cipsi_tucker(ci_vector, clustered_ham, 
+    ci_vector, pt_vector, etci, etci2, conv = tpsci_tucker(ci_vector, clustered_ham, 
                                                         thresh_cipsi        = 1e-5, 
                                                         thresh_ci_clip      = 1e-8, 
                                                         max_tucker_iter     = 20,
