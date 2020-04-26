@@ -118,7 +118,7 @@ def test_1():
     
     tci_dim = len(ci_vector)
 
-    rdm_a, rdm_b = tools.build_1rdm(ci_vector, clusters)
+    rdm_a, rdm_b = build_1rdm(ci_vector, clusters)
 
     with np.printoptions(precision=6, suppress=True):
         print(" Difference from PYSCF density matrix")

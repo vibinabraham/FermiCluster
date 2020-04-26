@@ -4,3 +4,4 @@ pathos
 pyscf
 opt_einsum
 pytest
+ray
