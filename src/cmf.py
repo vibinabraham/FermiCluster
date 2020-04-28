@@ -14,6 +14,7 @@ from ClusteredState import *
 from Cluster import *
 
 import ham_build
+import matvec
 
 def cmf(clustered_ham, ci_vector, h, g, 
             max_iter    = 20, 
@@ -233,7 +234,7 @@ def build_1rdm(ci_vector, clusters):
                 h[i,j] = 1
                 #op.add_local_terms()
                 op.add_1b_terms(h)
-                Nv = matvec1(op, ci_vector, thresh_search=1e-8)
+                Nv = matvec.matvec1(op, ci_vector, thresh_search=1e-8)
                 Nv = ci_vector.dot(Nv)
                 dm_aa_slow[i,j] = Nv
         print(" Here is the slow version:")
@@ -416,7 +417,7 @@ def build_tdm(r_vector,l_vector,clustered_ham):
                 h[i,j] = 1
                 #op.add_local_terms()
                 op.add_1b_terms(h)
-                Nv = matvec1(op, l_vector, thresh_search=1e-8)
+                Nv = matvec.matvec1(op, l_vector, thresh_search=1e-8)
                 Nv = l_vector.dot(Nv)
                 dm_aa_slow[i,j] = Nv
         print(" Here is the slow version:")
@@ -582,10 +583,10 @@ def build_tdm(r_vector,l_vector,clustered_ham):
 
 # }}}
 
+
 class CmfSolver:
     """
-    Class to organize orbital optimization in CMF.
-    To use CMF w/o oo just run the init and use the values from there
+
     """
     def __init__(self, h1, h2, ecore, blocks, init_fspace, C):
         self.h = h1
@@ -598,8 +599,13 @@ class CmfSolver:
         self.clustered_ham = None
         self.ci_vector = None
         self.e = 0
+        self.cmf_dm_guess = None
 
-    def init(self):
+
+    def init(self,cmf_dm_guess=None):
+
+        if cmf_dm_guess != None:
+            self.cmf_dm_guess = cmf_dm_guess
 
         h = self.h
         g = self.g
@@ -620,16 +626,28 @@ class CmfSolver:
         print(" Add 2-body terms")
         clustered_ham.add_2b_terms(g)
 
-        ci_vector = ClusteredState(clusters)
-        ci_vector.init(init_fspace)
+        ci_vector = ClusteredState()
+        ci_vector.init(clusters, init_fspace)
+
 
         self.clustered_ham = clustered_ham
         self.ci_vector = ci_vector
 
-        e_curr, converged, rdm_a, rdm_b = cmf(clustered_ham, ci_vector, h, g, max_iter = 20, thresh = 1e-8)
+        if self.cmf_dm_guess == None:
+            e_curr, converged, rdm_a, rdm_b = cmf(clustered_ham, ci_vector, h, g, max_iter = 20, thresh = 1e-8)
+
+        if self.cmf_dm_guess != None:
+            e_curr, converged, rdm_a, rdm_b = cmf(clustered_ham, ci_vector, h, g, 
+                    diis        = True,
+                    dm_guess    = self.cmf_dm_guess,
+                    max_iter    = 200, 
+                    thresh      = 1e-8)
+
+        # store rdm
+        self.cmf_dm_guess = (rdm_a,rdm_b)
 
         # build cluster basis and operator matrices using CMF optimized density matrices
-        for ci_idx, ci in enumerate(clusters):
+        for ci_idx, ci in enumerate(clustered_ham.clusters):
             #if delta_elec != None:
             #    fspaces_i = init_fspace[ci_idx]
             #    fspaces_i = ci.possible_fockspaces( delta_elec=(fspaces_i[0], fspaces_i[1], delta_elec) )
@@ -643,56 +661,12 @@ class CmfSolver:
             print(" Build operator matrices for cluster ",ci.idx)
             ci.build_op_matrices()
             ci.build_local_terms(h,g)
+
 
     def energy_dps(self):
         edps = ham_build.build_hamiltonian_diagonal(self.clustered_ham,self.ci_vector)
         print("EDPS %16.8f"%edps)
         return edps
-
-    def cmf_energy(self):
-        h = self.h
-        g = self.g
-        C = self.C
-        blocks = self.blocks
-        init_fspace = self.init_fspace
-        
-        n_blocks = len(blocks)
-        clusters = [Cluster(ci,c) for ci,c in enumerate(blocks)]
-        
-        print(" Clusters:")
-        [print(ci) for ci in clusters]
-        
-        clustered_ham = ClusteredOperator(clusters, core_energy=self.ecore)
-        print(" Add 1-body terms")
-        clustered_ham.add_local_terms()
-        clustered_ham.add_1b_terms(h)
-        print(" Add 2-body terms")
-        clustered_ham.add_2b_terms(g)
-
-        ci_vector = ClusteredState(clusters)
-        ci_vector.init(init_fspace)
-
-        self.clustered_ham = clustered_ham
-        self.ci_vector = ci_vector
-
-        e_curr, converged, rdm_a, rdm_b = cmf(clustered_ham, ci_vector, h, g, max_iter = 20, thresh = 1e-8)
-
-        # build cluster basis and operator matrices using CMF optimized density matrices
-        for ci_idx, ci in enumerate(clusters):
-            #if delta_elec != None:
-            #    fspaces_i = init_fspace[ci_idx]
-            #    fspaces_i = ci.possible_fockspaces( delta_elec=(fspaces_i[0], fspaces_i[1], delta_elec) )
-            #else:
-            fspaces_i = ci.possible_fockspaces()
-        
-            print()
-            print(" Form basis by diagonalizing local Hamiltonian for cluster: ",ci_idx)
-            ci.form_fockspace_eigbasis(h, g, fspaces_i, max_roots=100, rdm1_a=rdm_a, rdm1_b=rdm_b, ecore=self.ecore)
-            
-            print(" Build operator matrices for cluster ",ci.idx)
-            ci.build_op_matrices()
-            ci.build_local_terms(h,g)
-        return e_curr
 
     def energy(self,Kpq):
 
@@ -724,6 +698,9 @@ class CmfSolver:
         g = np.einsum("lmrs,rn->lmns",g,U)
         g = np.einsum("lmns,so->lmno",g,U)
 
+
+        cmf_dm_guess =  (U.T @ self.cmf_dm_guess[0] @ U,U.T @ self.cmf_dm_guess[0] @ U)
+
         n_blocks = len(blocks)
         clusters = [Cluster(ci,c) for ci,c in enumerate(blocks)]
         
@@ -737,10 +714,20 @@ class CmfSolver:
         print(" Add 2-body terms")
         clustered_ham.add_2b_terms(g)
 
-        ci_vector = ClusteredState(clusters)
-        ci_vector.init(init_fspace)
+        ci_vector = ClusteredState()
+        ci_vector.init(clusters, init_fspace)
 
-        e_curr, converged, rdm_a, rdm_b = cmf(clustered_ham, ci_vector, h, g, max_iter = 20, thresh = 1e-8)
+
+
+        if self.cmf_dm_guess == None:
+            e_curr, converged, rdm_a, rdm_b = cmf(clustered_ham, ci_vector, h, g, max_iter = 20, thresh = 1e-8)
+
+        if self.cmf_dm_guess != None:
+            e_curr, converged, rdm_a, rdm_b = cmf(clustered_ham, ci_vector, h, g, 
+                    diis        = True,
+                    dm_guess    = cmf_dm_guess,
+                    max_iter    = 20, 
+                    thresh      = 1e-8)
 
         # build cluster basis and operator matrices using CMF optimized density matrices
         for ci_idx, ci in enumerate(clusters):
@@ -775,21 +762,21 @@ class CmfSolver:
         init_fspace = self.init_fspace
         clustered_ham = self.clustered_ham
         ci_vector = self.ci_vector
+        cmf_dm_guess = self.cmf_dm_guess
 
 
         from scipy.sparse.linalg import expm
-        U = expm(Kpq)
-        print(U)
-        print(U.T @ U)
-        print(h)
-        C = C @ U
-        #molden.from_mo(mol, 'h4.molden', C)
+        U = expm(Kpq) #form unitary
+
+        C = C @ U  #rotate coeff
         h = U.T @ h @ U
         print(h)
         g = np.einsum("pqrs,pl->lqrs",g,U)
         g = np.einsum("lqrs,qm->lmrs",g,U)
         g = np.einsum("lmrs,rn->lmns",g,U)
         g = np.einsum("lmns,so->lmno",g,U)
+
+        cmf_dm_guess =  (U.T @ self.cmf_dm_guess[0] @ U,U.T @ self.cmf_dm_guess[0] @ U)
 
         n_blocks = len(blocks)
         clusters = [Cluster(ci,c) for ci,c in enumerate(blocks)]
@@ -804,14 +791,42 @@ class CmfSolver:
         print(" Add 2-body terms")
         clustered_ham.add_2b_terms(g)
 
-        ci_vector = ClusteredState(clusters)
-        ci_vector.init(init_fspace)
+        ci_vector = ClusteredState()
+        ci_vector.init(clusters, init_fspace)
+
+        if self.cmf_dm_guess == None:
+            e_curr, converged, rdm_a, rdm_b = cmf(clustered_ham, ci_vector, h, g, max_iter = 20, thresh = 1e-8)
+
+        if self.cmf_dm_guess != None:
+            e_curr, converged, rdm_a, rdm_b = cmf(clustered_ham, ci_vector, h, g, 
+                    diis        = True,
+                    dm_guess    = self.cmf_dm_guess,
+                    max_iter    = 20, 
+                    thresh      = 1e-8)
+
+        # build cluster basis and operator matrices using CMF optimized density matrices
+        for ci_idx, ci in enumerate(clustered_ham.clusters):
+            #if delta_elec != None:
+            #    fspaces_i = init_fspace[ci_idx]
+            #    fspaces_i = ci.possible_fockspaces( delta_elec=(fspaces_i[0], fspaces_i[1], delta_elec) )
+            #else:
+            fspaces_i = ci.possible_fockspaces()
+        
+            print()
+            print(" Form basis by diagonalizing local Hamiltonian for cluster: ",ci_idx)
+            ci.form_fockspace_eigbasis(h, g, fspaces_i, max_roots=100, rdm1_a=rdm_a, rdm1_b=rdm_b, ecore=self.ecore)
+            
+            print(" Build operator matrices for cluster ",ci.idx)
+            ci.build_op_matrices()
+            ci.build_local_terms(h,g)
+
 
         self.h = h
         self.g = g
         self.C = C
         self.clustered_ham = clustered_ham
         self.ci_vector = ci_vector
+        self.cmf_dm_guess = cmf_dm_guess
 
 
     def grad(self,Kpq):
@@ -841,6 +856,9 @@ class CmfSolver:
         g = np.einsum("lmrs,rn->lmns",g,U)
         g = np.einsum("lmns,so->lmno",g,U)
 
+
+        cmf_dm_guess =  (U.T @ self.cmf_dm_guess[0] @ U,U.T @ self.cmf_dm_guess[0] @ U)
+
         n_blocks = len(blocks)
         clusters = [Cluster(ci,c) for ci,c in enumerate(blocks)]
         
@@ -854,10 +872,20 @@ class CmfSolver:
         print(" Add 2-body terms")
         clustered_ham.add_2b_terms(g)
 
-        ci_vector = ClusteredState(clusters)
-        ci_vector.init(init_fspace)
+        ci_vector = ClusteredState()
+        ci_vector.init(clusters, init_fspace)
 
-        e_curr, converged, rdm_a, rdm_b = cmf(clustered_ham, ci_vector, h, g, max_iter = 20, thresh = 1e-8)
+
+
+        if self.cmf_dm_guess == None:
+            e_curr, converged, rdm_a, rdm_b = cmf(clustered_ham, ci_vector, h, g, max_iter = 20, thresh = 1e-8)
+
+        if self.cmf_dm_guess != None:
+            e_curr, converged, rdm_a, rdm_b = cmf(clustered_ham, ci_vector, h, g, 
+                    diis        = True,
+                    dm_guess    = self.cmf_dm_guess,
+                    max_iter    = 20, 
+                    thresh      = 1e-8)
 
         # build cluster basis and operator matrices using CMF optimized density matrices
         for ci_idx, ci in enumerate(clusters):
@@ -878,8 +906,8 @@ class CmfSolver:
 
 
 
-        h1_vector = matvec1(clustered_ham, ci_vector, thresh_search=0, nbody_limit=3)
-        h1_vector.print_configs()
+        h1_vector = matvec.matvec1(clustered_ham, ci_vector, thresh_search=0, nbody_limit=3)
+        #h1_vector.print_configs()
         rdm_a1, rdm_b1 = build_tdm(ci_vector,h1_vector,clustered_ham)
         rdm_a2, rdm_b2 = build_tdm(h1_vector,ci_vector,clustered_ham)
         print("Gradient")
