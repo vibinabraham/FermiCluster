@@ -73,7 +73,7 @@ def test_1():
     #SCF
 
     #mf = scf.RHF(mol).run(init_guess='atom')
-    mf = scf.RHF(mol).run()
+    mf = scf.RHF(mol).run(conv_tol=1e-14)
     #C = mf.mo_coeff #MO coeffs
     enu = mf.energy_nuc()
 
@@ -178,7 +178,7 @@ def test_1():
     h,g = reorder_integrals(cas_list,h,g)
     h = h + eff
     C = C[:,cas_list]
-    molden.from_mo(mol, 'h8.molden', C)
+    #molden.from_mo(mol, 'oocmf_0.molden', C)
 
     print("ecore %16.8f"%ecore)
 
@@ -206,13 +206,15 @@ def test_1():
     oocmf.init()
 
     x = np.zeros_like(h)
-    opt_result = scipy.optimize.minimize(oocmf.energy, x, jac=oocmf.grad, method = 'BFGS')
+    min_options = {'gtol': 1e-8, 'disp':False}
+    opt_result = scipy.optimize.minimize(oocmf.energy, x, jac=oocmf.grad, method = 'BFGS', options=min_options )
+    #opt_result = scipy.optimize.minimize(oocmf.energy, x, jac=oocmf.grad, method = 'BFGS', callback=oocmf.callback)
     print(opt_result.x)
-    Gpq = opt_result.x.reshape(h.shape)
-    print(Gpq)
+    Kpq = opt_result.x.reshape(h.shape)
+    print(Kpq)
 
     e_fcmf = oocmf.energy_dps()
-    oocmf.rotate(Gpq)
+    oocmf.rotate(Kpq)
     e_ocmf = oocmf.energy_dps()
     print("Orbital Frozen    CMF:%12.8f"%e_fcmf)
     print("Orbital Optimized CMF:%12.8f"%e_ocmf)
@@ -234,19 +236,23 @@ def test_1():
     #            [ 0.00094,  -0.030398, -0.123316,  0.002399, -0.,      -0.,       0.,       0.      ],
     #            [-0.030398,  0.00094,   0.002399, -0.123316, -0.,      -0.,       0.,       0.      ]])
 
-    ref_grad=  np.array([[-0.,       0.,      -0.,      -0.,      -0.097762,   0.002424,  -0.005265,  0.00193 ],
-                         [-0.,      -0.,      -0.,      -0.,       0.002424,  -0.097762,   0.00193 ,  -0.005265],
-                         [ 0.,       0.,       0.,       0.,      -0.00242 ,  -0.123246,   0.155976,  -0.004692],
-                         [ 0.,       0.,       0.,      -0.,      -0.123246,  -0.00242 ,  -0.004692,   0.155976],
-                         [ 0.097762,  -0.002424,   0.00242 ,   0.123246,  -0.,         0.,       -0.002241,  0.581922],
-                         [-0.002424,   0.097762,   0.123246,   0.00242 ,  -0.,        -0.,        0.581922, -0.002241],
-                         [ 0.005265,  -0.00193 ,  -0.155976,   0.004692,   0.002241, -0.581922, 0.,      -0.     ],
-                         [-0.00193 ,   0.005265,   0.004692,  -0.155976,  -0.581922,  0.002241, 0.,      -0.     ]])
-    print(Gpq)                                                  
-    print(ref_grad)
-    assert(np.allclose(Gpq,ref_grad,atol=1e-6))
-    assert(abs(e_fcmf - -8.26699733 ) <1e-8)
-    assert(abs(e_ocmf - -8.52888027 ) <1e-8)
+    ref_angles= np.array([[ 0.,      -0.,       -0.,       -0.,       -0.097782,  0.002467, -0.005287,  0.00192 ],
+                         [ 0.,       -0.,       -0.,       -0.,        0.002467, -0.097782,  0.00192,  -0.005287],
+                         [ 0.,        0.,        0.,        0.,       -0.002466, -0.123235,  0.155944, -0.004683],
+                         [ 0.,        0.,       -0.,        0.,       -0.123235, -0.002466, -0.004683,  0.155944],
+                         [ 0.097782, -0.002467,  0.002466,  0.123235,  0.,        0.,       -0.002248,  0.581917],
+                         [-0.002467,  0.097782,  0.123235,  0.002466, -0.,       -0.,        0.581917, -0.002248],
+                         [ 0.005287, -0.00192,  -0.155944,  0.004683,  0.002248, -0.581917,  0.,       -0.      ],
+                         [-0.00192,   0.005287,  0.004683, -0.155944, -0.581917,  0.002248,  0.,        0.      ]])
+    print(Kpq)                                                  
+    print(ref_angles)
+    try:
+        assert(np.allclose(Kpq,ref_angles,atol=1e-5))
+    except:
+        assert(np.allclose(-1*Kpq,ref_angles,atol=1e-5))
+
+    assert(abs(e_fcmf - -8.266997040181 ) <1e-8)
+    assert(abs(e_ocmf - -8.528879972678 ) <1e-8)
 
 if __name__== "__main__":
     test_1() 
