@@ -130,6 +130,7 @@ def tpsci_tucker(ci_vector, clustered_ham,
                                 2 = pt2 energy
     shared_mem          :   How much memory to allocate for shared object store for holding clustered_ham - only works with matvec4
     matvec              :   Which version of matvec to use? [1:4]
+    tucker_state_clip   :   Delete PT1 coefficients smaller than this before adding to vector to perform HOSVD
     """
 # {{{
 

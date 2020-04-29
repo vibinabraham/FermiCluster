@@ -613,6 +613,15 @@ class CmfSolver:
         self.cmf_ci_thresh = cmf_ci_thresh # threshold for the inner loop
         self.matvec = matvec
         self.do_intra_rots = do_intra_rots
+        self.to_freeze  = []
+
+    def freeze_cluster_mixing(self,ci,cj):
+        """
+        prevent mixing orbitals between clusters ci and cj
+        A is either the gradient to hand back to the optimizer or the (square) antihermitian rotation matrix kappa
+        """
+        self.to_freeze.append((ci,cj))
+
     
     def init(self,cmf_dm_guess=None):
 
@@ -624,7 +633,12 @@ class CmfSolver:
         C = self.C
         blocks = self.blocks
         init_fspace = self.init_fspace
-        
+       
+        if self.do_intra_rots == False:
+            # freeze intra_block_rotations
+            for bi in range(len(self.blocks)):
+                self.freeze_cluster_mixing(bi,bi)
+
         n_blocks = len(blocks)
         clusters = [Cluster(ci,c) for ci,c in enumerate(blocks)]
         
@@ -683,6 +697,15 @@ class CmfSolver:
     def energy(self,Kpq):
 
         Kpq = Kpq.reshape(self.h.shape[0],self.h.shape[1])
+
+        # remove frozen rotations
+        for freeze in self.to_freeze:
+            for bi in freeze:
+                for bj in freeze:
+                    for bii in self.blocks[bi]:
+                        for bjj in self.blocks[bj]:
+                            Kpq[bii,bjj] = 0
+
         if self.iprint > 0:
             print("Kpq")
             print(Kpq)
@@ -696,12 +719,7 @@ class CmfSolver:
         ci_vector = self.ci_vector
 
 
-        if self.do_intra_rots == False:
-            # delete rotations within a cluster
-            for b in blocks:
-                for bi in b:
-                    for bj in b:
-                        Kpq[bi,bj] = 0
+
 
         from scipy.sparse.linalg import expm
         U = expm(Kpq)
@@ -777,6 +795,13 @@ class CmfSolver:
     def rotate(self,Kpq):
         
         Kpq = Kpq.reshape(self.h.shape[0],self.h.shape[1])
+        # remove frozen rotations
+        for freeze in self.to_freeze:
+            for bi in freeze:
+                for bj in freeze:
+                    for bii in self.blocks[bi]:
+                        for bjj in self.blocks[bj]:
+                            Kpq[bii,bjj] = 0
 
         h = self.h
         g = self.g
@@ -855,6 +880,15 @@ class CmfSolver:
     def grad(self,Kpq):
 
         Kpq = Kpq.reshape(self.h.shape[0],self.h.shape[1])
+        # remove frozen rotations
+        print(self.to_freeze)
+        for freeze in self.to_freeze:
+            for bi in freeze:
+                for bj in freeze:
+                    print(" Freeze orbital mixing between clusters %4i and %4i"%(bi,bj)) 
+                    for bii in self.blocks[bi]:
+                        for bjj in self.blocks[bj]:
+                            Kpq[bii,bjj] = 0
 
         h = self.h
         g = self.g
@@ -958,12 +992,13 @@ class CmfSolver:
         #print("CurrCMF:%12.8f       Grad:%12.8f   "%(e_curr,np.linalg.norm(Gpq)))
         
 
-        if self.do_intra_rots == False:
-            # delete gradients within a cluster
-            for b in blocks:
-                for bi in b:
-                    for bj in b:
-                        Gpq[bi,bj] = 0
+        # remove frozen rotations
+        for freeze in self.to_freeze:
+            for bi in freeze:
+                for bj in freeze:
+                    for bii in self.blocks[bi]:
+                        for bjj in self.blocks[bj]:
+                            Gpq[bii,bjj] = 0
 
         self.gradient = Gpq.ravel()
         return Gpq.ravel()
