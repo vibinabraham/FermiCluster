@@ -63,37 +63,46 @@ def run(nproc=None):
     h,g = reorder_integrals(idx,h,g)
 
 
+    do_fci = 1
+    do_hci = 1
+    do_tci = 1
+
+    if do_fci:
+        efci, fci_dim = run_fci_pyscf(h,g,cas_nel,ecore=ecore)
+    if do_hci:
+        ehci, hci_dim = run_hci_pyscf(h,g,cas_nel,ecore=ecore,select_cutoff=1e-4,ci_cutoff=1e-4)
+    if do_tci:
         
-    clusters, clustered_ham, ci_vector, cmf_out = system_setup(h, g, ecore, blocks, init_fspace, 
-                        cmf_maxiter = 20,
-                        cmf_diis    = True,
-                        cmf_thresh  = 1e-14)
+        clusters, clustered_ham, ci_vector, cmf_out = system_setup(h, g, ecore, blocks, init_fspace, cmf_maxiter = 1 )
+        
+        
+        
+        
+        edps = build_hamiltonian_diagonal(clustered_ham,ci_vector)
+        ci_vector_ref = ci_vector.copy()
+        ci_vector, pt_vector, etci, etci2, t_conv = bc_cipsi_tucker(ci_vector_ref.copy(), clustered_ham, 
+                selection='heatbath', 
+                thresh_cipsi=1e-6, 
+                thresh_ci_clip=1e-7, 
+                max_tucker_iter=3)
+        etci += ecore
 
-    #hamiltonian_file = open('cmf_hamiltonian_file', 'wb')
-    #pickle.dump(clustered_ham, hamiltonian_file)
 
 
-    ci_vector, pt_vector, etci, etci2, conv = tpsci_tucker(ci_vector, clustered_ham, 
-                                                        thresh_cipsi        = 1e-5, 
-                                                        thresh_ci_clip      = 1e-8, 
-                                                        max_tucker_iter     = 20,
-                                                        nproc=nproc)
-    
-    
-    tci_dim = len(ci_vector)
 
-    etci += ecore
-    etci2 += ecore
 
-    print(" ecore: ", ecore)
-    print(" TCI:        %12.9f Dim:%6d"%(etci,tci_dim))
-    assert(abs(etci --108.85558061)< 1e-6)
-    #assert(abs(etci --108.855580011)< 1e-7)
-    #assert(tci_dim == 43)
+    print(" TCI:        %12.9f Dim:%6d"%(etci,len(ci_vector)))
+    print(" HCI:        %12.9f Dim:%6d"%(ehci,hci_dim))
+    print(" FCI:        %12.9f Dim:%6d"%(efci,fci_dim))
+    assert(abs(etci --108.855743070)< 1e-7)
+    assert(len(ci_vector) == 248)
+    assert(abs(efci   --108.85574521)< 1e-7)
 
 def test_1():
     run(nproc=None)
 
+def test_2():
+    run(nproc=1)
 
 if __name__== "__main__":
     test_1() 

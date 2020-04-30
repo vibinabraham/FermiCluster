@@ -1,998 +1,622 @@
+import math
+import sys
 import numpy as np
 import scipy
 import itertools
 import copy as cp
 from helpers import *
 import opt_einsum as oe
+import tools
+import time
 
 from ClusteredOperator import *
 from ClusteredState import *
+from Cluster import *
 
-def matvec1(h,v,term_thresh=1e-12):
+from matvec import *
+from ham_build import *
+
+
+def build_brdm(ci_vector, ci):
     """
-    Compute the action of H onto a sparse trial vector v
-    returns a ClusteredState object. 
-
+    Build block reduced density matrix for Cluster ci
     """
-# {{{
-    clusters = h.clusters
-    sigma = ClusteredState(clusters)
-    sigma = v.copy() 
-    sigma.zero()
-   
-    if 0:
-        # use this to debug
-        sigma.expand_to_full_space()
-
-
-    for fock_ri, fock_r in enumerate(v.fblocks()):
-
-        for terms in h.terms:
-            fock_l= tuple([(terms[ci][0]+fock_r[ci][0], terms[ci][1]+fock_r[ci][1]) for ci in range(len(clusters))])
-            good = True
-            for c in clusters:
-                if min(fock_l[c.idx]) < 0 or max(fock_l[c.idx]) > c.n_orb:
-                    good = False
-                    break
-            if good == False:
-                continue
-            
-            #print(fock_l, "<--", fock_r)
-            
-            if fock_l not in sigma.data:
-                sigma.add_fockspace(fock_l)
-
-            configs_l = sigma[fock_l] 
-            
-            for term in h.terms[terms]:
-                #print(" term: ", term)
-                state_sign = 1
-                for oi,o in enumerate(term.ops):
-                    if o == '':
-                        continue
-                    if len(o) == 1 or len(o) == 3:
-                        for cj in range(oi):
-                            state_sign *= (-1)**(fock_r[cj][0]+fock_r[cj][1])
-                    
-                for conf_ri, conf_r in enumerate(v[fock_r]):
-                    #print("  ", conf_r)
-                    
-                    #if abs(v[fock_r][conf_r]) < 5e-2:
-                    #    continue
-                    # get state sign 
-                    #print('state_sign ', state_sign)
-                    opii = -1
-                    mats = []
-                    good = True
-                    for opi,op in enumerate(term.ops):
-                        if op == "":
-                            continue
-                        opii += 1
-                        #print(opi,term.active)
-                        ci = clusters[opi]
-                        #ci = clusters[term.active[opii]]
-                        try:
-                            oi = ci.ops[op][(fock_l[ci.idx],fock_r[ci.idx])][:,conf_r[ci.idx],:]
-                            mats.append(oi)
-                        except KeyError:
-                            good = False
-                            break
-                    if good == False:
-                        continue                        
-                        #break
-                   
-                    if len(mats) == 0:
-                        continue
-                    #print('mats:', end='')
-                    #[print(m.shape,end='') for m in mats]
-                    #print()
-                    #print('ints:', term.ints.shape)
-                    #print("contract_string       :", term.contract_string)
-                    #print("contract_string_matvec:", term.contract_string_matvec)
-                    
-                    
-                    #tmp = oe.contract(term.contract_string_matvec, *mats, term.ints)
-                    tmp = np.einsum(term.contract_string_matvec, *mats, term.ints)
-                    
-
-                    v_coeff = v[fock_r][conf_r]
-                    tmp = state_sign * tmp.ravel() * v_coeff
-
-                    new_configs = [[i] for i in conf_r] 
-                    for cacti,cact in enumerate(term.active):
-                        new_configs[cact] = range(mats[cacti].shape[0])
-                    for sp_idx, spi in enumerate(itertools.product(*new_configs)):
-                        #print(" New config: %12.8f" %tmp[sp_idx], spi)
-                        if abs(tmp[sp_idx]) > term_thresh:
-                            if spi not in configs_l:
-                                configs_l[spi] = tmp[sp_idx] 
-                            else:
-                                configs_l[spi] += tmp[sp_idx] 
-    return sigma 
-# }}}
-
-
-def matvec1_parallel1(h_in,v,term_thresh=1e-12, nproc=None):
-    """
-    Compute the action of H onto a sparse trial vector v
-    returns a ClusteredState object. 
-    """
-# {{{
-    global h 
-    global clusters
-    global sigma 
-    print(" In matvec1_parallel1. nproc=",nproc) 
-    h = h_in
-    clusters = h_in.clusters
-    
-
-    sigma = ClusteredState(clusters)
-    sigma = v.copy() 
-    sigma.zero()
-   
-    if 0:
-        # use this to debug
-        sigma.expand_to_full_space()
-
-
-    def do_parallel_work(v_curr):
-        fock_r = v_curr[0]
-        conf_r = v_curr[1]
-        coeff  = v_curr[2]
-        
-        sigma_out = ClusteredState(clusters)
-        for terms in h.terms:
-            fock_l= tuple([(terms[ci][0]+fock_r[ci][0], terms[ci][1]+fock_r[ci][1]) for ci in range(len(clusters))])
-            good = True
-            for c in clusters:
-                if min(fock_l[c.idx]) < 0 or max(fock_l[c.idx]) > c.n_orb:
-                    good = False
-                    break
-            if good == False:
-                continue
-            
-            #print(fock_l, "<--", fock_r)
-            
-            if fock_l not in sigma_out.data:
-                sigma_out.add_fockspace(fock_l)
-        
-            configs_l = sigma_out[fock_l] 
-            
-            for term in h.terms[terms]:
-                #print(" term: ", term)
-                state_sign = 1
-                for oi,o in enumerate(term.ops):
-                    if o == '':
-                        continue
-                    if len(o) == 1 or len(o) == 3:
-                        for cj in range(oi):
-                            state_sign *= (-1)**(fock_r[cj][0]+fock_r[cj][1])
-                    
-                #print("  ", conf_r)
-                
-                #if abs(v[fock_r][conf_r]) < 5e-2:
-                #    continue
-                # get state sign 
-                #print('state_sign ', state_sign)
-                opii = -1
-                mats = []
-                good = True
-                for opi,op in enumerate(term.ops):
-                    if op == "":
-                        continue
-                    opii += 1
-                    #print(opi,term.active)
-                    ci = clusters[opi]
-                    #ci = clusters[term.active[opii]]
-                    try:
-                        oi = ci.ops[op][(fock_l[ci.idx],fock_r[ci.idx])][:,conf_r[ci.idx],:]
-                        mats.append(oi)
-                    except KeyError:
-                        good = False
-                        break
-                if good == False:
-                    continue                        
-                    #break
-               
-                if len(mats) == 0:
-                    continue
-                #print('mats:', end='')
-                #[print(m.shape,end='') for m in mats]
-                #print()
-                #print('ints:', term.ints.shape)
-                #print("contract_string       :", term.contract_string)
-                #print("contract_string_matvec:", term.contract_string_matvec)
-                
-                
-                #tmp = oe.contract(term.contract_string_matvec, *mats, term.ints)
-                tmp = np.einsum(term.contract_string_matvec, *mats, term.ints)
-                
-        
-                #v_coeff = v[fock_r][conf_r]
-                #tmp = state_sign * tmp.ravel() * v_coeff
-                tmp = state_sign * tmp.ravel() * coeff 
-        
-                new_configs = [[i] for i in conf_r] 
-                for cacti,cact in enumerate(term.active):
-                    new_configs[cact] = range(mats[cacti].shape[0])
-                for sp_idx, spi in enumerate(itertools.product(*new_configs)):
-                    #print(" New config: %12.8f" %tmp[sp_idx], spi)
-                    if abs(tmp[sp_idx]) > term_thresh:
-                        if spi not in configs_l:
-                            configs_l[spi] = tmp[sp_idx] 
-                        else:
-                            configs_l[spi] += tmp[sp_idx] 
-        return sigma_out.data
-    
-    import multiprocessing as mp
-    from pathos.multiprocessing import ProcessingPool as Pool
-
-    
-    if nproc == None:
-        pool = Pool()
-    else:
-        pool = Pool(processes=nproc)
-
-    out = pool.map(do_parallel_work, v, batches=100)
-    pool.close()
-    pool.join()
-    pool.clear()
-    #out = list(map(do_parallel_work, v))
-   
-    for o in out:
-        sigma.add(o)
-
-    return sigma 
-# }}}
-
-
-def build_full_hamiltonian(clustered_ham,ci_vector,iprint=0):
-    """
-    Build hamiltonian in basis in ci_vector
-    """
-# {{{
-    clusters = ci_vector.clusters
-    H = np.zeros((len(ci_vector),len(ci_vector)))
-    
-    shift_l = 0 
-    for fock_li, fock_l in enumerate(ci_vector.data):
-        configs_l = ci_vector[fock_l]
-        if iprint > 0:
-            print(fock_l)
-       
-        for config_li, config_l in enumerate(configs_l):
-            idx_l = shift_l + config_li 
-            
-            shift_r = 0 
-            for fock_ri, fock_r in enumerate(ci_vector.data):
-                configs_r = ci_vector[fock_r]
-                delta_fock= tuple([(fock_l[ci][0]-fock_r[ci][0], fock_l[ci][1]-fock_r[ci][1]) for ci in range(len(clusters))])
-                if fock_ri<fock_li:
-                    shift_r += len(configs_r) 
-                    continue
+    # {{{
+    rdms = OrderedDict()
+    for fspace, configs in ci_vector.items():
+        #print()
+        #print("fspace:",fspace)
+        #print()
+        curr_dim = ci.basis[fspace[ci.idx]].shape[1]
+        rdm = np.zeros((curr_dim,curr_dim))
+        for configi,coeffi in configs.items():
+            for cj in range(curr_dim):
+                configj = list(cp.deepcopy(configi))
+                configj[ci.idx] = cj
+                configj = tuple(configj)
+                #print(configi,configj,configi[ci.idx],configj[ci.idx])
                 try:
-                    terms = clustered_ham.terms[delta_fock]
+                    #print(configi,configj,configi[ci.idx],configj[ci.idx],coeffi,configs[configj])
+                    rdm[configi[ci.idx],cj] += coeffi*configs[configj]
+                    #print(configi[ci.idx],cj,rdm[configi[ci.idx],cj])
                 except KeyError:
-                    shift_r += len(configs_r) 
-                    continue 
-                
-                for config_ri, config_r in enumerate(configs_r):        
-                    idx_r = shift_r + config_ri
-                    if idx_r<idx_l:
-                        continue
-                    
-                    for term in terms:
-                        me = term.matrix_element(fock_l,config_l,fock_r,config_r)
-                        H[idx_l,idx_r] += me
-                        if idx_r>idx_l:
-                            H[idx_r,idx_l] += me
-                        #print(" %4i %4i = %12.8f"%(idx_l,idx_r,me),"  :  ",config_l,config_r, " :: ", term)
-                shift_r += len(configs_r) 
-        shift_l += len(configs_l)
-    return H
-# }}}
-
-
-def build_full_hamiltonian_open(clustered_ham,ci_vector,iprint=1):
-    """
-    Build hamiltonian in basis in ci_vector
-    """
-# {{{
-    clusters = ci_vector.clusters
-    H = np.zeros((len(ci_vector),len(ci_vector)))
-    n_clusters = len(clusters)
-
-    fock_space_shifts = [0]
-    for fi,f in enumerate(ci_vector.fblocks()):
-        configs_i = ci_vector[f]
-        fock_space_shifts.append(fock_space_shifts[-1]+len(configs_i))
-
-
-    for fock_li, fock_l in enumerate(ci_vector.data):
-        configs_l = ci_vector[fock_l]
-        for fock_ri, fock_r in enumerate(ci_vector.data):
-            if fock_li > fock_ri:
-                continue
-            configs_r = ci_vector[fock_r]
-
-            delta_fock= tuple([(fock_l[ci][0]-fock_r[ci][0], fock_l[ci][1]-fock_r[ci][1]) for ci in range(len(clusters))])
-            
-           
-
-
-            try:
-                terms = clustered_ham.terms[delta_fock]
-            except KeyError:
-                continue 
-            for term in terms:
-                # Compute the state sign now - since it only depends on fock spaces
-                state_sign = 1
-
-                term_exists = True
-                for oi,o in enumerate(term.ops):
-                    if o == '':
-                        continue
-                    if len(o) == 1 or len(o) == 3:
-                        for cj in range(oi):
-                            state_sign *= (-1)**(fock_r[cj][0]+fock_r[cj][1])
-                
-                    # Check to make sure each cluster is allowed to make the requested transition
-                    try:
-                        do = clusters[oi].ops[o]
-                    except:
-                        print(" Couldn't find:", term)
-                        exit()
-                    try:
-                        d = do[(fock_l[oi],fock_r[oi])]
-                        #d = do[(fock_bra[oi],fock_ket[oi])][bra[oi],ket[oi]] #D(I,J,:,:...)
-                    except:
-                        term_exists = False
-                if not term_exists:
-                    continue 
-
-                
-                for config_li, config_l in enumerate(configs_l):
-                    idx_l = fock_space_shifts[fock_li] + config_li 
-                    for config_ri, config_r in enumerate(configs_r):        
-                        idx_r = fock_space_shifts[fock_ri] + config_ri 
-                        
-                        if idx_r<idx_l:
-                            continue
-                
-                        # Check to make sure each cluster is diagonal except if active
-                        allowed = True
-                        for ci in range(n_clusters):
-                            if (config_l[ci]!=config_r[ci]) and (ci not in term.active):
-                                allowed = False
-                        if not allowed:
-                            continue
-                       
-
-                        #d = do[(fock_bra[oi],fock_ket[oi])][bra[oi],ket[oi]] #D(I,J,:,:...)
-                        mats = []
-                        for ci in term.active:
-                            mats.append( clusters[ci].ops[term.ops[ci]][(fock_l[ci],fock_r[ci])][config_l[ci],config_r[ci]] ) 
-
-                        me = 0.0
-                      
-                        if len(mats) != len(term.active):
-                            continue
-                        
-                        #check that the mats where treated as views and also contiguous
-                        #for m in mats:
-                        #    print(m.flags['OWNDATA'])  #False -- apparently this is a view
-                        #    print(m.__array_interface__)
-                        #    print()
-
-                        # todo:
-                        #    For some reason, precompiled contract expression is slower than direct einsum - figure this out
-                        #me = term.contract_expression(*mats) * state_sign
-                        me = np.einsum(term.contract_string,*mats,term.ints) * state_sign
-
-#                        me2 = term.matrix_element(fock_l,config_l,fock_r,config_r)
-#                        try:
-#                            assert(abs(me - me2) < 1e-8)
-#                        except:
-#                            print(term)
-#                            print(mats)
-#                            print(me)
-#                            print(me2)
-#                            exit()
-                        H[idx_l,idx_r] += me
-                        if idx_r>idx_l:
-                            H[idx_r,idx_l] += me
-    return H
-    
-
-# }}}
-
-
-def build_full_hamiltonian_parallel1(clustered_ham_in,ci_vector_in,iprint=1, nproc=None):
-    """
-    Build hamiltonian in basis in ci_vector
-    """
-# {{{
-    global clusters
-    global ci_vector
-    global clustered_ham
-    
-    print(" In build_full_hamiltonian_parallel1. nproc=",nproc) 
-
-    clustered_ham = clustered_ham_in
-    ci_vector = ci_vector_in
-    clusters = ci_vector.clusters
-
-    H = np.zeros((len(ci_vector),len(ci_vector)))
-    n_clusters = len(clusters)
-
-    def compute_parallel_block(f):
-        fock_l  = f[0]
-        fock_li = f[1]
-        fock_r  = f[2]
-        fock_ri = f[3]
-    
-        diagonal = False
-        if fock_l == fock_r:
-            diagonal = True
-
-        if fock_li > fock_ri:
-            return 
-        
-        #print("Processing the block: ")
-        #print(fock_l,fock_r)
-        
-        configs_l = ci_vector[fock_l]
-        configs_r = ci_vector[fock_r]
-        
-        Hblock = np.zeros((len(configs_l),len(configs_r)))
-
-        delta_fock= tuple([(fock_l[ci][0]-fock_r[ci][0], fock_l[ci][1]-fock_r[ci][1]) for ci in range(len(clusters))])
+                    pass
         try:
-            terms = clustered_ham.terms[delta_fock]
+            rdms[fspace[ci.idx]] += rdm 
         except KeyError:
-            return 
-        for term in terms:
-            # Compute the state sign now - since it only depends on fock spaces
-            state_sign = 1
+            rdms[fspace[ci.idx]] = rdm 
 
-            term_exists = True
-            for oi,o in enumerate(term.ops):
-                if o == '':
-                    continue
-                if len(o) == 1 or len(o) == 3:
-                    for cj in range(oi):
-                        state_sign *= (-1)**(fock_r[cj][0]+fock_r[cj][1])
-            
-                # Check to make sure each cluster is allowed to make the requested transition
-                try:
-                    do = clusters[oi].ops[o]
-                except:
-                    print(" Couldn't find:", term)
-                    exit()
-                try:
-                    d = do[(fock_l[oi],fock_r[oi])]
-                    #d = do[(fock_bra[oi],fock_ket[oi])][bra[oi],ket[oi]] #D(I,J,:,:...)
-                except:
-                    term_exists = False
-            if not term_exists:
-                continue 
-
-            
-            for config_li, config_l in enumerate(configs_l):
-                idx_l = config_li 
-                #idx_l = fock_space_shifts[fock_li] + config_li 
-                for config_ri, config_r in enumerate(configs_r):        
-                    idx_r = config_ri 
-                    #idx_r = fock_space_shifts[fock_ri] + config_ri 
-                    
-                    if diagonal and idx_r<idx_l:
-                        continue
-            
-                    # Check to make sure each cluster is diagonal except if active
-                    allowed = True
-                    for ci in range(n_clusters):
-                        if (config_l[ci]!=config_r[ci]) and (ci not in term.active):
-                            allowed = False
-                    if not allowed:
-                        continue
-                   
-
-                    #d = do[(fock_bra[oi],fock_ket[oi])][bra[oi],ket[oi]] #D(I,J,:,:...)
-                    mats = []
-                    for ci in term.active:
-                        mats.append( clusters[ci].ops[term.ops[ci]][(fock_l[ci],fock_r[ci])][config_l[ci],config_r[ci]] ) 
-
-                    me = 0.0
-                  
-                    if len(mats) != len(term.active):
-                        continue
-                    
-                    #check that the mats where treated as views and also contiguous
-                    #for m in mats:
-                    #    print(m.flags['OWNDATA'])  #False -- apparently this is a view
-                    #    print(m.__array_interface__)
-                    #    print()
-
-                    # todo:
-                    #    For some reason, precompiled contract expression is slower than direct einsum - figure this out
-                    #me = term.contract_expression(*mats) * state_sign
-                    me = np.einsum(term.contract_string,*mats,term.ints) * state_sign
-
-                    Hblock[idx_l,idx_r] += me
-                   
-                    if diagonal and idx_r>idx_l:
-                        Hblock[idx_r,idx_l] += me
-        return Hblock
-        
-
-
-
-    fock_space_shifts = [0]
-    for fi,f in enumerate(ci_vector.fblocks()):
-        configs_i = ci_vector[f]
-        fock_space_shifts.append(fock_space_shifts[-1]+len(configs_i))
-
-
-    fock_space_blocks = []
-    for fock_li, fock_l in enumerate(ci_vector.data):
-        for fock_ri, fock_r in enumerate(ci_vector.data):
-            if fock_li > fock_ri:
-                continue 
-            fock_space_blocks.append( (fock_l, fock_li, fock_r, fock_ri))
-
-    #for f in fock_space_blocks:
-    #    compute_parallel_block(f)
-
-
-    import multiprocessing as mp
-    from pathos.multiprocessing import ProcessingPool as Pool
-
-    
-    if nproc == None:
-        pool = Pool()
-    else:
-        pool = Pool(processes=nproc)
-
-    def test(f):
-        fock_l  = f[0]
-        fock_li = f[1]
-        fock_r  = f[2]
-        fock_ri = f[3]
-
-        if fock_li > fock_ri:
-            return 
-        print(fock_l,fock_r)
-        
-        configs_l = ci_vector[fock_l]
-        configs_r = ci_vector[fock_r]
-
-    #pool.map(test, fock_space_blocks)
-    Hblocks = pool.map(compute_parallel_block, fock_space_blocks)
-
-    pool.close()
-    pool.join()
-    pool.clear()
-    
-    for fi,f in enumerate(fock_space_blocks):
-        fock_l  = f[0] 
-        fock_li = f[1] 
-        fock_r  = f[2] 
-        fock_ri = f[3]
-        start_l = fock_space_shifts[fock_li]
-        stop_l  = fock_space_shifts[fock_li+1]
-        start_r = fock_space_shifts[fock_ri]
-        stop_r  = fock_space_shifts[fock_ri+1]
-        
-        if np.all(Hblocks[fi]) != None:
-            H[start_l:stop_l,start_r:stop_r] = Hblocks[fi]
-        if fock_l != fock_r:
-            if np.all(Hblocks[fi]) != None:
-                H[start_r:stop_r,start_l:stop_l] = Hblocks[fi].T
-            #try:
-            #if np.all(Hblocks[fi]) != None:
-            #try:
-            #    H[start_r:stop_r,start_l:stop_l] = Hblocks[fi].T
-            #except:
-            #    pass
-    
-    return H
-    
-
+    return rdms
 # }}}
 
 
-
-def build_effective_operator(cluster_idx, clustered_ham, ci_vector,iprint=0):
+def build_brdm_diagonal(ci_vector, ci_idx, clusters):
     """
-    Build effective operator, doing a partial trace over all clusters except cluster_idx
-    
-        H = sum_i o_i h_i
-    """
-# {{{
-    clusters = ci_vector.clusters
-    H = np.zeros((len(ci_vector),len(ci_vector)))
-   
-    new_op = ClusteredOperator(clustered_ham.clusters)
-    shift_l = 0 
-    for fock_li, fock_l in enumerate(ci_vector.data):
-        configs_l = ci_vector[fock_l]
-        if iprint > 0:
-            print(fock_l)
-       
-        for config_li, config_l in enumerate(configs_l):
-            idx_l = shift_l + config_li 
-            
-            shift_r = 0 
-            for fock_ri, fock_r in enumerate(ci_vector.data):
-                configs_r = ci_vector[fock_r]
-                delta_fock= tuple([(fock_l[ci][0]-fock_r[ci][0], fock_l[ci][1]-fock_r[ci][1]) for ci in range(len(clusters))])
-                if fock_ri<fock_li:
-                    shift_r += len(configs_r) 
-                    continue
-                try:
-                    terms = clustered_ham.terms[delta_fock]
-                except KeyError:
-                    shift_r += len(configs_r) 
-                    continue 
-                
-                for config_ri, config_r in enumerate(configs_r):        
-                    idx_r = shift_r + config_ri
-                    if idx_r<idx_l:
-                        continue
-                    
-                    for term in terms:
-                        new_term = term.effective_cluster_operator(cluster_idx, fock_l, config_l, fock_r, config_r)
-                shift_r += len(configs_r) 
-        shift_l += len(configs_l)
-    return new_op 
-# }}}
-
-
-
-def build_hamiltonian_diagonal(clustered_ham,ci_vector):
-    """
-    Build hamiltonian diagonal in basis in ci_vector
-    """
-# {{{
-    clusters = ci_vector.clusters
-    Hd = np.zeros((len(ci_vector)))
-    
-    shift = 0 
-   
-    idx = 0
-    for fockspace, configs in ci_vector.items():
-        for config, coeff in configs.items():
-            delta_fock= tuple([(0,0) for ci in range(len(clusters))])
-            terms = clustered_ham.terms[delta_fock]
-            for term in terms:
-                Hd[idx] += term.matrix_element(fockspace,config,fockspace,config)
-            idx += 1
-
-    return Hd
-
-# }}}
-
-
-def build_hamiltonian_diagonal_parallel1(clustered_ham_in,ci_vector, nproc=None):
-    """
-    Build hamiltonian diagonal in basis in ci_vector
-    """
-# {{{
-    global clusters
-    global clustered_ham
-    print(" In build_hamiltonian_diagonal_parallel1. nproc=",nproc) 
-
-    clustered_ham = clustered_ham_in
-    clusters = ci_vector.clusters
-    
-    global delta_fock
-    delta_fock= tuple([(0,0) for ci in range(len(clusters))])
-  
-    global glob_test
-    glob_test = 'nick'
-    global Hd
-    Hd = ci_vector.copy()
-    Hd.zero()
-   
-    idx = 0
-    for fock,conf,coeff in ci_vector:
-        Hd[fock][conf] = idx
-        idx += 1
-    
-    def do_parallel_work(v_curr):
-        fockspace = v_curr[0]
-        config = v_curr[1]
-        coeff  = v_curr[2]
-        
-        terms = clustered_ham.terms[delta_fock]
-        ## add diagonal energies
-        tmp = 0
-        for ci in clusters:
-            tmp += ci.energies[fockspace[ci.idx]][config[ci.idx]]
-        
-        for term in terms:
-            #Hd_out[fockspace][config] = term.diag_matrix_element(fockspace,config)
-            tmp += term.diag_matrix_element(fockspace,config)
-        return tmp
-
-    import multiprocessing as mp
-    from pathos.multiprocessing import ProcessingPool as Pool
-    if nproc == None:
-        pool = Pool()
-    else:
-        pool = Pool(processes=nproc)
-
-    out = pool.map(do_parallel_work, ci_vector)
-    pool.close()
-    pool.join()
-    pool.clear()
-    
-    #out = pool.map(do_parallel_work, ci_vector, batches=100)
-    #out = list(map(do_parallel_work, ci_vector))
-
-    #Hdv = np.zeros((len(ci_vector)))
-    #for o in out:
-    #    Hdv[o[0]] = o[1]
-    Hdv = np.array(out)
-    
-    return Hdv 
-
-# }}}
-
-
-def update_hamiltonian_diagonal(clustered_ham,ci_vector,Hd_vector):
-    """
-    Build hamiltonian diagonal in basis in ci_vector, 
-    Use already computed values if stored in Hd_vector, otherwise compute, updating Hd_vector 
-    with new values.
-    """
-# {{{
-    clusters = ci_vector.clusters
-    Hd = np.zeros((len(ci_vector)))
-    
-    shift = 0 
-   
-    idx = 0
-    for fockspace, configs in ci_vector.items():
-        for config, coeff in configs.items():
-            delta_fock= tuple([(0,0) for ci in range(len(clusters))])
-            try:
-                Hd[idx] += Hd_vector[fockspace][config]
-            except KeyError:
-                try:
-                    Hd_vector[fockspace][config] = 0 
-                except KeyError:
-                    Hd_vector.add_fockspace(fockspace)
-                    Hd_vector[fockspace][config] = 0 
-                terms = clustered_ham.terms[delta_fock]
-
-                ## add diagonal energies
-                tmp = 0
-                for ci in clusters:
-                    tmp += ci.energies[fockspace[ci.idx]][config[ci.idx]]
-                
-                for term in terms:
-                    #Hd[idx] += term.matrix_element(fockspace,config,fockspace,config)
-                    tmp += term.diag_matrix_element(fockspace,config)
-                #print(" nick: %12.8f"%(Hd[idx]-tmp))
-                Hd[idx] = tmp
-                Hd_vector[fockspace][config] = Hd[idx] 
-            idx += 1
-    return Hd
-
-# }}}
-
-#def update_hamiltonian_diagonal_parallel1(clustered_ham,ci_vector,Hd_vector):
-#    """
-#    Build hamiltonian diagonal in basis in ci_vector, 
-#    Use already computed values if stored in Hd_vector, otherwise compute, updating Hd_vector 
-#    with new values.
-#    """
-## {{{
-#    clusters = ci_vector.clusters
-#    Hd = np.zeros((len(ci_vector)))
-#    delta_fock = tuple([(0,0) for ci in range(len(clusters))])
-#   
-#    Hd_out = ci_vector.copy()
-#    Hd_out.zero()
-#
-#    idx = 0
-#    #get terms we already have
-#    for fockspace, config, coeff in ci_vector:
-#        try:
-#            Hd[idx] = Hd_vector[fockspace][config]
-#        except KeyError:
-#            pass
-#        idx += 1
-#
-#    for fockspace, config, coeff in ci_vector:
-#        if fockspace not in Hd_outuuz
-#        try:
-#            a = Hd_vector[fockspace][config]
-#        except KeyError:
-#            try:
-#                Hd_out[fockspace][config] = 0 
-#            except KeyError:
-#                Hd_vector.add_fockspace(fockspace)
-#                Hd_vector[fockspace][config] = 0 
-#            terms = clustered_ham.terms[delta_fock]
-#
-#            ## add diagonal energies
-#            tmp = 0
-#            for ci in clusters:
-#                tmp += ci.energies[fockspace[ci.idx]][config[ci.idx]]
-#            
-#            for term in terms:
-#                #Hd[idx] += term.matrix_element(fockspace,config,fockspace,config)
-#                tmp += term.diag_matrix_element(fockspace,config)
-#            #print(" nick: %12.8f"%(Hd[idx]-tmp))
-#            Hd[idx] = tmp
-#            Hd_vector[fockspace][config] = Hd[idx] 
-#        idx += 1
-#    
-#
-#    for fockspace, config, coeff in ci_vector:
-#
-#    out = list(map(do_parallel_work, ci_vector))
-#  
-#    for fock,conf,coeff in Hd_out:
-#        Hd_vector[fock][conf] = coeff
-#
-#    for o in out:
-#        Hd_out.add(o)
-#    return Hd.get_vector()
-#
-## }}}
-
-def precompute_cluster_basis_energies(clustered_ham):
-    """
-    For each cluster grab the local operator from clustered_ham, and store the expectation values
-    for each cluster state
+    Build diagonal of block reduced density matrix for cluster ci_idx
     """
     # {{{
-    clusters = clustered_ham.clusters
-
-
-    delta_fock= tuple([(0,0) for ci in range(len(clusters))])
-    terms = clustered_ham.terms[delta_fock]
-    for ci in clustered_ham.clusters:
-        ci.energies = {}
-        for fspace in ci.basis:
-            dim = ci.basis[fspace].shape[1]
-            ci.energies[fspace] = np.zeros((dim))
-
-    config_ref = [0]*len(clusters)
-    for ci in clusters:
-        for fspace in ci.basis:
-            fspace_curr = cp.deepcopy(list(delta_fock))
-            fspace_curr[ci.idx] = fspace
-            #print(fspace_curr)
-            for config in range(ci.basis[fspace].shape[1]):
-                config_curr = cp.deepcopy(config_ref)
-                config_curr[ci.idx] = config
-                e = 0
-                for term in terms:
-                    active = term.get_active_clusters()
-                    if len(active) == 1 and active[0] == ci.idx:
-                        e += term.matrix_element(fspace_curr,config_curr,fspace_curr,config_curr)
-                    ci.energies[fspace][config] = e
-# }}}
-
-def precompute_cluster_basis_energies_old(clustered_ham):
-    """
-    For each cluster grab the local operator from clustered_ham, and store the expectation values 
-    for each cluster state
-    """
-    # {{{
-    for ci in clustered_ham.clusters:
-        for fspace in ci.basis:
-            dim = ci.basis[fspace].shape[1]
-            ci.energies[fspace] = np.zeros((dim))
-        opi = clustered_ham.extract_local_operator(ci.idx)
-        for t in opi.terms:
-            assert(len(t.ops)==1)
-            if len(t.ops[0]) == 2:
-                for fspace_del in ci.ops[t.ops[0]]:
-                    assert(fspace_del[0] == fspace_del[1])
-                    D = ci.ops[t.ops[0]][fspace_del]
-                    
-                    # e(I) += D(I,I,pq) H(pq) 
-                    e = np.einsum('iipq,pq->i',D,t.ints)
-                    try:
-                        ci.energies[fspace_del[0]] += e
-                    except KeyError:
-                        ci.energies[fspace_del[0]] = e
-            elif len(t.ops[0]) == 4:
-                for fspace_del in ci.ops[t.ops[0]]:
-                    assert(fspace_del[0] == fspace_del[1])
-                    D = ci.ops[t.ops[0]][fspace_del]
-                    
-                    # e(I) += D(I,I,pqrs) H(pqrs) 
-                    e = np.einsum('iipqrs,pqrs->i',D,t.ints)
-                    try:
-                        ci.energies[fspace_del[0]] += e
-                    except KeyError:
-                        ci.energies[fspace_del[0]] = e
-# }}}
-
-def build_1rdm(ci_vector):
-    """
-    Build 1rdm C_{I,J,K}<IJK|p'q|LMN> C_{L,M,N}
-    """
-    # {{{
-    dm_aa = np.zeros((ci_vector.n_orb,ci_vector.n_orb))
-    dm_bb = np.zeros((ci_vector.n_orb,ci_vector.n_orb))
-
-
-    shift_l = 0 
-    for fock_li, fock_l in enumerate(ci_vector.data):
-        configs_l = ci_vector[fock_l]
-        if iprint > 0:
-            print(fock_l)
-       
-        for config_li, config_l in enumerate(configs_l):
-            idx_l = shift_l + config_li 
-            
-            shift_r = 0 
-            for fock_ri, fock_r in enumerate(ci_vector.data):
-                configs_r = ci_vector[fock_r]
-                delta_fock= tuple([(fock_l[ci][0]-fock_r[ci][0], fock_l[ci][1]-fock_r[ci][1]) for ci in range(len(clusters))])
-                if fock_ri<fock_li:
-                    shift_r += len(configs_r) 
-                    continue
-                try:
-                    terms = clustered_ham.terms[delta_fock]
-                except KeyError:
-                    shift_r += len(configs_r) 
-                    continue 
-                
-                for config_ri, config_r in enumerate(configs_r):        
-                    idx_r = shift_r + config_ri
-                    if idx_r<idx_l:
-                        continue
-                    
-                    for term in terms:
-                        me = term.matrix_element(fock_l,config_l,fock_r,config_r)
-                        H[idx_l,idx_r] += me
-                        if idx_r>idx_l:
-                            H[idx_r,idx_l] += me
-                        #print(" %4i %4i = %12.8f"%(idx_l,idx_r,me),"  :  ",config_l,config_r, " :: ", term)
-                shift_r += len(configs_r) 
-        shift_l += len(configs_l)
-    return H
-# }}}
-
-
-def build_brdm(ci_vector, ci_idx):
-    """
-    Build block reduced density matrix for cluster ci_idx
-    """
-    # {{{
-    ci = ci_vector.clusters[ci_idx]
+    ci = clusters[ci_idx]
     rdms = OrderedDict()
     for fspace, configs in ci_vector.items():
         #print()
         #print("fspace:",fspace)
         #print()
         curr_dim = ci.basis[fspace[ci_idx]].shape[1]
-        rdm = np.zeros((curr_dim,curr_dim))
+        rd = np.zeros((curr_dim))
         for configi,coeffi in configs.items():
-            for cj in range(curr_dim):
-                configj = list(cp.deepcopy(configi))
-                configj[ci_idx] = cj
-                configj = tuple(configj)
-                #print(configi,configj,configi[ci_idx],configj[ci_idx])
-                try:
-                    #print(configi,configj,configi[ci_idx],configj[ci_idx],coeffi,configs[configj])
-                    rdm[configi[ci_idx],cj] += coeffi*configs[configj]
-                    #print(configi[ci_idx],cj,rdm[configi[ci_idx],cj])
-                except KeyError:
-                    pass
+            try:
+                rd[configi[ci_idx]] += coeffi*coeffi
+            except KeyError:
+                pass
         try:
-            rdms[fspace[ci_idx]] += rdm 
+            rdms[fspace[ci_idx]] += rd 
         except KeyError:
-            rdms[fspace[ci_idx]] = rdm 
+            rdms[fspace[ci_idx]] = rd 
 
     return rdms
 # }}}
 
+
+def do_2body_search(blocks, init_fspace, h, g, max_cluster_size=4, max_iter_cmf=10, do_pt2=True):
+    """
+    Sort the cluster pairs based on how much correlation energy is recovered when combined
+    """
+# {{{
+    dimer_energies = {}
+    init_dim = 1
+    clusters = []
+    for ci,c in enumerate(blocks):
+        clusters.append(Cluster(ci,c))
+    for ci,c in enumerate(clusters):
+        init_dim = init_dim * calc_nchk(c.n_orb,init_fspace[ci][0])
+        init_dim = init_dim * calc_nchk(c.n_orb,init_fspace[ci][1])
+    
+    for i in range(len(blocks)):
+        for j in range(i+1,len(blocks)):
+            if len(blocks[i]) + len(blocks[j]) > max_cluster_size:
+                continue
+            
+            new_block = []
+            new_block.extend(blocks[i])
+            new_block.extend(blocks[j])
+            new_block = sorted(new_block)
+            new_blocks = [new_block]
+            new_init_fspace = [(init_fspace[i][0]+init_fspace[j][0],init_fspace[i][1]+init_fspace[j][1])]
+            for k in range(len(blocks)):
+                if k!=i and k!=j:
+                    new_blocks.append(blocks[k])
+                    new_init_fspace.append(init_fspace[k])
+            new_init_fspace = tuple(new_init_fspace)
+            
+            new_clusters = []
+            for ci,c in enumerate(new_blocks):
+                new_clusters.append(Cluster(ci,c))
+            
+            new_ci_vector = ClusteredState()
+            new_ci_vector.init(new_clusters,new_init_fspace)
+         
+            ## unless doing PT2, make sure new dimension is greater than 1
+            if do_pt2 == False:
+                dim = 1
+                for ci,c in enumerate(new_clusters):
+                    dim = dim * calc_nchk(c.n_orb,new_init_fspace[ci][0])
+                    dim = dim * calc_nchk(c.n_orb,new_init_fspace[ci][1])
+                if dim <= init_dim:
+                    continue
+            
+            print(" Clusters:")
+            [print(ci) for ci in new_clusters]
+            
+            new_clustered_ham = ClusteredOperator(new_clusters)
+            print(" Add 1-body terms")
+            new_clustered_ham.add_1b_terms(cp.deepcopy(h))
+            print(" Add 2-body terms")
+            new_clustered_ham.add_2b_terms(cp.deepcopy(g))
+            #clustered_ham.combine_common_terms(iprint=1)
+           
+           
+            # Get CMF reference
+            print(" Let's do CMF for blocks %4i:%-4i"%(i,j))
+            e_curr,converged = cmf(new_clustered_ham, new_ci_vector, cp.deepcopy(h), cp.deepcopy(g), max_iter=10, max_nroots=1)
+           
+            if do_pt2:
+                e2, v = compute_pt2_correction(new_ci_vector, new_clustered_ham, e_curr)
+                print(" PT2 Energy Total      = %12.8f" %(e_curr+e2))
+               
+                e_curr += e2
+
+            print(" Pairwise-CMF(%i,%i) Energy = %12.8f" %(i,j,e_curr))
+            dimer_energies[(i,j)] = e_curr
+    
+    import operator
+    dimer_energies = OrderedDict(sorted(dimer_energies.items(), key=lambda x: x[1]))
+    for d in dimer_energies:
+        print(" || %10s | %12.8f" %(d,dimer_energies[d]))
+  
+    pairs = list(dimer_energies.keys())
+    if len(pairs) == 0:
+        return blocks, init_fspace
+
+    #target_pair = next(iter(dimer_energies))
+    target_pair = pairs[0]
+
+    i = target_pair[0]
+    j = target_pair[1]
+    print(target_pair)
+    new_block = []
+    new_block.extend(blocks[i])
+    new_block.extend(blocks[j])
+    new_blocks = [new_block]
+    new_init_fspace = [(init_fspace[i][0]+init_fspace[j][0],init_fspace[i][1]+init_fspace[j][1])]
+    for k in range(len(blocks)):
+        if k!=i and k!=j:
+            new_blocks.append(blocks[k])
+            new_init_fspace.append(init_fspace[k])
+    print(" This is the new clustering")
+    print(" | %12.8f" %dimer_energies[(i,j)], new_blocks)
+    new_init_fspace = tuple(new_init_fspace)
+    print(new_init_fspace)
+    print()
+    return new_blocks, new_init_fspace
+# }}}
+
+def compute_pt2_correction(ci_vector, clustered_ham, e0, 
+        thresh_asci     = 0,
+        thresh_search   = 0,
+        pt_type         = 'en',
+        nbody_limit     = 4,
+        matvec          = 4,
+        batch_size      = 1,
+        shared_mem      = 3e9, #1GB holds clustered_ham
+        nproc           = None): 
+    # {{{
+        print()
+        print(" Compute PT2 Correction")
+        print("     |pt_type        : ", pt_type        )
+        print("     |thresh_search  : ", thresh_search  )
+        print("     |thresh_asci    : ", thresh_asci    )
+        print("     |matvec         : ", matvec         )
+        asci_vector = ci_vector.copy()
+        print(" Choose subspace from which to search for new configs. Thresh: ", thresh_asci)
+        print(" CI Dim          : %8i" % len(asci_vector))
+        kept_indices = asci_vector.clip(thresh_asci)
+        print(" Search Dim      : %8i Norm: %12.8f" %( len(asci_vector), asci_vector.norm()))
+        #asci_vector.normalize()
+
+        print(" Compute Matrix Vector Product:", flush=True)
+        profile = 0
+        if profile:
+            import cProfile
+            pr = cProfile.Profile()
+            pr.enable()
+
+        start = time.time()
+        if nbody_limit != 4:
+            print(" Warning: nbody_limit set to %4i, resulting PT energies are meaningless" %nbody_limit)
+
+        if matvec==1:
+            pt_vector = matvec1_parallel1(clustered_ham, asci_vector, nproc=nproc, thresh_search=thresh_search, nbody_limit=nbody_limit)
+        elif matvec==3:
+            pt_vector = matvec1_parallel3(clustered_ham, asci_vector, nproc=nproc, thresh_search=thresh_search, nbody_limit=nbody_limit)
+        elif matvec==4:
+            pt_vector = matvec1_parallel4(clustered_ham, asci_vector, nproc=nproc, thresh_search=thresh_search,
+                    nbody_limit=nbody_limit,
+                    batch_size=batch_size, shared_mem=shared_mem)
+        stop = time.time()
+        print(" Time spent in matvec: %12.2f" %( stop-start))
+        #exit()
+       
+        e0_curr = ci_vector.dot(pt_vector)/asci_vector.dot(asci_vector) 
+        print(" Zeroth-order energy: %12.8f Error in E0: %12.8f" %(e0_curr, e0_curr - e0)) 
+
+        if profile:
+            pr.disable()
+            pr.print_stats(sort='time')
+        
+        pt_vector.prune_empty_fock_spaces()
+
+
+        var = pt_vector.dot(pt_vector) - e0*e0
+        print(" Variance:          %12.8f" % var,flush=True)
+        tmp = ci_vector.dot(pt_vector)
+        var = pt_vector.dot(pt_vector) - tmp*tmp
+        print(" Variance Subspace: %12.8f" % var,flush=True)
+
+
+        print(" Remove CI space from pt_vector vector")
+        for fockspace,configs in pt_vector.items():
+            if fockspace in ci_vector.fblocks():
+                for config,coeff in list(configs.items()):
+                    if config in ci_vector[fockspace]:
+                        del pt_vector[fockspace][config]
+
+
+        for fockspace,configs in ci_vector.items():
+            if fockspace in pt_vector:
+                for config,coeff in configs.items():
+                    assert(config not in pt_vector[fockspace])
+
+        print(" Norm of CI vector = %12.8f" %ci_vector.norm())
+        print(" Dimension of CI space: ", len(ci_vector))
+        print(" Dimension of PT space: ", len(pt_vector))
+        print(" Compute Denominator",flush=True)
+        #exit()
+        pt_vector.prune_empty_fock_spaces()
+            
+        #import cProfile
+        #pr = cProfile.Profile()
+        #pr.enable()
+
+
+        # Build Denominator
+        if pt_type == 'en':
+            start = time.time()
+            if nproc==1:
+                Hd = update_hamiltonian_diagonal(clustered_ham, pt_vector, Hd_vector)
+            else:
+                Hd = build_hamiltonian_diagonal_parallel1(clustered_ham, pt_vector, nproc=nproc)
+            #pr.disable()
+            #pr.print_stats(sort='time')
+            end = time.time()
+            print(" Time spent in demonimator: %12.2f" %( end - start), flush=True)
+            
+            denom = 1/(e0 - Hd)
+        elif pt_type == 'mp':
+            start = time.time()
+            # get barycentric MP zeroth order energy
+            e0_mp = 0
+            for f,c,v in ci_vector:
+                for ci in clustered_ham.clusters:
+                    e0_mp += ci.ops['H_mf'][(f[ci.idx],f[ci.idx])][c[ci.idx],c[ci.idx]] * v * v
+            
+            print(" Zeroth-order MP energy: %12.8f" %e0_mp, flush=True)
+
+            #   This is not really MP once we have rotated away from the CMF basis.
+            #   H = F + (H - F), where F = sum_I F(I)
+            #
+            #   After Tucker basis, we just use the diagonal of this fock operator. 
+            #   Not ideal perhaps, but better than nothing at this stage
+            denom = np.zeros(len(pt_vector))
+            idx = 0
+            for f,c,v in pt_vector:
+                e0_X = 0
+                for ci in clustered_ham.clusters:
+                    e0_X += ci.ops['H_mf'][(f[ci.idx],f[ci.idx])][c[ci.idx],c[ci.idx]]
+                denom[idx] = 1/(e0_mp - e0_X)
+                idx += 1
+            end = time.time()
+            print(" Time spent in demonimator: %12.2f" %( end - start), flush=True)
+        
+        pt_vector_v = pt_vector.get_vector()
+        pt_vector_v.shape = (pt_vector_v.shape[0])
+
+        e2 = np.multiply(denom,pt_vector_v)
+        pt_vector.set_vector(e2)
+        e2 = np.dot(pt_vector_v,e2)
+        
+        ecore = clustered_ham.core_energy
+        print(" PT2 Energy Correction = %12.8f" %e2)
+        print(" PT2 Energy Total      = %12.8f" %(e0+e2+ecore))
+
+        return e2, pt_vector
+# }}}
+
+def extrapolate_pt2_correction(ci_vector, clustered_ham, e0, 
+        nsteps          = 10,
+        start           = 1,
+        stop            = 1e-4,
+        thresh_search   = 0,
+        pt_type         = 'en',
+        scale           = 'log', 
+        matvec          = 3,
+        nproc           = None): 
+    # {{{
+        print()
+        print(" Extrapolate PT2 Correction")
+        print("     |pt_type        : ", pt_type        )
+        print("     |thresh_search  : ", thresh_search  )
+        print("     |start          : ", start     )
+        print("     |stop           : ", stop      )
+        print("     |nsteps         : ", nsteps         )
+        print("     |scale          : ", scale        )
+        print(" NYI!")
+        exit()
+   
+        print(" E0: ", e0)
+        if scale=='log':
+            stepsize = np.log((start - stop)/nsteps) 
+            #stepsize = -(np.log(start) - np.log(stop))/nsteps 
+            print(" Stepsize: ", stepsize) 
+            asci1 = start
+            asci2 = start*np.exp(stepsize)
+            steps = []
+            for asci_iter in range(nsteps):
+                steps.append((asci1, asci2))
+                asci1 *= np.exp(stepsize)
+                asci2 *= np.exp(stepsize)
+        else:
+            print("NYI")
+            exit()
+
+        
+        pt_vector = ClusteredState()
+        count = 0
+        for asci1,asci2 in steps:
+            asci_v = ci_vector.copy()
+            asci_v.clip(asci2, max=asci1)
+            count += len(asci_v)
+            print(" Collect configs between %12.2e and %12.2e: Size: %7i Norm: %12.8f" %( asci1, asci2, len(asci_v), asci_v.norm()))
+            
+            if len(asci_v) == 0:
+                continue
+            print(" Compute Matrix Vector Product:", flush=True)
+            
+            start = time.time()
+            if matvec == 1:
+                pt_vector_curr = matvec1_parallel1(clustered_ham, asci_v, nproc=nproc, thresh_search=thresh_search)
+            elif matvec == 2:
+                pt_vector_curr = matvec1_parallel2(clustered_ham, asci_v, nproc=nproc, thresh_search=thresh_search)
+            elif matvec == 3:
+                pt_vector_curr = matvec1_parallel3(clustered_ham, asci_v, nproc=nproc, thresh_search=thresh_search)
+            elif matvec == 4:
+                pt_vector_curr = matvec1_parallel4(clustered_ham, asci_v, nproc=nproc, thresh_search=thresh_search)
+            else:
+                print(" wrong matvec")
+                exit()
+            #pt_vector_curr = matvec1_parallel3(clustered_ham, asci_v, nproc=nproc, thresh_search=thresh_search)
+            pt_vector.add(pt_vector_curr)
+            stop = time.time()
+            print(" Time spent in matvec: %12.2f" %( stop-start))
+          
+            e0_curr = ci_vector.dot(pt_vector) 
+            print(" Zeroth-order energy: %12.8f " %e0_curr) 
+            
+            pt_vector.prune_empty_fock_spaces()
+            
+            tmp = ci_vector.dot(pt_vector)
+            var = pt_vector.dot(pt_vector) - tmp*tmp
+            print(" Variance Subspace: %12.8f" % var,flush=True)
+            
+            print(" Remove CI space from pt_vector vector")
+            for fockspace,configs in pt_vector.items():
+                if fockspace in ci_vector.fblocks():
+                    for config,coeff in list(configs.items()):
+                        if config in ci_vector[fockspace]:
+                            del pt_vector[fockspace][config]
+            
+            
+            for fockspace,configs in ci_vector.items():
+                if fockspace in pt_vector:
+                    for config,coeff in configs.items():
+                        assert(config not in pt_vector[fockspace])
+            
+            print(" Norm of CI vector = %12.8f" %ci_vector.norm())
+            print(" Dimension of CI space: ", len(ci_vector))
+            print(" Dimension of PT space: ", len(pt_vector))
+            print(" Compute Denominator",flush=True)
+            #exit()
+            pt_vector.prune_empty_fock_spaces()
+                
+            
+            # Build Denominator
+            if pt_type == 'en':
+                start = time.time()
+                if nproc==1:
+                    Hd = update_hamiltonian_diagonal(clustered_ham, pt_vector, Hd_vector)
+                else:
+                    Hd = build_hamiltonian_diagonal_parallel1(clustered_ham, pt_vector, nproc=nproc)
+                end = time.time()
+                print(" Time spent in demonimator: %12.2f" %( end - start), flush=True)
+                
+                denom = 1/(e0 - Hd)
+            elif pt_type == 'mp':
+                start = time.time()
+                # get barycentric MP zeroth order energy
+                e0_mp = 0
+                for f,c,v in ci_vector:
+                    for ci in clustered_ham.clusters:
+                        e0_mp += ci.ops['H_mf'][(f[ci.idx],f[ci.idx])][c[ci.idx],c[ci.idx]] * v * v
+                
+                print(" Zeroth-order MP energy: %12.8f" %e0_mp, flush=True)
+            
+                #   This is not really MP once we have rotated away from the CMF basis.
+                #   H = F + (H - F), where F = sum_I F(I)
+                #
+                #   After Tucker basis, we just use the diagonal of this fock operator. 
+                #   Not ideal perhaps, but better than nothing at this stage
+                denom = np.zeros(len(pt_vector))
+                idx = 0
+                for f,c,v in pt_vector:
+                    e0_X = 0
+                    for ci in clustered_ham.clusters:
+                        e0_X += ci.ops['H_mf'][(f[ci.idx],f[ci.idx])][c[ci.idx],c[ci.idx]]
+                    denom[idx] = 1/(e0_mp - e0_X)
+                    idx += 1
+                end = time.time()
+                print(" Time spent in demonimator: %12.2f" %( end - start), flush=True)
+            
+            pt_vector_v = pt_vector.get_vector()
+            pt_vector_v.shape = (pt_vector_v.shape[0])
+            
+            e2 = np.multiply(denom,pt_vector_v)
+            e2 = np.dot(pt_vector_v,e2)
+            
+            ecore = clustered_ham.core_energy
+            print(" PT2 Energy Correction = %12.8f" %e2)
+            print(" PT2 Energy Total      = %12.8f" %(e0+e2+ecore))
+
+        assert(count == len(ci_vector))
+
+        return e2, pt_vector
+# }}}
+
+def run_hierarchical_sci(h,g,blocks,init_fspace,dimer_threshold,ecore):
+    """
+    compute a dimer calculation and figure out what states to retain for a larger calculation
+    """
+# {{{
+    fclusters = []
+    findex_list = {}
+    for ci,c in enumerate(blocks):
+        fclusters.append(Cluster(ci,c))
+        #findex_list[c] = {}
+
+    n_blocks = len(blocks)
+
+    for ca in range(0,n_blocks):
+        for cb in range(ca+1,n_blocks):
+            f_idx = [ca,cb]
+            s_blocks = [blocks[ca],blocks[cb]]
+            s_fspace = ((init_fspace[ca]),(init_fspace[cb]))
+            print("Blocks:",ca,cb)
+            print(s_blocks)
+            print(s_fspace)
+
+            idx = [j for sub in s_blocks for j in sub]
+            # h2
+            h2 = h[:,idx] 
+            h2 = h2[idx,:] 
+            print(h2)
+            g2 = g[:,:,:,idx] 
+            g2 = g2[:,:,idx,:] 
+            g2 = g2[:,idx,:,:] 
+            g2 = g2[idx,:,:,:] 
+
+            #do not want clusters to be wierdly indexed.
+            print(len(s_blocks[0]))
+            print(len(s_blocks[1]))
+            s_blocks = [range(0,len(s_blocks[0])),range(len(s_blocks[0]),len(s_blocks[0])+len(s_blocks[1]))]
+
+            s_clusters = []
+            for ci,c in enumerate(s_blocks):
+                s_clusters.append(Cluster(ci,c))
+
+            #Cluster States initial guess
+            ci_vector = ClusteredState()
+            ci_vector.init(s_clusters,(s_fspace))
+            ci_vector.print_configs()
+            print(" Clusters:")
+            [print(ci) for ci in s_clusters]
+
+            #Clustered Hamiltonian
+            clustered_ham = ClusteredOperator(s_clusters)
+            print(" Add 1-body terms")
+            clustered_ham.add_1b_terms(h2)
+            print(" Add 2-body terms")
+            clustered_ham.add_2b_terms(g2)
+
+            do_cmf = 0
+            if do_cmf:
+                # Get CMF reference
+                cmf(clustered_ham, ci_vector, h2, g2, max_iter=10,max_nroots=50)
+            else:
+                # Get vaccum reference
+                for ci_idx, ci in enumerate(s_clusters):
+                    print()
+                    print(" Form basis by diagonalize local Hamiltonian for cluster: ",ci_idx)
+                    ci.form_eigbasis_from_ints(h2,g2,max_roots=50)
+                    print(" Build these local operators")
+                    print(" Build mats for cluster ",ci.idx)
+                    ci.build_op_matrices()
+
+            ci_vector.expand_to_full_space()
+            H = build_full_hamiltonian(clustered_ham, ci_vector)
+            vguess = ci_vector.get_vector()
+            #e,v = scipy.sparse.linalg.eigsh(H,1,v0=vguess,which='SA')
+            e,v = scipy.sparse.linalg.eigsh(H,1,which='SA')
+            idx = e.argsort()
+            e = e[idx]
+            v = v[:,idx]
+            v0 = v[:,0]
+            e0 = e[0]
+            print(" Ground state of CI:                 %12.8f  CI Dim: %4i "%(e[0].real,len(ci_vector)))
+            ci_vector.zero()
+            ci_vector.set_vector(v0)
+            ci_vector.print_configs()
+
+            for fspace, configs in ci_vector.data.items():
+                for ci_idx, ci in enumerate(s_clusters):
+                    print("fspace",fspace[ci_idx])
+                    print("ci basis old\n",ci.basis[fspace[ci_idx]])
+                    vec = ci.basis[fspace[ci_idx]]
+                    #print(configs.items())
+                    idx = []
+                    for configi,coeffi in configs.items():
+                        #print(configi[ci_idx],coeffi)
+                        if abs(coeffi) > dimer_threshold:
+                            if configi[ci_idx] not in idx:
+                                idx.append(configi[ci_idx])
+                    print("IDX of Cluster")
+                    print(ci_idx,f_idx[ci_idx])
+                    print(idx)
+                    try:
+                        findex_list[f_idx[ci_idx],fspace[ci_idx]] = sorted(list(set(findex_list[f_idx[ci_idx],fspace[ci_idx]]) | set(idx)))
+                        #ci.cs_idx[fspace[ci_idx]] =  sorted(list(set(ci.cs_idx[fspace[ci_idx]]) | set(idx)))
+                    except:
+                        #print(findex_list[ci_idx][fspace[ci_idx]])
+                        findex_list[f_idx[ci_idx],fspace[ci_idx]] = sorted(idx)
+                        #ci.cs_idx[fspace[ci_idx]] =  sorted(idx) 
+
+                    ### TODO 
+                    # first : have to save these indices in fcluster obtect and not the s_cluster. so need to change that,
+                    # second: have to move the rest of the code in the block to outside pair loop. loop over fspace
+                    #           look at indices kept for fspace and vec also is in fspace. and then prune it.
+
+                    print(vec.shape)
+                    print(findex_list[f_idx[ci_idx],fspace[ci_idx]])
+                    vec = vec[:,findex_list[f_idx[ci_idx],fspace[ci_idx]]]
+                    #vec = vec[:,idx]
+                    print("ci basis new\n")
+                    print(vec)
+                    fclusters[f_idx[ci_idx]].basis[fspace[ci_idx]] = vec
+                    #print(ci.basis[fspace[ci_idx]])
+                    print("Fock indices")
+                    print(findex_list)
+
+    for ci_idx, ci in enumerate(fclusters):
+        ci.build_op_matrices()
+        #print(findex_list[ci_idx])
+    print("     *====================================================================.")
+    print("     |         Tensor Product Selected Configuration Interaction          |")
+    print("     *====================================================================*")
+
+    #Cluster States initial guess
+    ci_vector = ClusteredState()
+    ci_vector.init(fclusters,(init_fspace))
+    print(" Clusters:")
+    [print(ci) for ci in fclusters]
+
+
+    #Clustered Hamiltonian
+    clustered_ham = ClusteredOperator(fclusters)
+    print(" Add 1-body terms")
+    clustered_ham.add_1b_terms(h)
+    print(" Add 2-body terms")
+    clustered_ham.add_2b_terms(g)
+
+    ci_vector, pt_vector, etci, etci2,l  = tpsci_tucker(ci_vector.copy(), clustered_ham,thresh_cipsi=1e-6, thresh_ci_clip=5e-4,asci_clip=0)
+    #ci_vector, pt_vector, etci, etci2  = tp_cipsi(ci_vector.copy(), clustered_ham,thresh_cipsi=1e-10, thresh_ci_clip=5e-6,asci_clip=0.01)
+
+    print(" TPSCI:          %12.8f      Dim:%6d" % (etci+ecore, len(ci_vector)))
+    print(" TPSCI(2):       %12.8f      Dim:%6d" % (etci2+ecore,len(pt_vector)))
+# }}}

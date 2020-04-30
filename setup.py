@@ -17,10 +17,10 @@ requirements = open('requirements.txt').readlines()
 requirements = [r.strip() for r in requirements]
 
 
-setup(name='bc-ci',
-        version=0,
-        description='block-correlated CI',
-        url='https://github.com/vibinabraham/bc-ci',
+setup(name='FermiCluster',
+        version=0.1,
+        description='Tensor product methods in cluster state representations',
+        url='https://github.com/vibinabraham/FermiCluster',
         author='Vibin Abraham',
         author_email='vibin1@vt.edu',
         license='Apache 2',
