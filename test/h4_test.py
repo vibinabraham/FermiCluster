@@ -81,7 +81,7 @@ def test_1():
     print(" HCI:        %12.9f Dim:%6d"%(ehci-ecore,hci_dim))
     print(" FCI:        %12.9f Dim:%6d"%(efci-ecore,fci_dim))
     assert(abs(etci --3.08117519) < 1e-8)
-    assert(abs(etci2 --3.08150341) < 1e-8)
+    assert(abs(etci2 --3.08150334) < 1e-8)
     assert(tci_dim == 9)
     assert(abs(efci -ecore --3.08154574) < 1e-7)
     

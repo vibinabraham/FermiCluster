@@ -714,15 +714,24 @@ def hosvd(ci_vector, clustered_ham, hshift=1e-8):
             U = U[:,idx]
 
             if hshift != None:
+                #"""Adding cluster hamiltonian to RDM before diagonalization to make null space unique. """
+                #Hlocal = ci.ops['H_mf'][(fspace,fspace)]
+                #n,U = np.linalg.eigh(rdm + hshift*Hlocal)
+                #n = np.diag(U.T @ rdm @ U)
+                #idx = n.argsort()[::-1]
+                #n = n[idx]
+                #U = U[:,idx]
+
+                
                 """Adding cluster hamiltonian to RDM before diagonalization to make null space unique. """
                 n,U = np.linalg.eigh(rdm)
                 idx = n.argsort()[::-1]
                 n = n[idx]
                 U = U[:,idx]
-               
+                
                 remix = []
                 for ni in range(n.shape[0]):
-                    if n[ni] < 1e-6:
+                    if n[ni] < 1e-8:
                         remix.append(ni)
                 U2 = U[:,remix]
                 Hlocal = U2.T @ ci.ops['H_mf'][(fspace,fspace)] @ U2
