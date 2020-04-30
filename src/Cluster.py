@@ -463,6 +463,34 @@ class Cluster(object):
                     else:
                         print("Wrong dimension")
                         assert(1==0)
+                elif fspace_l in U and fspace_r not in U:
+                    Ul = U[fspace_l]
+                    o = self.ops[op][fspace_delta]
+                    if len(o.shape) == 2:
+                        self.ops[op][fspace_delta] = np.einsum('pq,ps->qs',Ul,o, optimize=True)
+                    elif len(o.shape) == 3:
+                        self.ops[op][fspace_delta] = np.einsum('pq,pst->qst',Ul,o, optimize=True)
+                    elif len(o.shape) == 4:
+                        self.ops[op][fspace_delta] = np.einsum('pq,pstu->qstu',Ul,o, optimize=True)
+                    elif len(o.shape) == 5:
+                        self.ops[op][fspace_delta] = np.einsum('pq,pstuv->qstuv',Ul,o, optimize=True)
+                    else:
+                        print("Wrong dimension")
+                        assert(1==0)
+                elif fspace_l not in U and fspace_r in U:
+                    Ur = U[fspace_r]
+                    o = self.ops[op][fspace_delta]
+                    if len(o.shape) == 2:
+                        self.ops[op][fspace_delta] = np.einsum('rs,qr->qs',Ur,o, optimize=True)
+                    elif len(o.shape) == 3:
+                        self.ops[op][fspace_delta] = np.einsum('rs,qrt->qst',Ur,o, optimize=True)
+                    elif len(o.shape) == 4:
+                        self.ops[op][fspace_delta] = np.einsum('rs,qrtu->qstu',Ur,o, optimize=True)
+                    elif len(o.shape) == 5:
+                        self.ops[op][fspace_delta] = np.einsum('rs,qrtuv->qstuv',Ur,o, optimize=True)
+                    else:
+                        print("Wrong dimension")
+                        assert(1==0)
                     #try:
                     #    self.ops[op][fspace_delta] = np.einsum('pq,rs,pr...->qs...',Ul,Ur,self.ops[op][fspace_delta], optimize=True)
                     #except ValueError:
