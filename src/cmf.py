@@ -615,12 +615,14 @@ class CmfSolver:
         self.do_intra_rots = do_intra_rots
         self.to_freeze  = []
 
-    def freeze_cluster_mixing(self,ci,cj):
+    def freeze_cluster_mixing(self,ci,cjlist):
         """
-        prevent mixing orbitals between clusters ci and cj
+        prevent mixing orbitals between clusters ci and each cluster in cjlist
         A is either the gradient to hand back to the optimizer or the (square) antihermitian rotation matrix kappa
         """
-        self.to_freeze.append((ci,cj))
+        for cj in cjlist:
+            self.to_freeze.append((ci,cj))
+            self.to_freeze.append((cj,ci))
 
     
     def init(self,cmf_dm_guess=None):
@@ -637,7 +639,7 @@ class CmfSolver:
         if self.do_intra_rots == False:
             # freeze intra_block_rotations
             for bi in range(len(self.blocks)):
-                self.freeze_cluster_mixing(bi,bi)
+                self.freeze_cluster_mixing(bi,(bi,))
 
         n_blocks = len(blocks)
         clusters = [Cluster(ci,c) for ci,c in enumerate(blocks)]

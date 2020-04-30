@@ -403,6 +403,7 @@ class ci_solver:
         #print(" Do alpha/beta terms")
         self.compute_ab_terms_direct(Hci)
 
+        Hci = .5*(Hci+Hci.T)
         
         return basis.T @ Hci @ basis
        
@@ -461,14 +462,23 @@ class ci_solver:
         if iprint>0:
             print(" Diagonalize Matrix for %i roots" %self.n_roots)
 
-        if Hci.shape[0] > 1:
+        Hci = .5*(Hci+Hci.T)
+        if Hci.shape[0] > 1 and Hci.shape[0] > self.n_roots:
             l,C = scipy.sparse.linalg.eigsh(Hci,self.n_roots,which='SA')
             sort_ind = np.argsort(l)
             l = l[sort_ind]
             C = C[:,sort_ind]
-        else:
+        elif Hci.shape[0] > 1 and Hci.shape[0] <= self.n_roots:
+            l,C = np.linalg.eigh(Hci)
+            sort_ind = np.argsort(l)
+            l = l[sort_ind]
+            C = C[:,sort_ind]
+        elif Hci.shape[0] == 1:
             l = [Hci[0,0]]
             C = np.array([[1.0]])
+        else:
+            print(" Problem with Hci dimension")
+            exit()
         #print(" Diagonalize Matrix")
         #l,C = np.linalg.eigh(Hci)
         #sort_ind = np.argsort(l)

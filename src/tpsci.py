@@ -54,6 +54,8 @@ def system_setup(h, g, ecore, blocks, init_fspace,
     print(" Add 2-body terms")
     clustered_ham.add_2b_terms(g)
 
+    clustered_ham.h = h
+    clustered_ham.g = g
 
     ci_vector = ClusteredState()
     ci_vector.init(clusters, init_fspace)
@@ -234,6 +236,15 @@ def tpsci_tucker(ci_vector, clustered_ham,
         elif selection == "heatbath":
             hosvd(ci_vector, clustered_ham, hshift=hshift)
 
+    
+        # Should we rebuild the operator matrices after rotating basis?
+        if 0:
+            h = clustered_ham.h
+            g = clustered_ham.g
+            for ci in clustered_ham.clusters:
+                print(" Build operator matrices for cluster ",ci.idx)
+                ci.build_op_matrices()
+                ci.build_local_terms(h,g)
 
         print(" Ensure TDMs are still contiguous:", flush=True)
         start = time.time()
@@ -704,23 +715,50 @@ def hosvd(ci_vector, clustered_ham, hshift=1e-8):
 
             if hshift != None:
                 """Adding cluster hamiltonian to RDM before diagonalization to make null space unique. """
-                Hlocal = ci.ops['H_mf'][(fspace,fspace)]
-                n,U = np.linalg.eigh(rdm + hshift*Hlocal)
-                n = np.diag(U.T @ rdm @ U)
+                n,U = np.linalg.eigh(rdm)
                 idx = n.argsort()[::-1]
                 n = n[idx]
                 U = U[:,idx]
+               
+                remix = []
+                for ni in range(n.shape[0]):
+                    if n[ni] < 1e-6:
+                        remix.append(ni)
+                U2 = U[:,remix]
+                Hlocal = U2.T @ ci.ops['H_mf'][(fspace,fspace)] @ U2
+                n2,v2 = np.linalg.eigh(Hlocal)
+                U2 = U2@v2
+                idx = n2.argsort()
+                n2 = n2[idx]
+                U2 = U2[:,idx]
+
+                U[:,remix] = U2
+
+                assert(np.amax(np.abs(U.T@U - np.eye(U.shape[1]))) < 1e-14)
+           
+            
+            n = np.diag(U.T @ rdm @ U)
+            Elocal = np.diag(U.T @ ci.ops['H_mf'][(fspace,fspace)] @ U)
+            ## check orthogonality
+            #if np.amax(np.abs(U.T@U - np.eye(U.shape[1]))) > 1e-12:
+            #    S = U.T @ U
+            #    S = scipy.linalg.inv( scipy.linalg.sqrtm(S))
+            #    U = U@S
+            #    print(" Warning: had to correct orthogonality", np.amax(np.abs(U.T@U - np.eye(U.shape[1]))))
+            #    assert(np.amax(np.abs(U.T@U - np.eye(U.shape[1]))) < 1e-14)
             
             norm += sum(n)
             fspace_norm = sum(n)
+            print("                 %4s:    %12s    %12s"%('','Population','Energy'), flush=True)
             for ni_idx,ni in enumerate(n):
-                if abs(ni/norm) > 1e-12:
+                if abs(ni/norm) > 1e-18:
                     fspace_entropy -= ni*np.log(ni/norm)/norm
                     entropy -=  ni*np.log(ni)
-                    print("   Rotated State %4i:    %12.8f"%(ni_idx,ni), flush=True)
+                    print("   Rotated State %4i:    %12.8f    %12.8f"%(ni_idx,ni,Elocal[ni_idx]), flush=True)
             print("   ----")
             print("   Entanglement entropy:  %12.8f" %fspace_entropy, flush=True) 
             print("   Norm:                  %12.8f" %fspace_norm, flush=True) 
+            #print(" det(U): %16.12f"%(np.linalg.det(U)))
             rotations[fspace] = U
         print(" Final entropy:.... %12.8f"%entropy)
         print(" Final norm:....... %12.8f"%norm)
@@ -728,6 +766,7 @@ def hosvd(ci_vector, clustered_ham, hshift=1e-8):
     
         start = time.time()
         ci.rotate_basis(rotations)
+        ci.check_basis_orthogonality()
         end = time.time()
         print(" Time spent rotating cluster basis: %12.2f" %(end-start))
     return

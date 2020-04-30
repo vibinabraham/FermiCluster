@@ -222,9 +222,17 @@ class Cluster(object):
                 for i,ei in enumerate(ci.results_e):
                     print(" Local State %5i: Local E: %12.8f Embedded E: %12.8f Total E: %12.8f" %(i, ei, ei+Eenv, ei+ecore+Eenv))
             fock = (na,nb)
-            self.basis[fock] = ci.results_v
+            
+            C = ci.results_v
+            #if np.amax(np.abs(C.T@C - np.eye(C.shape[1]))) > 1e-14:
+            #    S = C.T @ C
+            #    S = scipy.linalg.inv( scipy.linalg.sqrtm(S))
+            #    C = C@S
+            #    print(np.amax(np.abs(C.T@C - np.eye(C.shape[1]))))
+            #    assert(np.amax(np.abs(C.T@C - np.eye(C.shape[1]))) < 1e-14)
+            self.basis[fock] = C 
             self.Hlocal[fock] =  Hci 
-            self.ops['H_mf'][(fock,fock)] = ci.results_v.T @ Hci @ ci.results_v
+            self.ops['H_mf'][(fock,fock)] = C.T @ Hci @ C 
     # }}}
 
     #remove:
@@ -443,16 +451,39 @@ class Cluster(object):
                 if fspace_l in U and fspace_r in U:
                     Ul = U[fspace_l]
                     Ur = U[fspace_r]
-                    try:
-                        self.ops[op][fspace_delta] = np.einsum('pq,rs,pr...->qs...',Ul,Ur,self.ops[op][fspace_delta], optimize=True)
-                    except ValueError:
-                        print("Error: Rotate basis failed for term: ", op, " fspace_delta: ", fspace_delta) 
-                        print(Ul.shape)
-                        print(Ur.shape)
-                        print(self.ops[op][fspace_delta].shape)
-                        exit()
+                    o = self.ops[op][fspace_delta]
+                    if len(o.shape) == 2:
+                        self.ops[op][fspace_delta] = np.einsum('pq,rs,pr->qs',Ul,Ur,o, optimize=True)
+                    elif len(o.shape) == 3:
+                        self.ops[op][fspace_delta] = np.einsum('pq,rs,prt->qst',Ul,Ur,o, optimize=True)
+                    elif len(o.shape) == 4:
+                        self.ops[op][fspace_delta] = np.einsum('pq,rs,prtu->qstu',Ul,Ur,o, optimize=True)
+                    elif len(o.shape) == 5:
+                        self.ops[op][fspace_delta] = np.einsum('pq,rs,prtuv->qstuv',Ul,Ur,o, optimize=True)
+                    else:
+                        print("Wrong dimension")
+                        assert(1==0)
+                    #try:
+                    #    self.ops[op][fspace_delta] = np.einsum('pq,rs,pr...->qs...',Ul,Ur,self.ops[op][fspace_delta], optimize=True)
+                    #except ValueError:
+                    #    print("Error: Rotate basis failed for term: ", op, " fspace_delta: ", fspace_delta) 
+                    #    print(Ul.shape)
+                    #    print(Ur.shape)
+                    #    print(self.ops[op][fspace_delta].shape)
+                    #    exit()
    # }}}
-   
+  
+    def check_basis_orthogonality(self,thresh=1e-14):
+        for fspace,mat in self.basis.items():
+            I = mat.T @ mat 
+            try:
+                assert(np.amax(np.abs(I - np.eye(I.shape[0]))) < thresh)
+            except:
+                print(" WARNING: in check_basis:")
+                print(" Cluster:", self)
+                print(" Fockspace:", fspace)
+                print(" Orthogonality Error: ",np.amax(np.abs(I - np.eye(I.shape[0]))))
+
     def grow_basis_by_coupling(self, rdms=None):
        # {{{
         print("NYI")
@@ -608,6 +639,7 @@ class Cluster(object):
             ci.init(H,na,nb,1)
             #print(ci)
             self.ops['H'][(fock,fock)] = ci.build_H_matrix(self.basis[fock])
+            self.ops['H'][(fock,fock)] = .5*(self.ops['H'][(fock,fock)] + self.ops['H'][(fock,fock)].T)
             #print(" GS Energy: %12.8f" %self.ops['H'][(fock,fock)][0,0])
     # }}}
         
