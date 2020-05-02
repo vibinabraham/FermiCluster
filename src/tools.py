@@ -321,7 +321,7 @@ def compute_pt2_correction(ci_vector, clustered_ham, e0,
         return e2, pt_vector
 # }}}
 
-def compute_pt2_correction_lowmem(ci_vector, clustered_ham, e0, 
+def compute_pt2_correction_lowmem_serial(ci_vector, clustered_ham, e0, 
         thresh_asci     = 0,
         thresh_search   = 1e-12,
         pt_type         = 'en',
@@ -538,6 +538,127 @@ def compute_pt2_correction_lowmem(ci_vector, clustered_ham, e0,
 
     
         ecore = clustered_ham.core_energy
+        print(" PT2 Energy Correction = %12.8f" %e2)
+        print(" PT2 Energy Total      = %12.8f" %(e0+e2+ecore))
+
+        return e2
+# }}}
+
+def compute_pt2_correction_lowmem(ci_vector, clustered_ham_in, e0, 
+        thresh_asci     = 0,
+        thresh_search   = 1e-12,
+        pt_type         = 'en',
+        nbody_limit     = 4,
+        matvec          = 4,
+        batch_size      = 1,
+        shared_mem      = 3e9, #1GB holds clustered_ham
+        opt_einsum      = True,
+        nproc           = None): 
+    # {{{
+        print()
+        print(" Compute PT2 Correction using low-memory (slow) version")
+        print("     |pt_type        : ", pt_type        )
+        print("     |thresh_search  : ", thresh_search  )
+        print("     |thresh_asci    : ", thresh_asci    )
+        print("     |matvec         : ", matvec         )
+        asci_vector = ci_vector.copy()
+        print(" Choose subspace from which to search for new configs. Thresh: ", thresh_asci)
+        print(" CI Dim          : %8i" % len(asci_vector))
+        kept_indices = asci_vector.clip(thresh_asci)
+        print(" Search Dim      : %8i Norm: %12.8f" %( len(asci_vector), asci_vector.norm()))
+        #asci_vector.normalize()
+        
+
+        # get barycentric MP zeroth order energy
+        e0_mp = 0
+        for f,c,v in ci_vector:
+            for ci in clustered_ham_in.clusters:
+                e0_mp += ci.ops['H_mf'][(f[ci.idx],f[ci.idx])][c[ci.idx],c[ci.idx]] * v * v
+
+        import ray
+        import tools_para
+        if nproc==None:
+            ray.init(object_store_memory=shared_mem, num_cpus=3)
+        else:
+            ray.init(num_cpus=3, object_store_memory=shared_mem)
+    
+        h_id    = ray.put(clustered_ham_in)
+        v_id    = ray.put(ci_vector)
+
+          
+        #loop over fock blocks and set up jobs
+        jobs = []
+        e2 = 0
+        #Computei C(A)<A|H|X>DX<X|H|B>C(B) directly
+        clusters = clustered_ham_in.clusters
+        n_clusters = len(clusters)
+        v = asci_vector
+        for fock_l in v.fblocks(): 
+            for fock_r in v.fblocks(): 
+                confs_r = v[fock_r]
+                delta_fock= tuple([(fock_l[ci][0]-fock_r[ci][0], fock_l[ci][1]-fock_r[ci][1]) for ci in range(len(clusters))])
+                for terms_l in clustered_ham_in.terms:
+                    for terms_r in clustered_ham_in.terms:
+                        do_term = True 
+                        
+                        for ci in range(n_clusters):
+                            #if delta_fock[ci][0] != terms_l[ci][0] + terms_r[ci][0] or delta_fock[ci][1] != terms_l[ci][1] + terms_r[ci][1]:
+                            if fock_l[ci][0]+terms_l[ci][0] != fock_r[ci][0]+terms_r[ci][0] or fock_l[ci][1]+terms_l[ci][1] != fock_r[ci][1]+terms_r[ci][1]:
+                                do_term = False
+                                break
+
+                        if do_term == False:
+                            continue
+        
+                        # at this point we know that terms_l and term_r can connect fock_l and fock_r to the same fock_X
+                        # now go work
+                        fock_x = [(fock_l[ci][0]+terms_l[ci][0],fock_l[ci][1]+terms_l[ci][1]) for ci in range(n_clusters)]
+                        assert(fock_x == [(fock_r[ci][0]+terms_r[ci][0],fock_r[ci][1]+terms_r[ci][1]) for ci in range(n_clusters)])
+                       
+
+                        # Check to make sure fock_x has an acceptable number of electrons
+                        #
+                        do_term1 = True
+                        for ci in range(n_clusters):
+                            if (fock_x[ci][0] < 0) or (fock_x[ci][1] < 0) or (fock_x[ci][0] > clusters[ci].n_orb) or (fock_x[ci][1] > clusters[ci].n_orb):
+                                do_term1 = False
+                        if do_term1 == False:
+                            continue
+                       
+                        #print("fock_x :", fock_x)
+
+                        #[print(t) for t in clustered_ham.terms[terms_r]]
+                        #[print(t) for t in clustered_ham.terms[terms_l]]
+                        configs_x = {}
+                        for conf_r in v[fock_r]:
+                            coeff = v[fock_r][conf_r]
+                       
+                        
+                            inp = [conf_r, fock_r, coeff, fock_l, fock_x, terms_r, terms_l, h_id, v_id, pt_type, e0_mp]
+                            jobs.append(inp)
+                            #e2 += parallel_work(inp)
+                             
+        print(" PT2 Energy Correction %18.12f"%e2)
+
+       
+        print(" Number of ray jobs: ", len(jobs))
+        result_ids = [tools_para.parallel_work.remote(i) for i in jobs]
+       
+        e2 = 0
+        while len(result_ids): 
+            done_id, result_ids = ray.wait(result_ids) 
+            e2 += ray.get(done_id[0])
+        
+        #out = ray.get(result_ids)
+        #e2 = 0
+        #for o in out:
+        #    e2 += o 
+        
+
+        ray.shutdown()
+
+    
+        ecore = clustered_ham_in.core_energy
         print(" PT2 Energy Correction = %12.8f" %e2)
         print(" PT2 Energy Total      = %12.8f" %(e0+e2+ecore))
 
