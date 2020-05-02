@@ -237,14 +237,14 @@ def tpsci_tucker(ci_vector, clustered_ham,
             hosvd(ci_vector, clustered_ham, hshift=hshift)
 
     
-        # Should we rebuild the operator matrices after rotating basis?
-        if 0:
-            h = clustered_ham.h
-            g = clustered_ham.g
-            for ci in clustered_ham.clusters:
-                print(" Build operator matrices for cluster ",ci.idx)
-                ci.build_op_matrices()
-                ci.build_local_terms(h,g)
+#        # Should we rebuild the operator matrices after rotating basis?
+#        if 0:
+#            h = clustered_ham.h
+#            g = clustered_ham.g
+#            for ci in clustered_ham.clusters:
+#                print(" Build operator matrices for cluster ",ci.idx)
+#                ci.build_op_matrices()
+#                ci.build_local_terms(h,g)
 
         print(" Ensure TDMs are still contiguous:", flush=True)
         start = time.time()
