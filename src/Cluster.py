@@ -51,6 +51,7 @@ class Cluster(object):
         self.basis = {}                     # organized as basis = { (na,nb):v(IJ,s), (na',nb'):v(IJ,s), ...} 
                                             #       where IJ is alpha,beta string indices
         self.ops    = {}
+        self.ops_screen = {}
         
         self.energies = {}                  # Diagonal of local operators
 
