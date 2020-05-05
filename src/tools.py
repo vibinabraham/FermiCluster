@@ -589,6 +589,272 @@ def compute_pt2_correction_lowmem(ci_vector, clustered_ham_in, e0,
         @ray.remote
         def parallel_work3(inp):
         # {{{
+            fock_l  = inp[0]
+            pt_type = inp[1]
+            e0_mp   = inp[2]
+            e2_worker = 0
+            h = ray.get(h_id)
+            v = ray.get(v_id)
+            
+            thresh_search = 1e-12
+            opt_einsum = True
+            clusters = h.clusters
+        
+            for fock_r in v.fblocks(): 
+                confs_r = v[fock_r]
+                delta_fock= tuple([(fock_l[ci][0]-fock_r[ci][0], fock_l[ci][1]-fock_r[ci][1]) for ci in range(len(clusters))])
+                for terms_l in clustered_ham_in.terms:
+                    for terms_r in clustered_ham_in.terms:
+                        do_term = True 
+                        
+                        for ci in range(n_clusters):
+                            #if delta_fock[ci][0] != terms_l[ci][0] + terms_r[ci][0] or delta_fock[ci][1] != terms_l[ci][1] + terms_r[ci][1]:
+                            if fock_l[ci][0]+terms_l[ci][0] != fock_r[ci][0]+terms_r[ci][0] or fock_l[ci][1]+terms_l[ci][1] != fock_r[ci][1]+terms_r[ci][1]:
+                                do_term = False
+                                break
+                
+                        if do_term == False:
+                            continue
+                
+                        # at this point we know that terms_l and term_r can connect fock_l and fock_r to the same fock_X
+                        # now go work
+                        fock_x = [(fock_l[ci][0]+terms_l[ci][0],fock_l[ci][1]+terms_l[ci][1]) for ci in range(n_clusters)]
+                        assert(fock_x == [(fock_r[ci][0]+terms_r[ci][0],fock_r[ci][1]+terms_r[ci][1]) for ci in range(n_clusters)])
+                       
+                
+                        # Check to make sure fock_x has an acceptable number of electrons
+                        #
+                        do_term1 = True
+                        for ci in range(n_clusters):
+                            if (fock_x[ci][0] < 0) or (fock_x[ci][1] < 0) or (fock_x[ci][0] > clusters[ci].n_orb) or (fock_x[ci][1] > clusters[ci].n_orb):
+                                do_term1 = False
+                        if do_term1 == False:
+                            continue
+                        
+                        for conf_r in v[fock_r]:
+                            configs_x = {}
+                            coeff = v[fock_r][conf_r]
+                            
+                            for term in h.terms[terms_r]:
+                                 
+                                # do local terms separately
+                                if len(term.active) == 1:
+                                    #start2 = time.time()
+                                    
+                                    ci = term.active[0]
+                                        
+                                    tmp = clusters[ci].ops['H'][(fock_x[ci],fock_r[ci])][:,conf_r[ci]] * coeff 
+                                    
+                                    new_configs = [[i] for i in conf_r] 
+                                    
+                                    new_configs[ci] = range(clusters[ci].ops['H'][(fock_x[ci],fock_r[ci])].shape[0])
+                                    
+                                    for sp_idx, spi in enumerate(itertools.product(*new_configs)):
+                                        if abs(tmp[sp_idx]) > thresh_search:
+                                            if spi not in configs_x:
+                                                configs_x[spi] = tmp[sp_idx] 
+                                            else:
+                                                configs_x[spi] += tmp[sp_idx] 
+                                    #stop2 = time.time()
+                            
+                            
+                                else:
+                                    state_sign = 1
+                                    for oi,o in enumerate(term.ops):
+                                        if o == '':
+                                            continue
+                                        if len(o) == 1 or len(o) == 3:
+                                            for cj in range(oi):
+                                                state_sign *= (-1)**(fock_r[cj][0]+fock_r[cj][1])
+                                        
+                                    opii = -1
+                                    mats = []
+                                    good = True
+                                    for opi,op in enumerate(term.ops):
+                                        if op == "":
+                                            continue
+                                        opii += 1
+                                        ci = clusters[opi]
+                                        try:
+                                            oi = ci.ops[op][(fock_x[ci.idx],fock_r[ci.idx])][:,conf_r[ci.idx],:]
+                                            mats.append(oi)
+                                        except KeyError:
+                                            good = False
+                                            break
+                                    if good == False:
+                                        continue                        
+                                    if len(mats) == 0:
+                                        continue
+                                    
+                                    tmp = np.einsum(term.contract_string_matvec, *mats, term.ints, optimize=opt_einsum)
+                                    
+                                    
+                                    #stop2 = time.time()
+                                    
+                                    
+                                    #v_coeff = v[fock_r][conf_r]
+                                    #tmp = state_sign * tmp.ravel() * v_coeff
+                                    tmp = state_sign * tmp.ravel() * coeff 
+                                    
+                                    _abs = abs
+                                    
+                                    new_configs = [[i] for i in conf_r] 
+                                    for cacti,cact in enumerate(term.active):
+                                        new_configs[cact] = range(mats[cacti].shape[0])
+                                    for sp_idx, spi in enumerate(itertools.product(*new_configs)):
+                                        #print(" New config: %12.8f" %tmp[sp_idx], spi)
+                                        if _abs(tmp[sp_idx]) > thresh_search:
+                                            if spi not in configs_x:
+                                                configs_x[spi] = tmp[sp_idx] 
+                                            else:
+                                                configs_x[spi] += tmp[sp_idx] 
+                            
+                            #
+                            # C(A)<A| H(fock) | X> now completed
+                            #
+                            #   now remove from configs in variational space from X 
+                            #print(len(configs_x))
+                            fock_x = tuple(fock_x)
+                            if fock_x in v.fblocks():
+                                for config,coeff in v[fock_x].items():
+                                    if config in configs_x:
+                                        del configs_x[config]
+                                        #print(" Remove:", config)
+                            #[print(i,j) for i,j in configs_x.items()]
+                            
+                            
+                            #
+                            #   Now form denominator
+                            #
+                            if pt_type == 'en':
+                                print(" NYI!")
+                                exit()
+                            elif pt_type == 'mp':
+                                start = time.time()
+                                #   This is not really MP once we have rotated away from the CMF basis.
+                                #   H = F + (H - F), where F = sum_I F(I)
+                                #
+                                #   After Tucker basis, we just use the diagonal of this fock operator. 
+                                #   Not ideal perhaps, but better than nothing at this stage
+                                for c in configs_x.keys():
+                                    e0_X = 0
+                                    for ci in h.clusters:
+                                        e0_X += ci.ops['H_mf'][(fock_x[ci.idx],fock_x[ci.idx])][c[ci.idx],c[ci.idx]]
+                                    
+                                    configs_x[c] /= e0_mp - e0_X
+                                end = time.time()
+                                #print(" Time spent in demonimator: %12.2f" %( end - start), flush=True)
+                            
+                            #
+                            # C(A)<A| H(fock) | X> / delta E(X) now completed
+                            #
+                            
+                            
+                            # Now get C(B)<B|H|X>
+                           
+                            #print('fock_x:',fock_x)
+                            #print(configs_x)
+                            #HBX = {}
+                            delta_fock2= tuple([(fock_x[ci][0]-fock_l[ci][0], fock_x[ci][1]-fock_l[ci][1]) for ci in range(len(clusters))])
+                            for conf_x,coef_x in configs_x.items():
+                                #HBX[conf_x] = 0
+                                for conf_l,coef_l in v[fock_l].items():
+                                    #print("a:")
+                                    #print(fock_x, conf_x)
+                                    #print(fock_l, conf_l)
+                                    for term in h.terms[delta_fock2]:
+                                        e2_worker += coef_x * term.matrix_element(fock_x,conf_x,fock_l,conf_l) * coef_l
+                            
+            return e2_worker# }}}
+          
+        #loop over fock blocks and set up jobs
+        jobs = []
+        e2 = 0
+        #Computei C(A)<A|H|X>DX<X|H|B>C(B) directly
+        clusters = clustered_ham_in.clusters
+        n_clusters = len(clusters)
+        v = asci_vector
+        for fock_l in v.fblocks(): 
+            inp = [fock_l, pt_type, e0_mp]
+            jobs.append(inp)
+                             
+
+       
+        print(" Number of ray jobs: ", len(jobs))
+        #result_ids = [tools_para.parallel_work2.remote(i) for i in jobs]
+        result_ids = [parallel_work3.remote(i) for i in jobs]
+       
+        e2 = 0
+        start = time.time()
+        while len(result_ids): 
+            done_id, result_ids = ray.wait(result_ids) 
+            e2 += ray.get(done_id[0])
+            print(".",end='',flush=True)
+        stop = time.time()
+        print()
+        print(" Time spent in pt2 energy: %12.2f" %( stop - start), flush=True)
+        
+        #out = ray.get(result_ids)
+        #e2 = 0
+        #for o in out:
+        #    e2 += o 
+        
+
+        ray.shutdown()
+
+    
+        ecore = clustered_ham_in.core_energy
+        print(" PT2 Energy Correction = %12.8f" %e2)
+        print(" PT2 Energy Total      = %12.8f" %(e0+e2+ecore))
+
+        return e2
+# }}}
+
+def compute_pt2_correction_lowmem_old(ci_vector, clustered_ham_in, e0, 
+        thresh_asci     = 0,
+        thresh_search   = 1e-12,
+        pt_type         = 'en',
+        nbody_limit     = 4,
+        matvec          = 4,
+        batch_size      = 1,
+        shared_mem      = 3e9, #1GB holds clustered_ham
+        opt_einsum      = True,
+        nproc           = None): 
+    # {{{
+        print()
+        print(" Compute PT2 Correction using low-memory (slow) version")
+        print("     |pt_type        : ", pt_type        )
+        print("     |thresh_search  : ", thresh_search  )
+        print("     |thresh_asci    : ", thresh_asci    )
+        print("     |matvec         : ", matvec         )
+        asci_vector = ci_vector.copy()
+        print(" Choose subspace from which to search for new configs. Thresh: ", thresh_asci)
+        print(" CI Dim          : %8i" % len(asci_vector))
+        kept_indices = asci_vector.clip(thresh_asci)
+        print(" Search Dim      : %8i Norm: %12.8f" %( len(asci_vector), asci_vector.norm()))
+        #asci_vector.normalize()
+        
+
+        # get barycentric MP zeroth order energy
+        e0_mp = 0
+        for f,c,v in ci_vector:
+            for ci in clustered_ham_in.clusters:
+                e0_mp += ci.ops['H_mf'][(f[ci.idx],f[ci.idx])][c[ci.idx],c[ci.idx]] * v * v
+
+        import ray
+        import tools_para
+        if nproc==None:
+            ray.init(object_store_memory=shared_mem)
+        else:
+            ray.init(num_cpus=nproc, object_store_memory=shared_mem)
+    
+        h_id    = ray.put(clustered_ham_in)
+        v_id    = ray.put(ci_vector)
+
+
+        @ray.remote
+        def parallel_work3(inp):
+        # {{{
             fock_r  = inp[0]
             fock_l  = inp[1]
             fock_x  = inp[2]

@@ -360,7 +360,13 @@ class LocalClusteredTerm(ClusteredTerm):
         assert(len(self.active) == 1)
 
         ci = self.active[0]
-        return self.clusters[ci].ops['H'][(fock_bra[ci],fock_ket[ci])][bra[ci],ket[ci]]
+        try:
+            return self.clusters[ci].ops['H'][(fock_bra[ci],fock_ket[ci])][bra[ci],ket[ci]]
+        except KeyError:
+            print("ERROR: Problem with lookup")
+            print('fock_bra,fock_ket:',fock_bra[ci],fock_ket[ci])
+            print('bra,ket:',bra[ci],ket[ci])
+            raise KeyError 
 # }}}
     
     def diag_matrix_element(self,fock,config,opt_einsum=None):
