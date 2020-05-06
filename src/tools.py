@@ -544,7 +544,7 @@ def compute_pt2_correction_lowmem_serial(ci_vector, clustered_ham, e0,
         return e2
 # }}}
 
-def compute_pt2_correction_lowmem(ci_vector, clustered_ham_in, e0, 
+def compute_pt2_correction_lowmem_dense(ci_vector, clustered_ham_in, e0, 
         thresh_asci     = 0,
         thresh_search   = 1e-12,
         pt_type         = 'en',
@@ -885,8 +885,9 @@ def compute_pt2_correction_lowmem(ci_vector, clustered_ham_in, e0,
                                             if len(dest_sites) == 0:
                                                 eX = 0
                                                 conf_x = [i[0] for i in dest] 
-                                                if tuple(conf_x) in v[fock_x]:
-                                                    continue
+                                                if fock_x in v.fblocks():
+                                                    if tuple(conf_x) in v[fock_x]:
+                                                        continue
                                                 for ci in clusters:
                                                     eX += ci.ops['H_mf'][(fock_x[ci.idx],fock_x[ci.idx])][conf_x[ci.idx],conf_x[ci.idx]]
                                                 e2_worker += scale*configs_xl[0]*configs_xr[0] / (e0_mp-eX)
@@ -895,8 +896,9 @@ def compute_pt2_correction_lowmem(ci_vector, clustered_ham_in, e0,
                                                     eX = 0
                                                     conf_x = [i[0] for i in dest] 
                                                     conf_x[dest_sites[0]] = p
-                                                    if tuple(conf_x) in v[fock_x]:
-                                                        continue
+                                                    if fock_x in v.fblocks():
+                                                        if tuple(conf_x) in v[fock_x]:
+                                                            continue
                                                     for ci in clusters:
                                                         eX += ci.ops['H_mf'][(fock_x[ci.idx],fock_x[ci.idx])][conf_x[ci.idx],conf_x[ci.idx]]
                                                     e2_worker += scale*configs_xl[p]*configs_xr[p] / (e0_mp-eX)
@@ -907,8 +909,9 @@ def compute_pt2_correction_lowmem(ci_vector, clustered_ham_in, e0,
                                                         conf_x = [i[0] for i in dest] 
                                                         conf_x[dest_sites[0]] = p
                                                         conf_x[dest_sites[1]] = q
-                                                        if tuple(conf_x) in v[fock_x]:
-                                                            continue
+                                                        if fock_x in v.fblocks():
+                                                            if tuple(conf_x) in v[fock_x]:
+                                                                continue
                                                         for ci in clusters:
                                                             eX += ci.ops['H_mf'][(fock_x[ci.idx],fock_x[ci.idx])][conf_x[ci.idx],conf_x[ci.idx]]
                                                         e2_worker += scale*configs_xl[p,q]*configs_xr[p,q] / (e0_mp-eX)
@@ -921,8 +924,9 @@ def compute_pt2_correction_lowmem(ci_vector, clustered_ham_in, e0,
                                                             conf_x[dest_sites[0]] = p
                                                             conf_x[dest_sites[1]] = q
                                                             conf_x[dest_sites[2]] = r
-                                                            if tuple(conf_x) in v[fock_x]:
-                                                                continue
+                                                            if fock_x in v.fblocks():
+                                                                if tuple(conf_x) in v[fock_x]:
+                                                                    continue
                                                             for ci in clusters:
                                                                 eX += ci.ops['H_mf'][(fock_x[ci.idx],fock_x[ci.idx])][conf_x[ci.idx],conf_x[ci.idx]]
                                                             e2_worker += scale*configs_xl[p,q,r]*configs_xr[p,q,r] / (e0_mp-eX)
@@ -945,7 +949,257 @@ def compute_pt2_correction_lowmem(ci_vector, clustered_ham_in, e0,
                                             else:
                                                 print(" Problem with dimension")
                                                 exit(0)
-                                            return e2_worker
+                            
+            return e2_worker# }}}
+          
+        #loop over fock blocks and set up jobs
+        jobs = []
+        e2 = 0
+        #Computei C(A)<A|H|X>DX<X|H|B>C(B) directly
+        clusters = clustered_ham_in.clusters
+        n_clusters = len(clusters)
+        v = asci_vector
+        for fock_l in v.fblocks(): 
+            inp = [fock_l, pt_type, e0_mp]
+            jobs.append(inp)
+                             
+
+       
+        print(" Number of ray jobs: ", len(jobs))
+        #result_ids = [tools_para.parallel_work2.remote(i) for i in jobs]
+        result_ids = [parallel_work3.remote(i) for i in jobs]
+       
+        e2 = 0
+        start = time.time()
+        while len(result_ids): 
+            done_id, result_ids = ray.wait(result_ids) 
+            e2 += ray.get(done_id[0])
+            print(".",end='',flush=True)
+        stop = time.time()
+        print()
+        print(" Time spent in pt2 energy: %12.2f" %( stop - start), flush=True)
+        
+        #out = ray.get(result_ids)
+        #e2 = 0
+        #for o in out:
+        #    e2 += o 
+        
+
+        ray.shutdown()
+
+    
+        ecore = clustered_ham_in.core_energy
+        print(" PT2 Energy Correction = %12.8f" %e2)
+        print(" PT2 Energy Total      = %12.8f" %(e0+e2+ecore))
+
+        return e2
+# }}}
+
+def compute_pt2_correction_lowmem(ci_vector, clustered_ham_in, e0, 
+        thresh_asci     = 0,
+        thresh_search   = 1e-12,
+        pt_type         = 'en',
+        nbody_limit     = 4,
+        matvec          = 4,
+        batch_size      = 1,
+        shared_mem      = 3e9, #1GB holds clustered_ham
+        opt_einsum      = True,
+        nproc           = None): 
+    # {{{
+        print()
+        print(" Compute PT2 Correction using low-memory (slow) version")
+        print("     |pt_type        : ", pt_type        )
+        print("     |thresh_search  : ", thresh_search  )
+        print("     |thresh_asci    : ", thresh_asci    )
+        print("     |matvec         : ", matvec         )
+        asci_vector = ci_vector.copy()
+        print(" Choose subspace from which to search for new configs. Thresh: ", thresh_asci)
+        print(" CI Dim          : %8i" % len(asci_vector))
+        kept_indices = asci_vector.clip(thresh_asci)
+        print(" Search Dim      : %8i Norm: %12.8f" %( len(asci_vector), asci_vector.norm()))
+        #asci_vector.normalize()
+        
+        
+        # get barycentric MP zeroth order energy
+        e0_mp = 0
+        for f,c,v in ci_vector:
+            for ci in clustered_ham_in.clusters:
+                e0_mp += ci.ops['H_mf'][(f[ci.idx],f[ci.idx])][c[ci.idx],c[ci.idx]] * v * v
+
+        import ray
+        import tools_para
+        if nproc==None:
+            ray.init(object_store_memory=shared_mem)
+        else:
+            ray.init(num_cpus=nproc, object_store_memory=shared_mem)
+    
+        # precompute screening indices for operator mats
+        screen = 1e-4        
+        for ci in clustered_ham_in.clusters:
+            ci.ops_screen = {}
+            for o in ci.ops:
+                ci.ops_screen[o] = {} 
+                for f1,f2 in ci.ops[o]:
+                    oi = ci.ops[o][(f1,f2)]
+                    ci.ops_screen[o][(f1,f2)] = []
+                    for I in range(oi.shape[1]):
+                        nz_curr = []
+                        for J in range(oi.shape[0]):
+                            if len(oi.shape) > 2:
+                                if np.amax(np.abs(oi[J,I,:])) > screen:
+                                    #ci.ops_screen[o][(f1,f2)][I].append(J)
+                                    nz_curr.append(J)
+                            else:
+                                if np.amax(np.abs(oi[J,I])) > screen:
+                                    #ci.ops_screen[o][(f1,f2)][I].append(J)
+                                    nz_curr.append(J)
+                        ci.ops_screen[o][(f1,f2)].append(nz_curr)
+                        #print(len(ci.ops_screen[o][(f1,f2)][I]) / oi.shape[0])
+        
+
+        for terms in clustered_ham_in.terms:
+            for term in clustered_ham_in.terms[terms]:
+                term.active2 = [0]*term.n_clusters
+                for i in term.active:
+                    term.active2[i] = 1
+    
+        h_id    = ray.put(clustered_ham_in)
+        v_id    = ray.put(ci_vector)
+
+        def matvec_update_with_new_configs(coeff_tensor, new_configs, configs, active, thresh_search=1e-12):
+           # {{{
+            nactive = len(active) 
+           
+            _abs = abs
+        
+        
+            config_curr = [i[0] for i in new_configs]
+            count = 0
+            if nactive==2:
+       
+                for I in np.argwhere(np.abs(coeff_tensor) > thresh_search):
+                    try:
+                        config_curr[active[0]] = new_configs[active[0]][I[0]] 
+                        config_curr[active[1]] = new_configs[active[1]][I[1]] 
+                    except:
+                        print()
+                        print(" Tensor: ", coeff_tensor.shape)
+                        print(" Nz Idx: ", I)
+                        print(" new_co: ", new_configs)
+                        print(" active: ", active,flush=True)
+                        exit()
+                    key = tuple(config_curr)
+                    if key not in configs:
+                        configs[key] = coeff_tensor[I[0],I[1]]
+                    else:
+                        configs[key] += coeff_tensor[I[0],I[1]]
+                    #count += 1
+                #print(" nb2: size: %8i nonzero: %8i" %(coeff_tensor.size, count))
+        
+                            
+            elif nactive==3:
+        
+                for I in np.argwhere(np.abs(coeff_tensor) > thresh_search):
+                    config_curr[active[0]] = new_configs[active[0]][I[0]] 
+                    config_curr[active[1]] = new_configs[active[1]][I[1]] 
+                    config_curr[active[2]] = new_configs[active[2]][I[2]] 
+                    key = tuple(config_curr)
+                    if key not in configs:
+                        configs[key] = coeff_tensor[I[0],I[1],I[2]]
+                    else:
+                        configs[key] += coeff_tensor[I[0],I[1],I[2]]
+                    #count += 1
+                #print(" nb3: size: %8i nonzero: %8i" %(coeff_tensor.size, count))
+        
+            elif nactive==4:
+        
+                for I in np.argwhere(np.abs(coeff_tensor) > thresh_search):
+                    config_curr[active[0]] = new_configs[active[0]][I[0]] 
+                    config_curr[active[1]] = new_configs[active[1]][I[1]] 
+                    config_curr[active[2]] = new_configs[active[2]][I[2]] 
+                    config_curr[active[3]] = new_configs[active[3]][I[3]] 
+                    key = tuple(config_curr)
+                    if key not in configs:
+                        configs[key] = coeff_tensor[I[0],I[1],I[2],I[3]]
+                    else:
+                        configs[key] += coeff_tensor[I[0],I[1],I[2],I[3]]
+                    #count += 1
+                #print(" nb4: size: %8i nonzero: %8i" %(coeff_tensor.size, count))
+        
+            else:
+                # local terms should trigger a fail since they are handled separately 
+                print(" Wrong value in update_with_new_configs")
+                exit()
+       
+            #print(" Size of ndarray:   ", sys.getsizeof(coeff_tensor))
+            #print(" Size of dictionary:", sys.getsizeof(configs))
+        
+            return 
+        # }}}
+
+
+        @ray.remote
+        def parallel_work3(inp):
+        # {{{
+            fock_l  = inp[0]
+            pt_type = inp[1]
+            e0_mp   = inp[2]
+            e2_worker = 0
+            h = ray.get(h_id)
+            v = ray.get(v_id)
+            screen = 1e-4
+            
+            todo = 0
+            for fock_r in v.fblocks():
+                if fock_l >= fock_r:
+                    todo += 1
+            
+            fidx = 0
+            for fock_r in v.fblocks():
+                if fock_l >= fock_r:
+                    print('%7i/%-7i'%(fidx,todo),flush=True)
+                    fidx += 1
+                    scale = 1.0
+                    if fock_l > fock_r:
+                        scale = 2.0
+                    
+                    opt_einsum = True
+                    clusters = h.clusters
+                    
+                    confs_r = v[fock_r]
+                   
+                    # find pairs of terms which transition to the same fock space for X
+                    for terms_l in h.terms:
+                        fock_x = [(fock_l[ci][0]+terms_l[ci][0],fock_l[ci][1]+terms_l[ci][1]) for ci in range(n_clusters)]
+
+                        terms_r = tuple([(fock_x[ci][0] - fock_r[ci][0], fock_x[ci][1] - fock_r[ci][1]) for ci in range(len(clusters))])
+                      
+                        if terms_r not in h.terms:
+                            continue
+                        
+                    
+                        # at this point we know that terms_l and term_r can connect fock_l and fock_r to the same fock_X
+                        # Check to make sure fock_x has an acceptable number of electrons
+                        do_term1 = True
+                        for ci in range(n_clusters):
+                            if (fock_x[ci][0] < 0) or (fock_x[ci][1] < 0) or (fock_x[ci][0] > clusters[ci].n_orb) or (fock_x[ci][1] > clusters[ci].n_orb):
+                                do_term1 = False
+                        if do_term1 == False:
+                            continue
+                        
+                        # at this point we know that terms_l and term_r can connect fock_l and fock_r to the same fock_X
+                        assert(fock_x == [(fock_r[ci][0]+terms_r[ci][0],fock_r[ci][1]+terms_r[ci][1]) for ci in range(n_clusters)])
+                        
+                        #   We now need to go compute the contribution
+                        #       <fock_l|terms_l|fock_X> DX <fock_X|terms_r|fock_r>
+                        #
+                        #       we will compute the two numerators separately
+                        #           <fock_X|terms_l|fock_l>
+                        #           <fock_X|terms_r|fock_r>
+                        #
+                        #       then add the denominator only for necessary elements
+                        configs_xl = {}
+                        configs_xr = {}
 
                     
                         #
