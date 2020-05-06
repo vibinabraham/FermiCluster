@@ -606,10 +606,85 @@ def compute_pt2_correction_lowmem(ci_vector, clustered_ham_in, e0,
                         #print(len(ci.ops_screen[o][(f1,f2)][I]) / oi.shape[0])
         
 
+        for terms in clustered_ham_in.terms:
+            for term in clustered_ham_in.terms[terms]:
+                term.active2 = [0]*term.n_clusters
+                for i in term.active:
+                    term.active2[i] = 1
+    
         h_id    = ray.put(clustered_ham_in)
         v_id    = ray.put(ci_vector)
 
+        def apply_term_to_config(term, fock_l, fock_r, conf_r, dest, thresh_search=1e-12):
+# {{{
+        
+            """
+            Applies a ClusteredTerm to a single TPS, and only computes the coupling to configs contained in dest
+            dest is a list of states for each cluster to which we will allow transitions
+                e.g. [4,6,range(10),5]
+            """
+            shape = [len(i) for i in dest if len(i)>1]
+            if len(shape) == 0:
+                shape = (1,)
+            configs_out = {}
+            # do local terms separately
+            clusters = term.clusters 
+            if len(term.active) == 1:
+                #start2 = time.time()
+                ci = term.active[0]
+                   
+                tmp = clusters[ci].ops['H'][(fock_l[ci],fock_r[ci])][dest[ci],conf_r[ci]] 
+                tmp.shape = shape 
+                #print("a:")
+                #print(dest)
+                #print(clusters[ci].ops['H'][(fock_l[ci],fock_r[ci])].shape)
+                #print(tmp.shape)
+                #for sp_idx, spi in enumerate(itertools.product(*dest)):
+                #    configs_out[spi] = tmp[sp_idx] 
+                
+                return tmp 
+            
+            else:
+                state_sign = 1
+                for oi,o in enumerate(term.ops):
+                    if o == '':
+                        continue
+                    if len(o) == 1 or len(o) == 3:
+                        for cj in range(oi):
+                            state_sign *= (-1)**(fock_l[cj][0]+fock_l[cj][1])
+                    
+                opii = -1
+                mats = []
+                good = True
+                for opi,op in enumerate(term.ops):
+                    if op == "":
+                        continue
+                    opii += 1
+                    ci = clusters[opi]
+                    try:
+                        oi = ci.ops[op][(fock_l[ci.idx],fock_r[ci.idx])][dest[ci.idx],conf_r[ci.idx],:]
+                    except KeyError:
+                        good = False
+                        break
+                   
 
+                    if len(dest[ci.idx]) == 0:
+                        good = False
+                        break
+                    
+                    mats.append(oi)
+        
+                if good == False or len(mats) == 0:
+                    return np.array([]) 
+                
+                I = term.ints * state_sign 
+                tmp = np.einsum(term.contract_string_matvec, *mats, I, optimize=opt_einsum)
+                tmp.shape = shape 
+                #tmp = np.einsum(term.contract_string_matvec, *mats, term.ints, optimize=opt_einsum)
+                return tmp 
+                #matvec_update_with_new_configs(tmp, dest, configs_out, term.active, thresh_search)
+                #return configs_out
+# }}}
 
         def matvec_update_with_new_configs(coeff_tensor, new_configs, configs, active, thresh_search=1e-12):
            # {{{
@@ -745,7 +820,133 @@ def compute_pt2_correction_lowmem(ci_vector, clustered_ham_in, e0,
                         #       then add the denominator only for necessary elements
                         configs_xl = {}
                         configs_xr = {}
-                        
+                      
+                        if 1:
+                            # compute the correction between each TPS
+                            for conf_l in v[fock_l]:
+                                coef_l = v[fock_l][conf_l]
+                                
+                                #   form denominator from which we'll compute corrections
+                                if pt_type == 'en':
+                                    print(" NYI!")
+                                    exit(0)
+                                elif pt_type == 'mp':
+                                    e0_X_l = e0_mp 
+                                    for ci in h.clusters:
+                                        e0_X_l -= ci.ops['H_mf'][(fock_x[ci.idx],fock_x[ci.idx])][conf_l[ci.idx],conf_l[ci.idx]]
+                                
+                                for term_l in h.terms[terms_l]:
+                                    #print("tl",term_l.active2)
+                                    #print("dl",dest_l)
+                                    for conf_r in v[fock_r]:
+                                        coef_r = v[fock_r][conf_r]
+                                        #delta_conf = [conf_l[i] - conf_r[i] for i in range(n_clusters)] 
+                                        #print("cr",conf_r)
+                                        for term_r in h.terms[terms_r]:
+                                            if any([term_l.active2[i]==0 and term_r.active2[i]==0 and conf_l[i]!=conf_r[i] for i in range(n_clusters)]):
+                                                continue
+                                                    
+                                            #print()
+                                            #print("tr",term_r.active2)
+                                            dest_l = [[conf_l[i]] if term_l.active2[i]==0 else range(clusters[i].basis[fock_x[i]].shape[1]) for i in range(n_clusters)]
+                                            dest_r = [[conf_r[i]] if term_r.active2[i]==0 else range(clusters[i].basis[fock_x[i]].shape[1]) for i in range(n_clusters)]
+                                            #dest_r = [[conf_r[i]] if term_r.active2[i]==0 else ':' for i in range(n_clusters)]
+                                            dest   = [dest_l[i] if term_r.active2[i]==1 else dest_r[i] for i in range(n_clusters)]
+                                            #dest1  = [dest_l[i] if dest_r[i]==':' else dest_r[i] for i in range(n_clusters)]
+                                            #dest2  = [dest_r[i] if dest_l[i]==':' else dest_l[i] for i in range(n_clusters)]
+                                            #assert(dest1==dest2) 
+                                            configs_xl = apply_term_to_config(term_l, fock_x, fock_l, conf_l, dest, thresh_search=1e-12)
+                                            if configs_xl.size == 0:
+                                                continue
+                                            configs_xr = apply_term_to_config(term_r, fock_x, fock_r, conf_r, dest, thresh_search=1e-12)
+                                            if configs_xr.size == 0:
+                                                continue
+
+                                            configs_xl *= coef_l
+                                            configs_xr *= coef_r
+
+                                            print()
+                                            print(term_l)
+                                            print(term_r)
+                                            print(conf_l)
+                                            print(conf_r)
+                                            print(dest)
+                                            print(fock_x)
+                                            print(configs_xl)
+                                            print(configs_xr)
+                                            assert(len(configs_xr) == len(configs_xl))
+                                        
+                                            dest_shape = [i for i in dest if len(i) > 1]
+                                            dest_sites = [i for i in range(len(dest)) if len(dest[i]) > 1]
+                                            
+                                            print("dest_shape",dest_shape)
+                                            print("dest_sites",dest_sites)
+                                            fock_x = tuple(fock_x)
+                                            if len(dest_sites) == 0:
+                                                eX = 0
+                                                conf_x = [i[0] for i in dest] 
+                                                if tuple(conf_x) in v[fock_x]:
+                                                    continue
+                                                for ci in clusters:
+                                                    eX += ci.ops['H_mf'][(fock_x[ci.idx],fock_x[ci.idx])][conf_x[ci.idx],conf_x[ci.idx]]
+                                                e2_worker += scale*configs_xl[0]*configs_xr[0] / (e0_mp-eX)
+                                            elif len(dest_sites) == 1:
+                                                for p in dest_shape[0]:
+                                                    eX = 0
+                                                    conf_x = [i[0] for i in dest] 
+                                                    conf_x[dest_sites[0]] = p
+                                                    if tuple(conf_x) in v[fock_x]:
+                                                        continue
+                                                    for ci in clusters:
+                                                        eX += ci.ops['H_mf'][(fock_x[ci.idx],fock_x[ci.idx])][conf_x[ci.idx],conf_x[ci.idx]]
+                                                    e2_worker += scale*configs_xl[p]*configs_xr[p] / (e0_mp-eX)
+                                            elif len(dest_sites) == 2:
+                                                for p in dest_shape[0]:
+                                                    for q in dest_shape[1]:
+                                                        eX = 0
+                                                        conf_x = [i[0] for i in dest] 
+                                                        conf_x[dest_sites[0]] = p
+                                                        conf_x[dest_sites[1]] = q
+                                                        if tuple(conf_x) in v[fock_x]:
+                                                            continue
+                                                        for ci in clusters:
+                                                            eX += ci.ops['H_mf'][(fock_x[ci.idx],fock_x[ci.idx])][conf_x[ci.idx],conf_x[ci.idx]]
+                                                        e2_worker += scale*configs_xl[p,q]*configs_xr[p,q] / (e0_mp-eX)
+                                            elif len(dest_sites) == 3:
+                                                for p in dest_shape[0]:
+                                                    for q in dest_shape[1]:
+                                                        for r in dest_shape[2]:
+                                                            eX = 0
+                                                            conf_x = [i[0] for i in dest] 
+                                                            conf_x[dest_sites[0]] = p
+                                                            conf_x[dest_sites[1]] = q
+                                                            conf_x[dest_sites[2]] = r
+                                                            if tuple(conf_x) in v[fock_x]:
+                                                                continue
+                                                            for ci in clusters:
+                                                                eX += ci.ops['H_mf'][(fock_x[ci.idx],fock_x[ci.idx])][conf_x[ci.idx],conf_x[ci.idx]]
+                                                            e2_worker += scale*configs_xl[p,q,r]*configs_xr[p,q,r] / (e0_mp-eX)
+                                            elif len(dest_sites) == 4:
+                                                for p in dest_shape[0]:
+                                                    for q in dest_shape[1]:
+                                                        for r in dest_shape[2]:
+                                                            for r in dest_shape[2]:
+                                                                eX = 0
+                                                                conf_x = [i[0] for i in dest] 
+                                                                conf_x[dest_sites[0]] = p
+                                                                conf_x[dest_sites[1]] = q
+                                                                conf_x[dest_sites[2]] = r
+                                                                conf_x[dest_sites[2]] = s
+                                                                if tuple(conf_x) in v[fock_x]:
+                                                                    continue
+                                                                for ci in clusters:
+                                                                    eX += ci.ops['H_mf'][(fock_x[ci.idx],fock_x[ci.idx])][conf_x[ci.idx],conf_x[ci.idx]]
+                                                                e2_worker += scale*configs_xl[p,q,r,s]*configs_xr[p,q,r,s] / (e0_mp-eX)
+                                            else:
+                                                print(" Problem with dimension")
+                                                exit(0)
+                                            return e2_worker
+
                     
                         #
                         #   
