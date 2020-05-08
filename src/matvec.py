@@ -1168,9 +1168,9 @@ def matvec1_parallel4(h_in,v,thresh_search=1e-12, nproc=None, opt_einsum=True, n
     # }}}
 
     @ray.remote
-    def do_batch(batch):
+    def do_batch(batch,h):
         sigma_out = {} 
-        h = ray.get(h_id)
+        #h = ray.get(h_id)
         for v_curr in batch:
             fock_r = v_curr[0]
             conf_r = v_curr[1]
@@ -1307,7 +1307,7 @@ def matvec1_parallel4(h_in,v,thresh_search=1e-12, nproc=None, opt_einsum=True, n
 
 
 
-    result_ids = [do_batch.remote(i) for i in conf_batches]
+    result_ids = [do_batch.remote(i,h_in) for i in conf_batches]
 
      
     if 0:
