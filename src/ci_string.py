@@ -654,9 +654,78 @@ class ci_solver:
 # }}}
 
     
+    def svd_state(self,norbs1,norbs2, max_dim=None, thresh=-1):
+        """
+        Do an SVD of the FCI vector partitioned into clusters with (norbs1 | norbs2)
+        where the orbitals are assumed to be ordered for cluster 1| cluster 2 haveing norbs1 and 
+        norbs2, respectively.
+        """
+        assert(norbs1+norbs2==self.no)
+        from collections import OrderedDict
+        
+        vector = OrderedDict()
+        ket_a = ci_string(self.no,self.nea)
+        ket_b = ci_string(self.no,self.neb)
+        v = self.results_v
+        v.shape = (ket_a.max(), ket_b.max())
+        print(v.shape)
+        from bisect import bisect
 
+        fock_labels_a = [[None,None] for i in range(ket_a.max())]
+        fock_labels_b = [[None,None] for i in range(ket_b.max())]
 
+        for I in range(ket_a.max()):
+            fock_labels_a[I] = bisect(ket_a.config(),norbs1-1)
+            ket_a.incr()
+        for I in range(ket_b.max()):
+            fock_labels_b[I] = bisect(ket_b.config(),norbs1-1)
+            ket_b.incr()
+       
+        for I in range(v.shape[0]):
+            for J in range(v.shape[1]):
+                try:
+                    vector[fock_labels_a[I],fock_labels_b[J]].append(v[I,J])
+                except KeyError:
+                    vector[fock_labels_a[I],fock_labels_b[J]] = [v[I,J]]
 
+        norm = 0
+        for fock in vector:
+            print()
+            print(" Prepare fock space: ", fock)
+            vector[fock] = np.array(vector[fock])
+        
+            ket_a1 = ci_string(norbs1,fock[0])
+            ket_b1 = ci_string(norbs1,fock[1])
+            ket_a2 = ci_string(norbs2,self.nea-fock[0])
+            ket_b2 = ci_string(norbs2,self.neb-fock[1])
+           
+            print(" Dimensions:",ket_a1.max(), ket_b1.max(), ket_a2.max(), ket_b2.max(), vector[fock].size)
+            norm_curr = vector[fock].T @ vector[fock]
+            print(" Norm: %12.8f"%(np.sqrt(norm_curr)))
+            vector[fock].shape = (ket_a1.max()*ket_b1.max(), ket_a2.max()*ket_b2.max())
+            norm += norm_curr
+
+            #rdm = vector[fock] @ vector[fock].T
+            #print(" Diagonalize RDM of size:",rdm.shape)
+            print(" SVD current block of FCI vector with shape:",vector[fock].shape)
+            U,n,V = np.linalg.svd(vector[fock])
+            #sort_ind = np.argsort(n)[::-1]
+            #n = n[sort_ind]
+            #C = C[:,sort_ind]
+            print("   %5s:    %12s"%('State','Population'), flush=True)
+            nkeep = 0
+            for ni_idx,ni in enumerate(n):
+                if ni > thresh:
+                    nkeep += 1
+                #if abs(ni/norm) > 1e-18:
+                    print("   %5i:    %12.8f"%(ni_idx,ni), flush=True)
+                else:
+                    print("   %5i:    %12.8f*"%(ni_idx,ni), flush=True)
+            
+            U = U[:,:nkeep]
+            
+        norm = np.sqrt(norm)
+        assert(abs(norm - 1) < 1e-14)
 ################################################################################33
 #   Tools
 ################################################################################33
