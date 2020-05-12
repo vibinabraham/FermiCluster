@@ -85,100 +85,7 @@ def test_1():
         for i in range(len(osym)):
             print("%4d %8s %16.8f"%(i+1,osym[i],mf.mo_energy[i]))
 
-    mo_occ = mf.mo_occ>0
-    mo_vir = mf.mo_occ==0
-    print(mo_occ)
-    print(mo_vir)
-    mo_occ = np.where(mf.mo_occ>0)[0]
-    mo_vir = np.where(mf.mo_occ==0)[0]
-    print(mo_occ)
-    print(mo_vir)
-
-    from pyscf import mo_mapping
-    s_pop = mo_mapping.mo_comps('C 2pz', mol, mf.mo_coeff)
-    print(s_pop)
-    cas_list = s_pop.argsort()[-cas_norb:]
-    print('cas_list', np.array(cas_list))
-    print('s population for active space orbitals', s_pop[cas_list])
-
-
-    focc_list = list(set(mo_occ)-set(cas_list))
-    print(focc_list)
-    fvir_list = list(set(mo_vir)-set(cas_list))
-    print(fvir_list)
-
-
-    def get_eff_for_casci(focc_list,cas_list,h,g):
-    # {{{
-
-        cas_dim = len(cas_list)
-        const = 0
-        for i in focc_list:
-            const += 2 * h[i,i]
-            for j in focc_list:
-                const += 2 * g[i,i,j,j] -  g[i,j,i,j]
-
-        eff = np.zeros((cas_dim,cas_dim))
-        for L,l in enumerate(cas_list):
-            for M,m in enumerate(cas_list):
-                for j in focc_list:
-                    eff[L,M] += 2 * g[l,m,j,j] -  g[l,j,j,m]
-        return const, eff
-    # }}}
-
-    def reorder_integrals(idx,h,g):
-    # {{{
-        h = h[:,idx]
-        h = h[idx,:]
-
-        g = g[:,:,:,idx]
-        g = g[:,:,idx,:]
-        g = g[:,idx,:,:]
-        g = g[idx,:,:,:]
-        return h,g
-    # }}}
-
-    local = False
-    local = True
-    if local:
-        cl_c = mf.mo_coeff[:, focc_list]
-        cl_a = lo.Boys(mol, mf.mo_coeff[:, cas_list]).kernel(verbose=4)
-        cl_v = mf.mo_coeff[:, fvir_list]
-        C = np.column_stack((cl_c, cl_a, cl_v))
-    else:
-        cl_c = mf.mo_coeff[:, focc_list]
-        cl_a = mf.mo_coeff[:, cas_list]
-        cl_v = mf.mo_coeff[:, fvir_list]
-        C = np.column_stack((cl_c, cl_a, cl_v))
-
-    from pyscf import mo_mapping
-    s_pop = mo_mapping.mo_comps('C 2pz', mol, C)
-    print(s_pop)
-    cas_list = s_pop.argsort()[-cas_norb:]
-    print('cas_list', np.array(cas_list))
-    print('s population for active space orbitals', s_pop[cas_list])
-    focc_list = list(set(mo_occ)-set(cas_list))
-    print(focc_list)
-    fvir_list = list(set(mo_vir)-set(cas_list))
-    print(fvir_list)
-
-
-
-    h = C.T.dot(mf.get_hcore()).dot(C)
-    g = ao2mo.kernel(mol,C,aosym='s4',compact=False).reshape(4*((h.shape[0]),))
-    const,eff = get_eff_for_casci(focc_list,cas_list,h,g)
-
-
-    focc_list = list(set(mo_occ)-set(cas_list))
-    print(focc_list)
-    fvir_list = list(set(mo_vir)-set(cas_list))
-    print(fvir_list)
-
-    ecore = enu + const
-    h,g = reorder_integrals(cas_list,h,g)
-    h = h + eff
-    C = C[:,cas_list]
-    #molden.from_mo(mol, 'oocmf_0.molden', C)
+    h,ecore,g,C = get_pi_space(mol,mf,cas_norb,cas_nel,local=True)
 
     print("ecore %16.8f"%ecore)
 
@@ -192,7 +99,7 @@ def test_1():
     idx = m2[1]
     C = C[:,idx]
     h,g = reorder_integrals(idx,h,g)
-    molden.from_mo(mol, 'h8.molden', C)
+    #molden.from_mo(mol, 'cas.molden', C)
 
     blocks = [[0,1,2,3],[4,5],[6,7]]
     init_fspace = ((2,2),(1,1),(1,1))

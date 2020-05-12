@@ -41,6 +41,7 @@ def system_setup(h, g, ecore, blocks, init_fspace,
     print("     |cmf_thresh     : ", cmf_thresh)
     print("     |cmf_diis_start : ", cmf_diis_start)
     print("     |cmf_max_diis   : ", cmf_max_diis)
+    print("     |Ecore          : ", ecore)
     n_blocks = len(blocks)
     clusters = [Cluster(ci,c) for ci,c in enumerate(blocks)]
     

@@ -12,15 +12,16 @@ import pyscf
 ttt = time.time()
 
 n_orb = 8
-U = 1.
+U = 4.
 beta = 1.0
 
 h, g = get_hubbard_params(n_orb,beta,U,pbc=False)
 np.random.seed(2)
 #tmp = np.random.rand(h.shape[0],h.shape[1])*0.01
 #h += tmp + tmp.T
+C = np.eye(h.shape[0])
 
-if 1:
+if 0:
     Escf,orb,h,g,C = run_hubbard_scf(h,g,n_orb//2)
 
 blocks = [[0,1,2,3],[4,5,6,7]]
@@ -35,8 +36,36 @@ if do_fci:
     efci, fci_dim = run_fci_pyscf(h,g,nelec,ecore=0)
 if do_hci:
     ehci, hci_dim = run_hci_pyscf(h,g,nelec,ecore=0,select_cutoff=1e-3,ci_cutoff=1e-3)
+
+ecore = 0
 if do_tci:
-    ci_vector, pt_vector, etci, etci2 = run_tpsci(h,g,blocks,init_fspace,ecore=0,thresh_cipsi=1e-6)
+
+    oocmf = CmfSolver(h, g, ecore, blocks, init_fspace,C,max_roots=100)
+    oocmf.init()
+
+
+    h = oocmf.h
+    g = oocmf.g
+    clustered_ham = oocmf.clustered_ham
+    ci_vector = oocmf.ci_vector
+
+    edps = build_hamiltonian_diagonal(clustered_ham,ci_vector)
+    print("%16.10f"%(edps+ecore))
+
+    ci_vector, pt_vector, etci, etci2, t_conv = tpsci_tucker(ci_vector.copy(), clustered_ham,
+                        pt_type             = 'mp',
+                        thresh_cipsi        = 1e-5,
+                        thresh_ci_clip      = 1e-6,
+                        max_tucker_iter     = 1,
+                        nbody_limit         = 4,
+                        shared_mem          = 1e9,
+                        thresh_search       = 1e-6,
+                        thresh_asci         = 1e-2,
+                        matvec=3,
+                        tucker_state_clip   = None,
+                        tucker_conv_target  = 0,    #converge variational energy
+                        nproc               = None)
+
     tci_dim = len(ci_vector)
 
 if do_fci:
