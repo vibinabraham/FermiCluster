@@ -1049,6 +1049,197 @@ class Cluster(object):
         print(" Time spent building TDMs Total %12.2f" %(stop_tot-start_tot))
 # }}}
 
+    def form_dmet_basis(self,h,g,Da,Db,thresh=1e-3,iprint=1,ecore=0,do_embedding=True):
+        print()
+        print(" Form DMET-style basis for ", self)
+        D = Da+Db
+        #K = np.einsum('pqrs,rs->pq',g,D)
+        K = np.einsum('pqrs,ps->qr',g,D)
+      
+        na_tot = int(round(np.trace(Da)))
+        nb_tot = int(round(np.trace(Db)))
+        active = self.orb_list
+        backgr = [i for i in range(h.shape[0]) if i not in active ]
+
+        print(" Active:", active)
+        print(" Backgr:", backgr)
+        K2 = np.zeros_like(K)
+        K2 = np.zeros((self.n_orb, D.shape[0]-self.n_orb))
+
+        for pi,p in enumerate(active):
+            for qi,q in enumerate(backgr):
+                K2[pi,qi] = K[p,q]
+
+        print("K2")
+        print(K2)
+        U,s,V = np.linalg.svd(K2)
+        print("  %16s"%("Sing. Val."))
+        nkeep = 0
+        for si in s:
+            if si > thresh:
+                nkeep += 1
+                print("  %16.12f"%si)
+            else:
+                print("  %16.12f*"%si)
+        C = np.zeros_like(h)
+        for pi,p in enumerate(active):
+            for qi,q in enumerate(active):
+                #C[p,qi] = U[pi,qi]
+                if pi==qi:
+                    C[p,qi] = 1
+        for pi,p in enumerate(backgr):
+            for qi,q in enumerate(backgr):
+                C[p,qi+len(active)] = V[qi,pi]
+    
+        Cfrag = C[:,0:self.n_orb]
+        Cbath = C[:,self.n_orb:self.n_orb+nkeep]
+        Cenvt = C[:,self.n_orb+nkeep:]
+
+        print("Cfrag")
+        print(Cfrag)
+        print(" NElec: %12.8f"%(np.trace(Cfrag.T@(Da+Db)@Cfrag)))
+        print("Cbath")
+        print(Cbath)
+        print(" NElec: %12.8f"%(np.trace(Cbath.T@(Da+Db)@Cbath)))
+        print("Cenv")
+        print(Cenvt)
+        print(" NElec: %12.8f"%(np.trace(Cenvt.T@(Da+Db)@Cenvt)))
+        #print("U")
+        #print(U)
+        #print("V")
+        #print(V)
+        #print("C")
+        #print(C)
+        #print("K")
+        #print(K)
+        K2 = C.T @ K @ C
+        #print("K2")
+        #print(K2)
+        Da2 = C.T @ Da @ C
+        Db2 = C.T @ Db @ C
+        na = np.trace(Da2[0:self.n_orb+nkeep,0:self.n_orb+nkeep])
+        nb = np.trace(Db2[0:self.n_orb+nkeep,0:self.n_orb+nkeep])
+       
+        print(" Number of electrons in Fragment+Bath system:")
+        print("   Alpha: %12.8f"%(na))
+        print("   Beta : %12.8f"%(nb))
+    
+        # Modify environment density to have integer number of electrons
+        #nelec_envt = round(np.trace(Cenv.T@(Da+Db)@Cenv))
+        #print(" Change in electron count in environment: %12.8f"%(nelec_envt - np.trace(Cenv.T@(Da+Db)@Cenv)))
+        #print(" Create embedding potential using %3i electrons."%nelec_envt)
+        denvt_a = Cenvt@Cenvt.T @ Da @ Cenvt@ Cenvt.T
+        denvt_b = Cenvt@Cenvt.T @ Db @ Cenvt@ Cenvt.T
+        na_envt = np.trace(denvt_a)
+        nb_envt = np.trace(denvt_b)
+        print(" Number of electrons in Environment system:")
+        print("   Alpha: %12.8f"%(na_envt))
+        print("   Beta : %12.8f"%(nb_envt))
+
+        na_envt = int(round(np.trace(Cenvt.T@(Da)@Cenvt)))
+        nb_envt = int(round(np.trace(Cenvt.T@(Db)@Cenvt)))
+        #print(" Change in electron count in environment: %12.8f"%(nelec_envt - np.trace(Cenv.T@(Da+Db)@Cenv)))
+        na_actv = self
+        print(" Create embedding potential using %3i electrons."%(na_envt+nb_envt))
+
+
+        ss_norb = self.n_orb + nkeep
+        Css = C[:,0:ss_norb]
+       
+        if 0:
+            #mcweeny
+            denvt_a = Cenvt @ Cenvt.T @ Da @ Cenvt @ Cenvt.T 
+            denvt_b = Cenvt @ Cenvt.T @ Db @ Cenvt @ Cenvt.T 
+            for i in range(100):
+                na = np.trace(denvt_a)
+                nb = np.trace(denvt_b)
+                print(" Number of electrons in Fragment+Bath system:  %12.8f a %12.8f b"%(na,nb))
+                denvt_a = 3*denvt_a@denvt_a - 2*denvt_a@denvt_a@denvt_a
+                denvt_b = 3*denvt_b@denvt_b - 2*denvt_b@denvt_b@denvt_b
+                if abs(na - np.trace(denvt_a))<1e-15 and abs(nb - np.trace(denvt_b))<1e-15:
+                    break
+        
+            
+        else:
+            #eigenvalue
+            n,U = np.linalg.eigh(denvt_a)
+            idx = n.argsort()[::-1]
+            n = n[idx]
+            U = U[:,idx]
+            
+            #we shouldn't ever have zero eigevanlues in our keep space
+            for i in range(nkeep):
+                assert(n[i]>1e-14)
+            denvt_a = U[:,0:na_envt] @ U[:,0:na_envt].T
+            
+            n,U = np.linalg.eigh(denvt_b)
+            idx = n.argsort()[::-1]
+            n = n[idx]
+            U = U[:,idx]
+            
+            #we shouldn't ever have zero eigevanlues in our keep space
+            for i in range(nkeep):
+                assert(n[i]>1e-14)
+            denvt_b = U[:,0:nb_envt] @ U[:,0:nb_envt].T
+           
+        if do_embedding:
+            ga =  np.zeros(h.shape) 
+            gb =  np.zeros(h.shape) 
+            ga += np.einsum('pqrs,pq->rs',g,(denvt_a+denvt_b))
+            ga -= np.einsum('pqrs,ps->qr',g,denvt_a)
+            
+            gb += np.einsum('pqrs,pq->rs',g,(denvt_a+denvt_b))
+            gb -= np.einsum('pqrs,ps->qr',g,denvt_b)
+            
+           
+            f = h + .25*(ga + gb)
+            Eenv = np.trace((Da+Db) @ f) 
+            if iprint>1:
+                print(" ----")
+                print(" Eenv            : % 12.8f" %(Eenv)) 
+            
+            t = 2*f-h
+        else:
+            t = h
+            Eenv = 0
+
+        print(" Number of electrons in Environment system:")
+        print("   Alpha: %12.8f"%(np.trace(denvt_a)))
+        print("   Beta : %12.8f"%(np.trace(denvt_b)))
+        
+        na_actv = na_tot - na_envt
+        nb_actv = nb_tot - nb_envt
+        print(" Number of electrons in Fragment+Bath:")
+        print("   Alpha: %12i"%(na_actv))
+        print("   Beta : %12i"%(na_actv))
+        
+        # rotate integrals to current subspace basis
+        hss = Css.T @ t @ Css
+        gss = np.einsum("pqrs,pl->lqrs",g,Css)
+        gss = np.einsum("lqrs,qm->lmrs",gss,Css)
+        gss = np.einsum("lmrs,rn->lmns",gss,Css)
+        gss = np.einsum("lmns,so->lmno",gss,Css)
+        
+        H = Hamiltonian()
+        H.S = np.eye(hss.shape[0])
+        H.C = H.S
+        H.t = hss
+        H.V = gss
+      
+        ci = ci_solver()
+        ci.algorithm = "direct"
+        ci.init(H,na_actv,nb_actv,1)
+        print(ci)
+        Hci = ci.run()
+        
+        if iprint>0:
+            for i,ei in enumerate(ci.results_e):
+                print(" Local State %5i: Local E: %12.8f Embedded E: %12.8f Total E: %12.8f" %(i, ei, ei+Eenv, ei+ecore+Eenv))
+    
+        ci.svd_state(len(active),nkeep, thresh=.001)
+
+
+
 
 ###################################################################################################################
 

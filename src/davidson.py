@@ -145,15 +145,12 @@ class Davidson:
         self.iter += 1
 
     def print_iteration(self):
-        print("  Davidson Iter %4i " %self.iter,)
-        print("|",)
-        print(" Vecs:%4li : "% self.n_vecs ,)
-        print("|",)
+        print("  Davidson Iter %4i " %self.iter,"|"," Vecs:%4li : "% self.n_vecs ,"|",end='')
         for r in range(0,self.n_roots):
-            print(" %16.8f "%self.ritz_vals[r],)
-        print("|",)
+            print(" %16.8f "%self.ritz_vals[r],end='')
+        print("|",end='')
         for r in range(0,self.n_roots):
-            print(" %6.1e " % self.res_vals[r],) 
+            print(" %6.1e " % self.res_vals[r],end='') 
         print()
 
     def converged(self):

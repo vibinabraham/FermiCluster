@@ -510,7 +510,7 @@ class ci_solver:
     
     def run_davidson(self):
     # {{{
-        print(" Diagonalize Matrix")
+        #print(" Diagonalize Matrix")
         #e,C = scipy.sparse.linalg.eigsh(Hci,self.n_roots)
         #e,C = np.linalg.eigh(Hci)
         #e += self.H.e_nuc + self.H.e_core
@@ -698,10 +698,16 @@ class ci_solver:
             ket_b1 = ci_string(norbs1,fock[1])
             ket_a2 = ci_string(norbs2,self.nea-fock[0])
             ket_b2 = ci_string(norbs2,self.neb-fock[1])
-           
+          
+            # when swapping alpha2 and beta1 do we flip sign?
+            sign = 1
+            if (self.nea-fock[0]%2)==1 and (fock[1]%2)==1:
+                sign = -1
             print(" Dimensions:",ket_a1.max(), ket_b1.max(), ket_a2.max(), ket_b2.max(), vector[fock].size)
             norm_curr = vector[fock].T @ vector[fock]
             print(" Norm: %12.8f"%(np.sqrt(norm_curr)))
+            vector[fock].shape = (ket_a1.max(), ket_a2.max(), ket_b1.max(), ket_b2.max())
+            vector[fock] = sign*np.ascontiguousarray(np.swapaxes(vector[fock],1,2))
             vector[fock].shape = (ket_a1.max()*ket_b1.max(), ket_a2.max()*ket_b2.max())
             norm += norm_curr
 
@@ -726,6 +732,7 @@ class ci_solver:
             
         norm = np.sqrt(norm)
         assert(abs(norm - 1) < 1e-14)
+        return U
 ################################################################################33
 #   Tools
 ################################################################################33
