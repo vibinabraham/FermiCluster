@@ -20,11 +20,11 @@ def test_1():
     ###     PYSCF INPUT
     molecule = '''
     H      0.00       0.00       0.00
-    H      2.00       0.00       2.00
-    H      0.00       2.20       2.00
-    H      2.10       2.00       0.00
-    H      0.00       2.20       4.00
-    H      2.10       2.00       2.00
+    H      1.00       0.00       0.00
+    H      0.00       0.10       2.00
+    H      1.00       0.10       2.00
+    H      0.00       0.20       4.00
+    H      1.00       0.20       4.00
     '''
     charge = 0
     spin  = 0
@@ -86,10 +86,11 @@ def test_1():
     nb = 4
 
     ci = ci_solver()
-    ci.algorithm = "davidson"
+    ci.max_iter = 300
+    ci.algorithm = "davidson2"
     ci.init(H,na,nb,1)
     print(ci)
-    Hci = ci.run()
+    ci.run(iprint=1)
     for i,ei in enumerate(ci.results_e):
         print(" State %5i: E: %12.8f Total E: %12.8f" %(i, ei, ei+ecore))
     ci.svd_state(4,8, thresh=.001)
@@ -179,16 +180,18 @@ def test_2():
         exit()
 
     ci = ci_solver()
-    ci.algorithm = "davidson"
+    ci.max_iter  = 300
+    ci.algorithm = "direct"
+    ci.algorithm = "davidson2"
+    ci.thresh    = 1e-12 
     ci.init(H,na,nb,1)
     print(ci)
     ci.run()
-    ci.results_v.shape = vfci.shape
-    print(ci.results_v)
+    #ci.results_v.shape = vfci.shape
     for i,ei in enumerate(ci.results_e):
         print(" State %5i: E: %12.8f Total E: %12.8f" %(i, ei, ei+ecore))
-    exit()
     ci.svd_state(4,4, thresh=.001)
+    exit()
 
 if __name__== "__main__":
     test_1() 

@@ -216,6 +216,8 @@ class ci_solver:
         self.neb        = 0
         self.H          = Hamiltonian() 
         self.no         = 0 
+        self.thresh     = 1e-5 
+        self.max_iter   = 100 
         self.full_dim   = 0
         self.n_roots    = 1
         self.status     = "uninitialized"
@@ -270,48 +272,6 @@ class ci_solver:
        
 
 
-        # Vectorized
-        no = ket_a.no
-        A = np.zeros(bra_a_max, ket_a_max, no, no)
-        B = np.zeros(bra_b_max, ket_b_max, no, no)
-        #alpha
-        ket = ket_a
-        bra = bra_a
-
-        def build_spin_tdms(bra,ket):
-        # {{{
-            A = np.zeros(bra.max, ket.max, ket.no, ket.no)
-            ket.reset()
-            bra.reset()
-            for K in range(ket.max():
-                bra.dcopy(ket)
-            
-                for p in range(ket.no):
-                    for q in range(ket.no):
-                        bra.dcopy(ket)
-                        bra.a(q)
-                        if bra.sign() == 0:
-                            continue
-                        bra.c(p)
-                        if bra.sign() == 0:
-                            continue
-                        
-                        L = bra.linear_index()
-            
-                        sign = bra.sign() 
-                        
-                        H[K,L,p,q] += sign
-                ket.incr()
-            return A
-        # }}}
-        
-
-        A = build_spin_tdms(bra_a, ket_a)
-        B = build_spin_tdms(bra_b, ket_b)
-
-        print(A.shape)
-        print(B.shape)
-        exit()
         ket_b.reset()
         for Kb in range(ket_b_max): 
             
@@ -462,10 +422,13 @@ class ci_solver:
         return basis.T @ Hci @ basis
        
 
-    def run(self):
-        #print(" Compute spin diagonals")
+    def run(self,iprint=0):
+        if iprint>0:
+            print(" Compute spin diagonals",flush=True)
         self.Hdiag_s[0] = self.precompute_spin_diagonal_block(self.nea)
         self.Hdiag_s[1] = self.precompute_spin_diagonal_block(self.neb)
+        if iprint>0:
+            print(" done",flush=True)
         
         self.ket_a = ci_string(self.no,self.nea)
         self.ket_b = ci_string(self.no,self.neb)
@@ -482,13 +445,47 @@ class ci_solver:
 
         if self.algorithm == "direct":
             Hci = self.run_direct()
+            return Hci
         elif self.algorithm == "davidson":
             self.run_davidson()
+            return
+        elif self.algorithm == "davidson2":
+            self.Apr = self.build_spin_tdms(bra_a,ket_a)
+            self.Bpr = self.build_spin_tdms(bra_b,ket_b)
+            self.Bpr = np.einsum('KLqs,prqs->KLpr',self.Bpr,self.H.V)
+            self.run_davidson()
+            return
         else:
             print(" Wrong option for algorithm")
             exit(-1)
-        return Hci
+        return
        
+    def build_spin_tdms(self,bra,ket):
+    # {{{
+        A = np.zeros((bra.max(), ket.max(), ket.no, ket.no))
+        ket.reset()
+        bra.reset()
+        for K in range(ket.max()):
+            bra.dcopy(ket)
+        
+            for p in range(ket.no):
+                for q in range(ket.no):
+                    bra.dcopy(ket)
+                    bra.a(q)
+                    if bra.sign() == 0:
+                        continue
+                    bra.c(p)
+                    if bra.sign() == 0:
+                        continue
+                    
+                    L = bra.linear_index()
+        
+                    sign = bra.sign() 
+                    
+                    A[K,L,p,q] += sign
+            ket.incr()
+        return A
+    # }}}
 
     def run_direct(self, iprint=0):
 # {{{
@@ -575,9 +572,9 @@ class ci_solver:
         bra_b = self.bra_b
 
         dav = Davidson(self.full_dim, self.n_roots)
-        dav.thresh      = 1e-5 
+        dav.thresh      = self.thresh 
         dav.max_vecs    = 100 
-        dav.max_iter    = 100 
+        dav.max_iter    = self.max_iter 
         dav.form_rand_guess()
         dav.sig_curr = np.zeros((self.full_dim, self.n_roots))
 
@@ -588,8 +585,21 @@ class ci_solver:
             dav.sig_curr = np.zeros(dav.vec_curr.shape) 
             #dav.sig_curr = dav.vec_curr * (self.H.e_nuc + self.H.e_core)
 
-            self.compute_ab_terms_sigma(dav.sig_curr, dav.vec_curr)
-       
+            if self.algorithm == 'davidson':
+                self.compute_ab_terms_sigma(dav.sig_curr, dav.vec_curr)
+            elif self.algorithm == 'davidson2':
+                #print(self.Bpr.shape)
+                #print(self.H.V.shape)
+                #print(dav.vec_curr.shape)
+                nvecs = dav.vec_curr.shape[1]
+                c = dav.vec_curr*1
+                #print(c.shape)
+                c.shape = (ket_a.max(), ket_b.max(), nvecs)
+                dav.sig_curr.shape = (ket_a.max(),ket_b.max(),nvecs)
+                dav.sig_curr += np.einsum('IJpr,KLpr,JLt->IKt',self.Apr,self.Bpr,c,optimize=True)
+                dav.sig_curr.shape = (ket_a.max()*ket_b.max(),nvecs)
+
+                    
             for s in range(dav.n_roots):
                 sig_curr = cp.deepcopy(dav.sig_curr[:,s])
                 vec_curr = cp.deepcopy(dav.vec_curr[:,s])
