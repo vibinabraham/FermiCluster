@@ -78,11 +78,10 @@ def test_1():
     clusters, clustered_ham, ci_vector, cmf_out  = system_setup(h, g, ecore, blocks, init_fspace, max_roots = 100,  cmf_maxiter = 0 )
     rdm_a, rdm_b = build_1rdm(ci_vector, clusters)
 
-    for ci in clusters:
-        ci.form_dmet_basis(h,g,rdm_a,rdm_b, thresh=.0001, do_embedding=False)
-        #ci.form_dmet_basis(h,g,rdm_a,rdm_b, thresh=.0001, do_embedding=True)
+    #for ci in clusters:
+    #    ci.form_dmet_basis(h,g,rdm_a,rdm_b, thresh=.0001, do_embedding=False)
+    #    #ci.form_dmet_basis(h,g,rdm_a,rdm_b, thresh=.0001, do_embedding=True)
 
-    exit()
     na = 2
     nb = 4
 

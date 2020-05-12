@@ -238,6 +238,16 @@ class ci_solver:
     def compute_ab_terms_sigma(self,sig,vec):
 # {{{
 
+        """
+        Better way to do this:
+
+            sigma(Ia,Ib,s) += <pq|rs> p'q'sr C(Ia,Jb,s)
+                            = <a(Ia)|p'r|a(Ja)> <b(Ib)|q's|b(Jb)> <pq|rs> C(Ja,Jb,s)
+                            = sum_pq Apr(Ia,Ja) Bpr(Ib,Jb) C(Ja,Jb,s)
+        
+            Form these quantities separately
+        """
+
         #   Create local references to ci_strings
         ket_a = self.ket_a
         ket_b = self.ket_b
@@ -257,7 +267,51 @@ class ci_solver:
         range_s = range(sig.shape[1])
         
         _abs = abs
+       
+
+
+        # Vectorized
+        no = ket_a.no
+        A = np.zeros(bra_a_max, ket_a_max, no, no)
+        B = np.zeros(bra_b_max, ket_b_max, no, no)
+        #alpha
+        ket = ket_a
+        bra = bra_a
+
+        def build_spin_tdms(bra,ket):
+        # {{{
+            A = np.zeros(bra.max, ket.max, ket.no, ket.no)
+            ket.reset()
+            bra.reset()
+            for K in range(ket.max():
+                bra.dcopy(ket)
+            
+                for p in range(ket.no):
+                    for q in range(ket.no):
+                        bra.dcopy(ket)
+                        bra.a(q)
+                        if bra.sign() == 0:
+                            continue
+                        bra.c(p)
+                        if bra.sign() == 0:
+                            continue
+                        
+                        L = bra.linear_index()
+            
+                        sign = bra.sign() 
+                        
+                        H[K,L,p,q] += sign
+                ket.incr()
+            return A
+        # }}}
         
+
+        A = build_spin_tdms(bra_a, ket_a)
+        B = build_spin_tdms(bra_b, ket_b)
+
+        print(A.shape)
+        print(B.shape)
+        exit()
         ket_b.reset()
         for Kb in range(ket_b_max): 
             
