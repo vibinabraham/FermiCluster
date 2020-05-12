@@ -168,8 +168,8 @@ class PyscfHelper(object):
             '''
             Generate IBOS from orthogonal IAOs
             '''
-            ibo_occ = lo.ibo.ibo(mol, mo_occ[:,loc_nstart:], iao_occ)
-            ibo_vir = lo.ibo.ibo(mol, mo_vir[:,:loc_vstop], iao_vir)
+            ibo_occ = lo.ibo.ibo(mol, mo_occ[:,loc_nstart:], iaos = iao_occ)
+            ibo_vir = lo.ibo.ibo(mol, mo_vir[:,:loc_vstop], iaos = iao_vir)
 
             C = np.column_stack((c_core,ibo_occ,ibo_vir,c_out))
 
@@ -452,6 +452,24 @@ def get_eff_for_casci(n_start,n_stop,h,g):
     return const, eff
 # }}}
 
+def get_eff_for_casci_orblist(focc_list,cas_list,h,g):
+# {{{
+
+    cas_dim = len(cas_list)
+    const = 0
+    for i in focc_list:
+        const += 2 * h[i,i]
+        for j in focc_list:
+            const += 2 * g[i,i,j,j] -  g[i,j,i,j]
+
+    eff = np.zeros((cas_dim,cas_dim))
+    for L,l in enumerate(cas_list):
+        for M,m in enumerate(cas_list):
+            for j in focc_list:
+                eff[L,M] += 2 * g[l,m,j,j] -  g[l,j,j,m]
+    return const, eff
+# }}}
+
 def ordering_diatomics(mol,C,basis_set):
 # {{{
     ##DZ basis diatomics reordering with frozen 1s
@@ -492,6 +510,7 @@ def ordering_diatomics(mol,C,basis_set):
         #print(s_pop)
         ref += s_pop
         cas_list = s_pop.argsort()[-dim_orb[i]:]
+        cas_list = np.sort(cas_list)
         print('cas_list', np.array(cas_list))
         new_idx.extend(cas_list) 
         #print(orb,' population for active space orbitals', s_pop[cas_list])
@@ -505,6 +524,37 @@ def ordering_diatomics(mol,C,basis_set):
     for label in mol.ao_labels():
         print(label)
 
+    assert(len(new_idx) == len(set(new_idx)))
     return new_idx
 # }}}
 
+def get_pi_space(mol,mf,cas_norb,cas_nel,local=True):
+# {{{
+    from pyscf import mcscf, mo_mapping, lo, ao2mo
+    # find the 2pz orbitals using mo_mapping
+    ao_labels = ['C 2pz']
+    pop = mo_mapping.mo_comps(ao_labels, mol, mf.mo_coeff)
+    cas_list = np.sort(pop.argsort()[-cas_norb:])  #take the 2z orbitals and resort in MO order
+    print('Population for pz orbitals', pop[cas_list])
+    mo_occ = np.where(mf.mo_occ>0)[0]
+    focc_list = list(set(mo_occ)-set(cas_list))
+    focc = len(focc_list)
+
+    # localize the active space
+    if local:
+        cl_a = lo.Boys(mol, mf.mo_coeff[:, cas_list]).kernel(verbose=4)
+        C = mf.mo_coeff 
+        C[:,cas_list] = cl_a
+    else:
+        C = mf.mo_coeff
+
+    # reorder the orbitals to get docc,active,vir ordering  (Note:sort mo takes orbital ordering from 1)
+    mycas = mcscf.CASCI(mf, cas_norb, cas_nel)
+    C = mycas.sort_mo(cas_list+1,mo_coeff=C)
+
+    # Get the active space integrals and the frozen core energy
+    h, ecore = mycas.get_h1eff(C)
+    g = ao2mo.kernel(mol,C[:,focc:focc+cas_norb], aosym = 's4', compact = False).reshape(4*((cas_norb),))
+    C = C[:,focc:focc+cas_norb]  #only carrying the active sapce orbs
+    return h,ecore,g,C
+# }}}

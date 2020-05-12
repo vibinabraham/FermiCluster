@@ -644,6 +644,7 @@ class CmfSolver:
         n_blocks = len(blocks)
         clusters = [Cluster(ci,c) for ci,c in enumerate(blocks)]
         
+        print(" Ecore   :%16.8f"%self.ecore)
         print(" Clusters:")
         [print(ci) for ci in clusters]
         

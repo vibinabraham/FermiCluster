@@ -318,6 +318,8 @@ def compute_pt2_correction(ci_vector, clustered_ham, e0,
         print(" PT2 Energy Correction = %12.8f" %e2)
         print(" PT2 Energy Total      = %12.8f" %(e0+e2+ecore))
 
+        print("TPSCI+PT %s thresh_asci:%1.e thresh_search:%1.e   %12.8f"%(pt_type,thresh_asci,thresh_search,e0+e2+ecore))
+
         return e2, pt_vector
 # }}}
 
