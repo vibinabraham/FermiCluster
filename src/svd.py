@@ -21,13 +21,14 @@ def test_1():
     molecule = '''
     H      0.00       0.00       0.00
     H      1.00       0.00       0.00
-    H      0.00       0.10       2.00
-    H      1.00       0.10       2.00
-    H      0.00       0.20       4.00
-    H      1.00       0.20       4.00
+    H      0.00       0.10       2.50
+    H      1.00       0.10       2.50
+    H      0.00       0.20       3.50
+    H      1.00       0.20       4.50
     '''
     charge = 0
     spin  = 0
+    #basis_set = 'sto-3g'
     basis_set = '3-21g'
 
     ###     TPSCI BASIS INPUT
@@ -38,8 +39,12 @@ def test_1():
     #cas_nel = 10
 
     ###     TPSCI CLUSTER INPUT
+    blocks = [[0,1],[2,3],[4,5]]
+    init_fspace = ((1, 1), (1, 1), (1, 1))
+    
     blocks = [[0,1,2,3],[4,5,6,7],[8,9,10,11]]
     init_fspace = ((1, 1), (1, 1), (1, 1))
+    
     
     nelec = tuple([sum(x) for x in zip(*init_fspace)])
     if cas == True:
@@ -56,18 +61,6 @@ def test_1():
 
     print(" Ecore: %12.8f" %ecore)
     
-
-
-    if 0:
-        from pyscf import fci
-        cisolver = fci.direct_spin1.FCI()
-        cisolver.max_cycle = 300 
-        cisolver.conv_tol = 1e-14 
-        efci, ci = cisolver.kernel(h, g, h.shape[1], nelec, ecore=ecore,nroots=1,verbose=100)
-        #efci, fci_dim = run_fci_pyscf(h,g,nelec,ecore=ecore)
-        print(" E(FCI): %12.8f" %efci)
-    
-    
     H = Hamiltonian()
     H.S = np.eye(h.shape[0])
     H.C = H.S
@@ -82,30 +75,38 @@ def test_1():
     #    ci.form_dmet_basis(h,g,rdm_a,rdm_b, thresh=.0001, do_embedding=False)
     #    #ci.form_dmet_basis(h,g,rdm_a,rdm_b, thresh=.0001, do_embedding=True)
 
-    na = 2
-    nb = 4
+    na = 3
+    nb = 3
 
     ci = ci_solver()
     ci.max_iter = 300
-    ci.algorithm = "davidson2"
+    ci.algorithm = "direct"
+    ci.algorithm = "davidson"
+    ci.thresh    = 1e-8
     ci.init(H,na,nb,1)
     print(ci)
     ci.run(iprint=1)
     for i,ei in enumerate(ci.results_e):
         print(" State %5i: E: %12.8f Total E: %12.8f" %(i, ei, ei+ecore))
+    #ci.svd_state(2,4, thresh=.001)
     ci.svd_state(4,8, thresh=.001)
 
 
 
 def test_2():
+    """
+    Test that the SVD exactly finds the minimal space for a 2 cluster problem,
+    without any complications from environment embedding
+    """
+
     ttt = time.time()
 
     ###     PYSCF INPUT
     molecule = '''
     H      0.00       0.00       0.00
-    H      2.00       0.00       2.00
-    H      0.00       2.20       2.00
-    H      2.10       2.00       0.00
+    H      1.00       0.00       0.00
+    H      0.00       2.20       1.30
+    H      1.00       2.00       1.30
     '''
     charge = 0
     spin  = 0
@@ -156,13 +157,31 @@ def test_2():
     H.V = g
     H.ecore = ecore
 
-    clusters, clustered_ham, ci_vector, cmf_out  = system_setup(h, g, ecore, blocks, init_fspace, max_roots = 100,  cmf_maxiter = 0 )
+    clusters, clustered_ham, ci_vector, cmf_out  = system_setup(h, g, ecore, blocks, init_fspace, max_roots = 3,  cmf_maxiter = 0 )
     rdm_a, rdm_b = build_1rdm(ci_vector, clusters)
 
-    #for ci in clusters:
-    #    ci.form_dmet_basis(h,g,rdm_a,rdm_b, thresh=.0001, do_embedding=False)
-    #    #ci.form_dmet_basis(h,g,rdm_a,rdm_b, thresh=.0001, do_embedding=True)
-
+    if 0:
+        for ci in clusters:
+            ci.form_dmet_basis(h,g,rdm_a,rdm_b, thresh_schmidt=1e-3)
+            #ci.form_dmet_basis(h,g,rdm_a,rdm_b, thresh=.0001, do_embedding=True)
+            print(" Build operator matrices for cluster ",ci.idx)
+            ci.build_op_matrices()
+            ci.build_local_terms(h,g)
+    
+    ci_vector.expand_to_full_space(clusters)
+    print(len(ci_vector))
+    H = build_full_hamiltonian_parallel1(clustered_ham, ci_vector)
+    n_roots=1
+    print(" Diagonalize Hamiltonian Matrix:",flush=True)
+    e,v = scipy.sparse.linalg.eigsh(H,n_roots,which='SA')
+    idx = e.argsort()
+    e = e[idx]
+    v = v[:,idx]
+    v0 = v[:,0]
+    e0 = e[0]
+    e1 = 1*e0
+    print(" Ground state of CI:                 %12.8f  CI Dim: %4i "%(ecore+e0.real,len(ci_vector)))
+    exit()
     na = 2
     nb = 2
     
@@ -182,7 +201,7 @@ def test_2():
     ci = ci_solver()
     ci.max_iter  = 300
     ci.algorithm = "direct"
-    ci.algorithm = "davidson2"
+    ci.algorithm = "davidson"
     ci.thresh    = 1e-12 
     ci.init(H,na,nb,1)
     print(ci)
@@ -190,9 +209,9 @@ def test_2():
     #ci.results_v.shape = vfci.shape
     for i,ei in enumerate(ci.results_e):
         print(" State %5i: E: %12.8f Total E: %12.8f" %(i, ei, ei+ecore))
-    ci.svd_state(4,4, thresh=.001)
+    ci.svd_state(4,4, thresh=1e-6)
     exit()
 
 if __name__== "__main__":
-    test_1() 
-    #test_2() 
+    #test_1() 
+    test_2() 

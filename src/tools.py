@@ -470,6 +470,99 @@ def extrapolate_pt2_correction(ci_vector, clustered_ham, e0,
         return e2, pt_vector
 # }}}
 
+def build_1rdm_dressed_integrals(hin, vin, orb_list, rdm1_a, rdm1_b, iprint=0):
+    """
+    contract 2e ints with rdms to get dressed ints in a subspace
+    orb_list is the list of orbitals to construct the integrals in
+    """
+    # {{{
+    print(" Create CASCI hamiltonian matrix with 1rdm embedding")
+    norb_act = len(orb_list)
+    h = np.zeros([norb_act]*2)
+    f = np.zeros([norb_act]*2)
+    v = np.zeros([norb_act]*4)
+    da = np.zeros([norb_act]*2)
+    db = np.zeros([norb_act]*2)
+   
+    for pidx,p in enumerate(orb_list):
+        for qidx,q in enumerate(orb_list):
+            h[pidx,qidx] = hin[p,q]
+            da[pidx,qidx] = rdm1_a[p,q]
+            db[pidx,qidx] = rdm1_b[p,q]
+    
+    for pidx,p in enumerate(orb_list):
+        for qidx,q in enumerate(orb_list):
+            for ridx,r in enumerate(orb_list):
+                for sidx,s in enumerate(orb_list):
+                    v[pidx,qidx,ridx,sidx] = vin[p,q,r,s]
+
+
+    print(" Compute single particle embedding potential")
+    denv_a = 1*rdm1_a
+    denv_b = 1*rdm1_b
+    dact_a = 0*rdm1_a
+    dact_b = 0*rdm1_b
+    for pidx,p in enumerate(orb_list):
+        for qidx,q in enumerate(range(rdm1_a.shape[0])):
+            denv_a[p,q] = 0
+            denv_b[p,q] = 0
+            denv_a[q,p] = 0
+            denv_b[q,p] = 0
+            
+            dact_a[p,q] = rdm1_a[p,q] 
+            dact_b[p,q] = rdm1_b[p,q] 
+            dact_a[q,p] = rdm1_a[q,p]
+            dact_b[q,p] = rdm1_b[q,p]
+    
+    if iprint>1:
+        print(" Environment 1RDM:")
+        print_mat(denv_a+denv_b)
+    print(" Trace of env 1RDM: %12.8f" %np.trace(denv_a + denv_b))
+    print(" Compute energy of 1rdm:")
+    e1 =  np.trace(hin @ rdm1_a )
+    e1 += np.trace(hin @ rdm1_b )
+    e2 =  np.einsum('pqrs,pq,rs->',vin,rdm1_a,rdm1_a)
+    e2 -= np.einsum('pqrs,ps,qr->',vin,rdm1_a,rdm1_a)
+    
+    e2 += np.einsum('pqrs,pq,rs->',vin,rdm1_b,rdm1_b)
+    e2 -= np.einsum('pqrs,ps,qr->',vin,rdm1_b,rdm1_b)
+    
+    e2 += np.einsum('pqrs,pq,rs->',vin,rdm1_a,rdm1_b)
+    e2 += np.einsum('pqrs,pq,rs->',vin,rdm1_b,rdm1_a)
+    #e += np.einsum('pqrs,pq,rs->',vin,d,d)
+    
+    e = e1 + .5*e2
+    if iprint>1:
+        print(" E1              : % 12.8f" %(e1))
+        print(" E2              : % 12.8f" %(e2))
+    print(" E(mean-field)   : % 12.8f" %(e))
+    
+    ga =  np.zeros(hin.shape) 
+    gb =  np.zeros(hin.shape) 
+    ga += np.einsum('pqrs,pq->rs',vin,(denv_a+denv_b))
+    ga -= np.einsum('pqrs,ps->qr',vin,denv_a)
+    
+    gb += np.einsum('pqrs,pq->rs',vin,(denv_a+denv_b))
+    gb -= np.einsum('pqrs,ps->qr',vin,denv_b)
+
+    De = denv_a + denv_b
+    Fa = hin + .5*ga
+    Fb = hin + .5*gb
+    F = hin + .25*(ga + gb)
+    Eenv = np.trace(De @ F) 
+    if iprint>1:
+        print(" ----")
+        print(" Eenv            : % 12.8f" %(Eenv)) 
+   
+    f = np.zeros([norb_act]*2)
+    for pidx,p in enumerate(orb_list):
+        for qidx,q in enumerate(orb_list):
+            f[pidx,qidx] =  F[p,q]
+
+    t = 2*f-h
+    return Eenv,t,v 
+# }}}
+
 def run_hierarchical_sci(h,g,blocks,init_fspace,dimer_threshold,ecore):
     """
     compute a dimer calculation and figure out what states to retain for a larger calculation

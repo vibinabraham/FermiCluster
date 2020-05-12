@@ -9,6 +9,7 @@ from Hamiltonian import *
 from davidson import *
 from helpers import *
 from myfci import *
+import tools
 
 class Cluster(object):
 
@@ -109,7 +110,7 @@ class Cluster(object):
         for f in spaces:
             assert(len(f)==2)
 
-        if len(f) == 0:
+        if len(spaces) == 0:
             print(" No spaces requested - certainly a mistake")
             exit()
 
@@ -117,92 +118,17 @@ class Cluster(object):
         for f in spaces:
             print("    Alpha:Beta = %4i %-4i" %(f[0],f[1]))
 
-        h = np.zeros([self.n_orb]*2)
-        f = np.zeros([self.n_orb]*2)
-        v = np.zeros([self.n_orb]*4)
-        da = np.zeros([self.n_orb]*2)
-        db = np.zeros([self.n_orb]*2)
-       
-        for pidx,p in enumerate(self.orb_list):
-            for qidx,q in enumerate(self.orb_list):
-                h[pidx,qidx] = hin[p,q]
-                da[pidx,qidx] = rdm1_a[p,q]
-                db[pidx,qidx] = rdm1_b[p,q]
-        
-        for pidx,p in enumerate(self.orb_list):
-            for qidx,q in enumerate(self.orb_list):
-                for ridx,r in enumerate(self.orb_list):
-                    for sidx,s in enumerate(self.orb_list):
-                        v[pidx,qidx,ridx,sidx] = vin[p,q,r,s]
+        if rdm1_a is None:
+            rdm1_a = np.zeros_like(hin)
+        if rdm1_b is None:
+            rdm1_b = np.zeros_like(hin)
 
-
-        if rdm1_a is not None and rdm1_b is not None:
-            print(" Compute single particle embedding potential")
-            denv_a = 1*rdm1_a
-            denv_b = 1*rdm1_b
-            dact_a = 0*rdm1_a
-            dact_b = 0*rdm1_b
-            for pidx,p in enumerate(self.orb_list):
-                for qidx,q in enumerate(range(rdm1_a.shape[0])):
-                    denv_a[p,q] = 0
-                    denv_b[p,q] = 0
-                    denv_a[q,p] = 0
-                    denv_b[q,p] = 0
-                    
-                    dact_a[p,q] = rdm1_a[p,q] 
-                    dact_b[p,q] = rdm1_b[p,q] 
-                    dact_a[q,p] = rdm1_a[q,p]
-                    dact_b[q,p] = rdm1_b[q,p]
-           
-            if iprint>1:
-                print(" Environment 1RDM:")
-                print_mat(denv_a+denv_b)
-            print(" Trace of env 1RDM: %12.8f" %np.trace(denv_a + denv_b))
-            print(" Compute energy of 1rdm:")
-            e1 =  np.trace(hin @ rdm1_a )
-            e1 += np.trace(hin @ rdm1_b )
-            e2 =  np.einsum('pqrs,pq,rs->',vin,rdm1_a,rdm1_a)
-            e2 -= np.einsum('pqrs,ps,qr->',vin,rdm1_a,rdm1_a)
-            
-            e2 += np.einsum('pqrs,pq,rs->',vin,rdm1_b,rdm1_b)
-            e2 -= np.einsum('pqrs,ps,qr->',vin,rdm1_b,rdm1_b)
-            
-            e2 += np.einsum('pqrs,pq,rs->',vin,rdm1_a,rdm1_b)
-            e2 += np.einsum('pqrs,pq,rs->',vin,rdm1_b,rdm1_a)
-            #e += np.einsum('pqrs,pq,rs->',vin,d,d)
-           
-            e = e1 + .5*e2
-            if iprint>1:
-                print(" E1              : % 12.8f" %(e1))
-                print(" E2              : % 12.8f" %(e2))
-            print(" E(mean-field)   : % 12.8f" %(e+ecore))
-           
-            ga =  np.zeros(hin.shape) 
-            gb =  np.zeros(hin.shape) 
-            ga += np.einsum('pqrs,pq->rs',vin,(denv_a+denv_b))
-            ga -= np.einsum('pqrs,ps->qr',vin,denv_a)
-            
-            gb += np.einsum('pqrs,pq->rs',vin,(denv_a+denv_b))
-            gb -= np.einsum('pqrs,ps->qr',vin,denv_b)
-
-            De = denv_a + denv_b
-            Fa = hin + .5*ga
-            Fb = hin + .5*gb
-            F = hin + .25*(ga + gb)
-            Eenv = np.trace(De @ F) 
-            if iprint>1:
-                print(" ----")
-                print(" Eenv            : % 12.8f" %(Eenv)) 
-       
-            f = np.zeros([self.n_orb]*2)
-            for pidx,p in enumerate(self.orb_list):
-                for qidx,q in enumerate(self.orb_list):
-                    f[pidx,qidx] =  F[p,q]
+        Eenv,h,v = tools.build_1rdm_dressed_integrals(hin,vin,self.orb_list,rdm1_a,rdm1_b)
 
         H = Hamiltonian()
         H.S = np.eye(h.shape[0])
         H.C = H.S
-        H.t = 2*f-h
+        H.t = h
         H.V = v
         H.ecore = ecore
         self.basis = {}
@@ -1049,7 +975,11 @@ class Cluster(object):
         print(" Time spent building TDMs Total %12.2f" %(stop_tot-start_tot))
 # }}}
 
-    def form_dmet_basis(self,h,g,Da,Db,thresh=1e-3,iprint=1,ecore=0,do_embedding=True):
+    def form_dmet_basis(self,h,g,Da,Db,thresh_orb=1e-8,thresh_schmidt=1e-3,iprint=1,ecore=0,do_embedding=True):
+        """
+        thresh_orb      :   threshold for determining how many bath orbitals to include
+        thresh_schmidt  :   threshold for determining how many singular vectors to include for cluster basis
+        """
         print()
         print(" Form DMET-style basis for ", self)
         D = Da+Db
@@ -1076,7 +1006,7 @@ class Cluster(object):
         print("  %16s"%("Sing. Val."))
         nkeep = 0
         for si in s:
-            if si > thresh:
+            if si > thresh_orb:
                 nkeep += 1
                 print("  %16.12f"%si)
             else:
@@ -1143,65 +1073,45 @@ class Cluster(object):
         print(" Create embedding potential using %3i electrons."%(na_envt+nb_envt))
 
 
-        ss_norb = self.n_orb + nkeep
-        Css = C[:,0:ss_norb]
+        # rotate integrals to current subspace basis
+        denvt_a = C.T @ denvt_a @ C
+        denvt_b = C.T @ denvt_b @ C
+        h2 = C.T @ h @ C
+        g2 = np.einsum("pqrs,pl->lqrs",g,C)
+        g2 = np.einsum("lqrs,qm->lmrs",g2,C)
+        g2 = np.einsum("lmrs,rn->lmns",g2,C)
+        g2 = np.einsum("lmns,so->lmno",g2,C)
        
-        if 0:
-            #mcweeny
-            denvt_a = Cenvt @ Cenvt.T @ Da @ Cenvt @ Cenvt.T 
-            denvt_b = Cenvt @ Cenvt.T @ Db @ Cenvt @ Cenvt.T 
-            for i in range(100):
-                na = np.trace(denvt_a)
-                nb = np.trace(denvt_b)
-                print(" Number of electrons in Fragment+Bath system:  %12.8f a %12.8f b"%(na,nb))
-                denvt_a = 3*denvt_a@denvt_a - 2*denvt_a@denvt_a@denvt_a
-                denvt_b = 3*denvt_b@denvt_b - 2*denvt_b@denvt_b@denvt_b
-                if abs(na - np.trace(denvt_a))<1e-15 and abs(nb - np.trace(denvt_b))<1e-15:
-                    break
-        
-            
-        else:
-            #eigenvalue
-            n,U = np.linalg.eigh(denvt_a)
-            idx = n.argsort()[::-1]
-            n = n[idx]
-            U = U[:,idx]
-            
-            #we shouldn't ever have zero eigevanlues in our keep space
-            for i in range(nkeep):
-                assert(n[i]>1e-14)
-            denvt_a = U[:,0:na_envt] @ U[:,0:na_envt].T
-            
-            n,U = np.linalg.eigh(denvt_b)
-            idx = n.argsort()[::-1]
-            n = n[idx]
-            U = U[:,idx]
-            
-            #we shouldn't ever have zero eigevanlues in our keep space
-            for i in range(nkeep):
-                assert(n[i]>1e-14)
-            denvt_b = U[:,0:nb_envt] @ U[:,0:nb_envt].T
-           
+        # find closest idempotent density for the environment
         if do_embedding:
-            ga =  np.zeros(h.shape) 
-            gb =  np.zeros(h.shape) 
-            ga += np.einsum('pqrs,pq->rs',g,(denvt_a+denvt_b))
-            ga -= np.einsum('pqrs,ps->qr',g,denvt_a)
-            
-            gb += np.einsum('pqrs,pq->rs',g,(denvt_a+denvt_b))
-            gb -= np.einsum('pqrs,ps->qr',g,denvt_b)
-            
-           
-            f = h + .25*(ga + gb)
-            Eenv = np.trace((Da+Db) @ f) 
-            if iprint>1:
-                print(" ----")
-                print(" Eenv            : % 12.8f" %(Eenv)) 
-            
-            t = 2*f-h
+            if Cenvt.shape[1]>0:
+                #eigenvalue
+                n,U = np.linalg.eigh(denvt_a)
+                idx = n.argsort()[::-1]
+                n = n[idx]
+                U = U[:,idx]
+                print(n) 
+                #we shouldn't ever have zero eigevanlues in our keep space
+                for i in range(nkeep):
+                    assert(n[i]>1e-14)
+                denvt_a = U[:,0:na_envt] @ U[:,0:na_envt].T
+                
+                n,U = np.linalg.eigh(denvt_b)
+                idx = n.argsort()[::-1]
+                n = n[idx]
+                U = U[:,idx]
+                
+                #we shouldn't ever have zero eigevanlues in our keep space
+                for i in range(nkeep):
+                    assert(n[i]>1e-14)
+                denvt_b = U[:,0:nb_envt] @ U[:,0:nb_envt].T
+
+            Eenv,h2,g2 = tools.build_1rdm_dressed_integrals(h2,g2,range(Cfrag.shape[1]+Cbath.shape[1]),denvt_a,denvt_b)
         else:
-            t = h
-            Eenv = 0
+            denvt_a *= 0
+            denvt_b *= 0
+            Eenv,h2,g2 = tools.build_1rdm_dressed_integrals(h2,g2,range(Cfrag.shape[1]+Cbath.shape[1]),denvt_a,denvt_b)
+
 
         print(" Number of electrons in Environment system:")
         print("   Alpha: %12.8f"%(np.trace(denvt_a)))
@@ -1212,19 +1122,13 @@ class Cluster(object):
         print(" Number of electrons in Fragment+Bath:")
         print("   Alpha: %12i"%(na_actv))
         print("   Beta : %12i"%(na_actv))
-        
-        # rotate integrals to current subspace basis
-        hss = Css.T @ t @ Css
-        gss = np.einsum("pqrs,pl->lqrs",g,Css)
-        gss = np.einsum("lqrs,qm->lmrs",gss,Css)
-        gss = np.einsum("lmrs,rn->lmns",gss,Css)
-        gss = np.einsum("lmns,so->lmno",gss,Css)
+
         
         H = Hamiltonian()
-        H.S = np.eye(hss.shape[0])
+        H.S = np.eye(h2.shape[0])
         H.C = H.S
-        H.t = hss
-        H.V = gss
+        H.t = h2
+        H.V = g2
       
         ci = ci_solver()
         ci.algorithm = "direct"
@@ -1236,8 +1140,14 @@ class Cluster(object):
             for i,ei in enumerate(ci.results_e):
                 print(" Local State %5i: Local E: %12.8f Embedded E: %12.8f Total E: %12.8f" %(i, ei, ei+Eenv, ei+ecore+Eenv))
     
-        ci.svd_state(len(active),nkeep, thresh=.001)
-
+        self.basis = {}
+        self.ops['H_mf'] = {}
+        
+        self.basis = ci.svd_state(len(active),nkeep, thresh=thresh_schmidt)
+        print(" We will have these fock spaces present")
+        for na,nb in self.basis:
+            print(na,nb)
+        
 
 
 

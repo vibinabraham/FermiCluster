@@ -406,8 +406,6 @@ class ci_solver:
         ket_b = self.ket_b
        
        
-        #   TODO: replace this with matrix free implementation for larger systems
-
         #   
         #   Add spin diagonal components
         #print(" Add spin diagonals")
@@ -447,12 +445,14 @@ class ci_solver:
             Hci = self.run_direct()
             return Hci
         elif self.algorithm == "davidson":
-            self.run_davidson()
-            return
-        elif self.algorithm == "davidson2":
+            #faster (still crazy slow) 
             self.Apr = self.build_spin_tdms(bra_a,ket_a)
             self.Bpr = self.build_spin_tdms(bra_b,ket_b)
             self.Bpr = np.einsum('KLqs,prqs->KLpr',self.Bpr,self.H.V)
+            self.run_davidson()
+            return
+        elif self.algorithm == "davidson2":
+            #slowest
             self.run_davidson()
             return
         else:
@@ -503,7 +503,8 @@ class ci_solver:
         Hci += np.kron(np.eye(ket_a.max()), self.Hdiag_s[1])
         Hci += np.kron(self.Hdiag_s[0],np.eye(ket_b.max()))
 
-        #print(" Do alpha/beta terms")
+        if iprint>0:
+            print(" Do alpha/beta terms")
         self.compute_ab_terms_direct(Hci)
    
         #print(" Hamiltonian Matrix:")
@@ -585,9 +586,9 @@ class ci_solver:
             dav.sig_curr = np.zeros(dav.vec_curr.shape) 
             #dav.sig_curr = dav.vec_curr * (self.H.e_nuc + self.H.e_core)
 
-            if self.algorithm == 'davidson':
+            if self.algorithm == 'davidson2':
                 self.compute_ab_terms_sigma(dav.sig_curr, dav.vec_curr)
-            elif self.algorithm == 'davidson2':
+            elif self.algorithm == 'davidson':
                 #print(self.Bpr.shape)
                 #print(self.H.V.shape)
                 #print(dav.vec_curr.shape)
@@ -605,6 +606,8 @@ class ci_solver:
                 vec_curr = cp.deepcopy(dav.vec_curr[:,s])
                 sig_curr.shape = (ket_a.max(), ket_b.max())
                 vec_curr.shape = (ket_a.max(), ket_b.max())
+                #sig_curr.shape = (ket_b.max(), ket_a.max())
+                #vec_curr.shape = (ket_b.max(), ket_a.max())
                        
                 # (I x A)c = vec(AC)
                 sig_curr += self.Hdiag_s[0].dot(vec_curr);
@@ -629,7 +632,7 @@ class ci_solver:
        
         self.results_e = dav.eigenvalues()
         self.results_v = dav.eigenvectors()
-        
+       
         print(" Eigenvalues of CI matrix:")
         for i in range(min(30,len(self.results_e))):
             print(" State: %4i     %12.8f"%(i,self.results_e[i]))
@@ -724,6 +727,7 @@ class ci_solver:
         where the orbitals are assumed to be ordered for cluster 1| cluster 2 haveing norbs1 and 
         norbs2, respectively.
         """
+        # {{{
         assert(norbs1+norbs2==self.no)
         from collections import OrderedDict
         
@@ -752,6 +756,7 @@ class ci_solver:
                 except KeyError:
                     vector[fock_labels_a[I],fock_labels_b[J]] = [v[I,J]]
 
+        schmidt_basis = {}
         norm = 0
         for fock in vector:
             print()
@@ -767,7 +772,7 @@ class ci_solver:
             sign = 1
             if (self.nea-fock[0]%2)==1 and (fock[1]%2)==1:
                 sign = -1
-            print(" Dimensions:",ket_a1.max(), ket_b1.max(), ket_a2.max(), ket_b2.max(), vector[fock].size)
+            print(" Dimensions: %5i x %-5i" %(ket_a1.max()*ket_b1.max(), ket_a2.max()*ket_b2.max()))
             norm_curr = vector[fock].T @ vector[fock]
             print(" Norm: %12.8f"%(np.sqrt(norm_curr)))
             vector[fock].shape = (ket_a1.max(), ket_a2.max(), ket_b1.max(), ket_b2.max())
@@ -777,7 +782,7 @@ class ci_solver:
 
             #rdm = vector[fock] @ vector[fock].T
             #print(" Diagonalize RDM of size:",rdm.shape)
-            print(" SVD current block of FCI vector with shape:",vector[fock].shape)
+            #print(" SVD current block of FCI vector with shape:",vector[fock].shape)
             U,n,V = np.linalg.svd(vector[fock])
             #sort_ind = np.argsort(n)[::-1]
             #n = n[sort_ind]
@@ -792,11 +797,15 @@ class ci_solver:
                 else:
                     print("   %5i:    %12.8f*"%(ni_idx,ni), flush=True)
             
-            U = U[:,:nkeep]
+            schmidt_basis[fock] = U[:,:nkeep]
             
         norm = np.sqrt(norm)
         assert(abs(norm - 1) < 1e-14)
-        return U
+        return schmidt_basis 
+    # }}}
+
+
+
 ################################################################################33
 #   Tools
 ################################################################################33
