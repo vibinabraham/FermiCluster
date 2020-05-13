@@ -81,7 +81,7 @@ def test_1():
     
     if 1:
         for ci in clusters:
-            ci.form_dmet_basis(h,g,rdm_a,rdm_b, thresh_schmidt=1e-3, do_embedding=True)
+            ci.form_schmidt_basis(h,g,rdm_a,rdm_b, thresh_schmidt=1e-3, do_embedding=True)
             print(" Build operator matrices for cluster ",ci.idx)
             ci.build_op_matrices()
             ci.build_local_terms(h,g)
@@ -168,8 +168,8 @@ def test_2():
 
     if 1:
         for ci in clusters:
-            ci.form_dmet_basis(h,g,rdm_a,rdm_b, thresh_schmidt=1e-3)
-            #ci.form_dmet_basis(h,g,rdm_a,rdm_b, thresh=.0001, do_embedding=True)
+            ci.form_schmidt_basis(h,g,rdm_a,rdm_b, thresh_schmidt=1e-3)
+            #ci.form_schmidt_basis(h,g,rdm_a,rdm_b, thresh=.0001, do_embedding=True)
             print(" Build operator matrices for cluster ",ci.idx)
             ci.build_op_matrices()
             ci.build_local_terms(h,g)

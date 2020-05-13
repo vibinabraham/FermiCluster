@@ -996,13 +996,13 @@ class Cluster(object):
         print(" Time spent building TDMs Total %12.2f" %(stop_tot-start_tot))
 # }}}
 
-    def form_dmet_basis(self,h,g,Da,Db,thresh_orb=1e-8,thresh_schmidt=1e-3,iprint=1,ecore=0,do_embedding=True):
+    def form_schmidt_basis(self,h,g,Da,Db,thresh_orb=1e-8,thresh_schmidt=1e-3,iprint=1,ecore=0,do_embedding=True):
         """
         thresh_orb      :   threshold for determining how many bath orbitals to include
         thresh_schmidt  :   threshold for determining how many singular vectors to include for cluster basis
         """
         print()
-        print(" Form DMET-style basis for ", self)
+        print(" Form Schmidt-style basis for ", self)
         D = Da+Db
         #K = np.einsum('pqrs,rs->pq',g,D)
         K = np.einsum('pqrs,ps->qr',g,D)
