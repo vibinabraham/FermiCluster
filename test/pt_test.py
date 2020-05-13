@@ -83,12 +83,15 @@ def test1():
     assert(abs(e2b+e0 - -2.04632485) < 1e-8)
    
     clusters, clustered_ham, ci_vector, cmf_out = system_setup(h, g, ecore, blocks, init_fspace, max_roots = 4,  cmf_maxiter = 20 )
+    rdma = cmf_out[1]
+    rdmb = cmf_out[2]
     for ci in clusters:
-        ci.grow_basis_by_energy()
+        ci.grow_basis_by_energy(h,g,rdm1_a=rdma, rdm1_b=rdmb)
         
         print(" Build operator matrices for cluster ",ci.idx)
         ci.build_op_matrices()
         ci.build_local_terms(h,g)
+        ci.build_effective_cmf_hamiltonian(h,g,rdma,rdmb)
     
     e_cmf = cmf_out[0]
     e0 = e_cmf + clustered_ham.core_energy
@@ -114,12 +117,15 @@ def test1():
     assert(abs(e2b+e0 - -2.20440668) < 1e-8)
   
 
+    rdma = cmf_out[1]
+    rdmb = cmf_out[2]
     for ci in clusters:
-        ci.grow_basis_by_energy()
+        ci.grow_basis_by_energy(h,g,rdm1_a=rdma, rdm1_b=rdmb)
         
         print(" Build operator matrices for cluster ",ci.idx)
         ci.build_op_matrices()
         ci.build_local_terms(h,g)
+        ci.build_effective_cmf_hamiltonian(h,g,rdma,rdmb)
     
 
     e0 = etci + clustered_ham.core_energy

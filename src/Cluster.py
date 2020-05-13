@@ -102,6 +102,7 @@ class Cluster(object):
         the cluster basis vectors. This is the main step in CMF
 
         This function creates entries in the self.ops dictionary for self.ops['H_mf']
+        Hlocal is the same operator but stored in the full determinant basis (we'll probably want to remove this soon) 
         This data is used to obtain the cluster 
         energies for an MP2 like correction rather than a EN correction.
 
@@ -438,6 +439,7 @@ class Cluster(object):
                 print(" Fockspace:", fspace)
                 print(" Orthogonality Error: ",np.amax(np.abs(I - np.eye(I.shape[0]))))
 
+    #NYI
     def grow_basis_by_coupling(self, rdms=None):
        # {{{
         print("NYI")
@@ -484,12 +486,42 @@ class Cluster(object):
             for ii,i in enumerate(l):
                 print(" %4i %12.8f"%(ii+1,i))
 # }}}
-    
-    def grow_basis_by_energy(self, max_roots=None, max_energy=None):
-       # {{{
-        #  Aa
+   
+
+    def grow_basis_by_energy(self, hin, vin, max_roots=None, max_energy=None, rdm1_a=None, rdm1_b=None):
+        """
+        Grow the cluster basis for each fock space currently present
+
+            this works by building local hamiltonian, H (or mean-field H if rdm1_a/b are provided)
+            in the orthogonal complement of the current space, then diagonalizes this, and then adds the rest of the space
+            allowed by limitations imposed by max_roots or max_energy.
+
+            max_roots   : maximum number of new vectors to add
+            max_energy  : max energy of new vectors to add
+        """
+        # {{{
         start = time.time()
+
+        if rdm1_a is None:
+            rdm1_a = np.zeros(hin.shape)
+        if rdm1_b is None:
+            rdm1_b = np.zeros(hin.shape)
+
+        Eenv,h,v = tools.build_1rdm_dressed_integrals(hin,vin,self.orb_list,rdm1_a,rdm1_b)
+        
+        H = Hamiltonian()
+        H.S = np.eye(h.shape[0])
+        H.C = H.S
+        H.t = h
+        H.V = v
         for fock in self.basis:
+            ci = ci_solver()
+            ci.algorithm = "direct"
+            na = fock[0]
+            nb = fock[1]
+            ci.init(H,na,nb,1)
+            #print(ci)
+        
             v1 = self.basis[fock]
 
             dimX = v1.shape[0] - v1.shape[1] # how many vectors can we add?
@@ -505,7 +537,8 @@ class Cluster(object):
             
             #print()
 
-            HX = v1.T @ self.Hlocal[fock] @ v1
+            #HX = v1.T @ self.Hlocal[fock] @ v1
+            HX = ci.build_H_matrix(v1)
 
             l,U = np.linalg.eigh(HX)
             idx = l.argsort()
@@ -533,11 +566,15 @@ class Cluster(object):
             self.basis[fock] = v2
 
             assert(np.amax(v2.T @ v2 - np.eye(v2.shape[1])) < 1e-14)
+           
+        # since we have made all the operators  invalid - remove the data so it will trigger 
+        # an error if we try to use it before rebuilding
+        self.ops = {}
             
             # The mean-field hamiltonian (H_mf) lives in the cluster basis while 
             # the same operator (Hlocal) lives in the determinant basis
             # this doesn't get updated with all the other operators, so update this quantity here
-            self.ops['H_mf'][(fock,fock)] = v2.T @ self.Hlocal[fock] @ v2 
+            #self.ops['H_mf'][(fock,fock)] = v2.T @ self.Hlocal[fock] @ v2 
             
             #print(U.shape)
             #for ii,i in enumerate(l):
@@ -556,7 +593,7 @@ class Cluster(object):
         return self.ops[opstr][(fI,fJ)][I,J,:]
 
 
-    def build_local_terms(self,hin,vin,rdm1_a=None,rdm1_b=None):
+    def build_local_terms(self,hin,vin):
         start = time.time()
         self.ops['H'] = {}
         """
@@ -596,10 +633,19 @@ class Cluster(object):
             self.ops['H'][(fock,fock)] = .5*(self.ops['H'][(fock,fock)] + self.ops['H'][(fock,fock)].T)
             #print(" GS Energy: %12.8f" %self.ops['H'][(fock,fock)][0,0])
         
-        if rdm1_a is None:
-            rdm1_a = np.zeros_like(hin)
-        if rdm1_b is None:
-            rdm1_b = np.zeros_like(hin)
+
+        stop = time.time()
+        print(" Time spent TDM 0: %12.2f" %(stop-start))
+    # }}}
+
+
+    def build_effective_cmf_hamiltonian(self,hin,vin,rdm1_a,rdm1_b):
+        """
+        grab integrals acting locally and form precontracted operator in current eigenbasis
+        """
+        start = time.time()
+        self.ops['H_mf'] = {} 
+        # {{{
         Eenv,h,v = tools.build_1rdm_dressed_integrals(hin,vin,self.orb_list,rdm1_a,rdm1_b)
         
         H = Hamiltonian()
@@ -610,13 +656,11 @@ class Cluster(object):
        
         for fock in self.basis:
             ci = ci_solver()
-            ci.algorithm = "direct"
             na = fock[0]
             nb = fock[1]
             ci.init(H,na,nb,1)
-            #print(ci)
             self.ops['H_mf'][(fock,fock)] = ci.build_H_matrix(self.basis[fock])
-    # }}}
+        # }}}
         
 
         stop = time.time()
@@ -1167,13 +1211,15 @@ class Cluster(object):
             for i,ei in enumerate(ci.results_e):
                 print(" Local State %5i: Local E: %12.8f Embedded E: %12.8f Total E: %12.8f" %(i, ei, ei+Eenv, ei+ecore+Eenv))
     
-        self.basis = {}
-        self.ops['H_mf'] = {}
+        # since we have made all the operators  invalid - remove the data so it will trigger 
+        # an error if we try to use it before rebuilding
+        self.ops = {}
         
         self.basis = ci.svd_state(len(active),nkeep, thresh=thresh_schmidt)
-        print(" We will have these fock spaces present")
-        for na,nb in self.basis:
-            print(na,nb)
+        if iprint>0:
+            print(" We will have these fock spaces present")
+            for na,nb in self.basis:
+                print(na,nb)
         
 
 

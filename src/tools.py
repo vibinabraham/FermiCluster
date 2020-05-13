@@ -485,7 +485,7 @@ def build_1rdm_dressed_integrals(hin, vin, orb_list, rdm1_a, rdm1_b, iprint=0):
     v = np.zeros([norb_act]*4)
     da = np.zeros([norb_act]*2)
     db = np.zeros([norb_act]*2)
-   
+    
     for pidx,p in enumerate(orb_list):
         for qidx,q in enumerate(orb_list):
             h[pidx,qidx] = hin[p,q]

@@ -87,12 +87,15 @@ def test1():
     print(" Ground state of CI:                 %12.8f  CI Dim: %4i "%(e[0].real,len(ci_vector)))
 
 
+    rdma = cmf_out[1]
+    rdmb = cmf_out[2]
     for ci in clusters:
-        ci.grow_basis_by_energy(max_roots=5)
+        ci.grow_basis_by_energy(h,g,max_roots=5,rdm1_a=rdma, rdm1_b=rdmb)
         
         print(" Build operator matrices for cluster ",ci.idx)
         ci.build_op_matrices()
         ci.build_local_terms(h,g)
+        ci.build_effective_cmf_hamiltonian(h,g,rdma,rdmb)
     print(" Build exact eigenstate")
     ci_vector.expand_to_full_space(clusters)
     print(" Size of basis2: ",len(ci_vector))
