@@ -432,7 +432,7 @@ class Cluster(object):
             I = mat.T @ mat 
             try:
                 assert(np.amax(np.abs(I - np.eye(I.shape[0]))) < thresh)
-            except:
+            except AssertionError:
                 print(" WARNING: in check_basis:")
                 print(" Cluster:", self)
                 print(" Fockspace:", fspace)
@@ -556,7 +556,7 @@ class Cluster(object):
         return self.ops[opstr][(fI,fJ)][I,J,:]
 
 
-    def build_local_terms(self,hin,vin):
+    def build_local_terms(self,hin,vin,rdm1_a=None,rdm1_b=None):
         start = time.time()
         self.ops['H'] = {}
         """
@@ -595,6 +595,27 @@ class Cluster(object):
             self.ops['H'][(fock,fock)] = ci.build_H_matrix(self.basis[fock])
             self.ops['H'][(fock,fock)] = .5*(self.ops['H'][(fock,fock)] + self.ops['H'][(fock,fock)].T)
             #print(" GS Energy: %12.8f" %self.ops['H'][(fock,fock)][0,0])
+        
+        if rdm1_a is None:
+            rdm1_a = np.zeros_like(hin)
+        if rdm1_b is None:
+            rdm1_b = np.zeros_like(hin)
+        Eenv,h,v = tools.build_1rdm_dressed_integrals(hin,vin,self.orb_list,rdm1_a,rdm1_b)
+        
+        H = Hamiltonian()
+        H.S = np.eye(h.shape[0])
+        H.C = H.S
+        H.t = h
+        H.V = v
+       
+        for fock in self.basis:
+            ci = ci_solver()
+            ci.algorithm = "direct"
+            na = fock[0]
+            nb = fock[1]
+            ci.init(H,na,nb,1)
+            #print(ci)
+            self.ops['H_mf'][(fock,fock)] = ci.build_H_matrix(self.basis[fock])
     # }}}
         
 
@@ -1025,6 +1046,9 @@ class Cluster(object):
         Cbath = C[:,self.n_orb:self.n_orb+nkeep]
         Cenvt = C[:,self.n_orb+nkeep:]
 
+        # add these to the class so we can visualize them later
+        self.C_schmidt = C
+        
         print("Cfrag")
         print(Cfrag)
         print(" NElec: %12.8f"%(np.trace(Cfrag.T@(Da+Db)@Cfrag)))
@@ -1131,9 +1155,12 @@ class Cluster(object):
         H.V = g2
       
         ci = ci_solver()
-        ci.algorithm = "direct"
         ci.init(H,na_actv,nb_actv,1)
-        print(ci)
+        print(ci,flush=True)
+        if ci.full_dim > 10000:
+            ci.algorithm = "davidson"
+        else:
+            ci.algorithm = "direct"
         Hci = ci.run()
         
         if iprint>0:

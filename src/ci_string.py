@@ -446,6 +446,7 @@ class ci_solver:
             return Hci
         elif self.algorithm == "davidson":
             #faster (still crazy slow) 
+            print(" Form TDMs for FCI",flush=True)
             self.Apr = self.build_spin_tdms(bra_a,ket_a)
             self.Bpr = self.build_spin_tdms(bra_b,ket_b)
             self.Bpr = np.einsum('KLqs,prqs->KLpr',self.Bpr,self.H.V)
@@ -797,7 +798,8 @@ class ci_solver:
                 else:
                     print("   %5i:    %12.8f*"%(ni_idx,ni), flush=True)
             
-            schmidt_basis[fock] = U[:,:nkeep]
+            if nkeep > 0:
+                schmidt_basis[fock] = U[:,:nkeep]
             
         norm = np.sqrt(norm)
         assert(abs(norm - 1) < 1e-14)

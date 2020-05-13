@@ -433,9 +433,15 @@ class ClusteredOperator:
         h is a square matrix NxN, where N is the number of spatial orbitals
         """
 # {{{
-        assert(len(h.shape)==2)
-        assert(h.shape[0]==self.n_orb)
-        assert(h.shape[1]==self.n_orb)
+        
+        try:
+            assert(len(h.shape)==2)
+            assert(h.shape[0]==self.n_orb)
+            assert(h.shape[1]==self.n_orb)
+        except AssertionError:
+            print(h.shape)
+            print(self.n_orb)
+            raise AssertionError
 
         delta_tmp = []
         ops_tmp = []

@@ -1,7 +1,7 @@
 numpy
 scipy
 pathos
-pyscf
+pyscf==1.7.1
 opt_einsum
 pytest
 ray
