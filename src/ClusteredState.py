@@ -203,15 +203,24 @@ class ClusteredState(OrderedDict):
         if block not in self.data:
             self.data[block] = OrderedDict()
 
+    def compute_size_of_space(self,clusters):
+        """
+        Compute the size of hilbert space accessible with given cluster basis 
+        """
+        # {{{
+        size = 0
+        for fspace in self.fblocks():
+            size += self.compute_max_fock_space_dim(fspace,clusters)
+        return size 
+# }}}
+
     def compute_max_fock_space_dim(self,fspace,clusters):
         """
         Compute the max number of configurations in a given fock space
         """
         # {{{
-        print(fspace)
         dim = 1
         for c in clusters:
-            print(c.basis)
             # get number of vectors for current fock space
             dim *= c.basis[fspace[c.idx]].shape[1]
         return dim
