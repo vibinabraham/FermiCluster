@@ -208,9 +208,29 @@ class ClusteredState(OrderedDict):
         Compute the size of hilbert space accessible with given cluster basis 
         """
         # {{{
+        ns = []
+        na = 0
+        nb = 0
         size = 0
-        for fspace in self.fblocks():
-            size += self.compute_max_fock_space_dim(fspace,clusters)
+        for fblock,configs in self.items():
+            for c in fblock:
+                na += c[0]
+                nb += c[1]
+            break
+    
+        for c in clusters:
+            nsi = []
+            for fspace in c.basis:
+                nsi.append(fspace)
+            ns.append(nsi)
+        for newfock in itertools.product(*ns):
+            nacurr = 0
+            nbcurr = 0
+            for c in newfock:
+                nacurr += c[0]
+                nbcurr += c[1]
+            if nacurr == na and nbcurr == nb:
+                size += self.compute_max_fock_space_dim(newfock,clusters)
         return size 
 # }}}
 
