@@ -649,7 +649,6 @@ def grow_hamiltonian_parallel(h_old,clustered_ham,ci_vector,ci_vector_old,iprint
     parallelized over matrix elements
     """
 # {{{
-    global _h
     old_dim = len(ci_vector_old) 
     old_basis = ci_vector_old.copy()
     new_basis = ci_vector.copy()
@@ -688,8 +687,8 @@ def grow_hamiltonian_parallel(h_old,clustered_ham,ci_vector,ci_vector_old,iprint
         if f1 in new_basis:
             assert(c1 not in new_basis[f1])
  
+    global _h
     _h  = clustered_ham
-    new_basis_id    = ray.put(new_basis)
 
     try:
         assert(np.amax(np.abs(H-H.T))<1e-14)
@@ -703,7 +702,13 @@ def grow_hamiltonian_parallel(h_old,clustered_ham,ci_vector,ci_vector_old,iprint
         raise AssertionError
   
 
-    def do_parallel_work(fock_l, conf_l, idx_l, basis_r):
+    #def do_parallel_work(fock_l, conf_l, idx_l, basis_r):
+    def do_parallel_work(inp):
+        fock_l = inp[0]
+        conf_l = inp[1]
+        idx_l  = inp[2]
+        basis_r= inp[3]
+
         out = []
         for fock_r in basis_r.fblocks():
             confs_r = basis_r[fock_r]
@@ -717,7 +722,7 @@ def grow_hamiltonian_parallel(h_old,clustered_ham,ci_vector,ci_vector_old,iprint
                             me += term.matrix_element(fock_l,conf_l,fock_r,conf_r)
                         out.append( (idx_r, me) )
 
-        return (idx_l,out)
+        return ([idx_l,out])
 
 
     import multiprocessing as mp
@@ -737,8 +742,12 @@ def grow_hamiltonian_parallel(h_old,clustered_ham,ci_vector,ci_vector_old,iprint
     pool.join()
     pool.clear()
 
-    for row_idx, row in enumerate(results):
-        for col_idx, term in row:
+    for result in results:
+        row_idx=result[0]
+        row=result[1]
+        for col in row:
+            col_idx = col[0]
+            term = col[1]
             assert( col_idx >= row_idx)
             assert( abs(H[row_idx,col_idx])<1e-16)
             assert( abs(H[col_idx,row_idx])<1e-16)
