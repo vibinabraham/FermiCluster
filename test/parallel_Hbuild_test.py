@@ -94,10 +94,9 @@ def test_1():
     print(" Build Hamiltonian. Space = ", len(ci_vector), flush=True)
     #H = build_full_hamiltonian_open(clustered_ham, ci_vector)
     start = timer()
-    H = build_full_hamiltonian_parallel1(clustered_ham, ci_vector)
+    H = build_full_hamiltonian_parallel2(clustered_ham, ci_vector)
     stop = timer()
     print(" Time lapse: ",(stop-start))
-
     n_roots=1
     print(" Diagonalize Hamiltonian Matrix:",flush=True)
     e,v = scipy.sparse.linalg.eigsh(H,n_roots,which='SA')
@@ -107,6 +106,27 @@ def test_1():
     v0 = v[:,0]
     e0 = e[0]
     e1 = 1*e0
+    print(" Ground state of CI:                 %12.8f  CI Dim: %4i "%(ecore+e0.real,len(ci_vector)))
+
+    
+    print(" Build Hamiltonian. Space = ", len(ci_vector), flush=True)
+    start = timer()
+    ci_vector.randomize_vector()
+    ci_vector_small = ci_vector.copy()
+    ci_vector_small.clip(.1)
+    H = build_full_hamiltonian_parallel2(clustered_ham, ci_vector_small)
+    H = grow_hamiltonian_parallel(H, clustered_ham, ci_vector, ci_vector_small)
+    stop = timer()
+    print(" Time lapse: ",(stop-start))
+    n_roots=1
+    print(" Diagonalize Hamiltonian Matrix:",flush=True)
+    e,v = scipy.sparse.linalg.eigsh(H,n_roots,which='SA')
+    idx = e.argsort()
+    e = e[idx]
+    v = v[:,idx]
+    v0 = v[:,0]
+    e0 = e[0]
+    e2 = 1*e0
     print(" Ground state of CI:                 %12.8f  CI Dim: %4i "%(ecore+e0.real,len(ci_vector)))
 
     print(" Now do the serial version")
@@ -122,11 +142,12 @@ def test_1():
     v = v[:,idx]
     v0 = v[:,0]
     e0 = e[0]
-    e2 = 1*e0
+    e3 = 1*e0
     print(" Ground state of CI:                 %12.8f  CI Dim: %4i "%(ecore+e0.real,len(ci_vector)))
 
     print(" Diagonalize Hamiltonian Matrix:",flush=True)
     assert(abs(e2-e1) < 1e-8)
+    assert(abs(e3-e1) < 1e-8)
 
 
 
