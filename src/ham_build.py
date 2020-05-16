@@ -496,7 +496,7 @@ def build_full_hamiltonian_parallel2(clustered_ham_in,ci_vector_in,iprint=1, npr
 
 
 
-def grow_hamiltonian_parallel(h_old,clustered_ham,ci_vector,ci_vector_old,iprint=1, nproc=None, opt_einsum=True, thresh=1e-14,
+def grow_hamiltonian_parallel_ray(h_old,clustered_ham,ci_vector,ci_vector_old,iprint=1, nproc=None, opt_einsum=True, thresh=1e-14,
         shared_mem=1e9):
     """
     Grow the Hamiltonian matrix by building only the new matrix elements for the new space indicated by ci_vector
@@ -636,6 +636,115 @@ def grow_hamiltonian_parallel(h_old,clustered_ham,ci_vector,ci_vector_old,iprint
         raise AssertionError
    
     ray.shutdown()
+    return H
+    
+
+# }}}
+
+
+
+def grow_hamiltonian_parallel(h_old,clustered_ham,ci_vector,ci_vector_old,iprint=1, nproc=None, opt_einsum=True, thresh=1e-14):
+    """
+    Grow the Hamiltonian matrix by building only the new matrix elements for the new space indicated by ci_vector
+    parallelized over matrix elements
+    """
+# {{{
+    global _h
+    old_dim = len(ci_vector_old) 
+    old_basis = ci_vector_old.copy()
+    new_basis = ci_vector.copy()
+    full_basis = ci_vector.copy()
+    old_basis.set_vector(np.array(range(len(old_basis))))
+    new_basis.set_vector(np.array(range(len(new_basis))))
+    full_basis.set_vector(np.array(range(len(full_basis))))
+    for f,c,v in old_basis:
+        del new_basis[f][c]
+    new_basis.prune_empty_fock_spaces()
+    print(" Size of old space:", len(old_basis))
+    print(" Size of new space:", len(new_basis))
+    print(" Size of all space:", len(full_basis))
+    assert(len(full_basis)==len(old_basis)+len(new_basis))
+    
+    clusters = clustered_ham.clusters
+    print(" In grow_hamiltonian_parallel. nproc=",nproc) 
+
+    H = np.zeros((len(ci_vector),len(ci_vector)))
+    n_clusters = len(clusters)
+
+    #for f1,c1,i1 in old_basis:
+    #    for f2,c2,i2 in old_basis:
+    #        H[full_basis[f1][c1],full_basis[f2][c2]] = h_old[i1,i2]
+    #        print(full_basis[f1][c1],full_basis[f2][c2] , i1,i2)
+    for f1,cs1 in old_basis.items():
+        for c1,i1 in old_basis[f1].items():
+            for f2,cs2 in old_basis.items():
+                for c2,i2 in old_basis[f2].items():
+                    H[full_basis[f1][c1],full_basis[f2][c2]] = h_old[i1,i2]
+
+    for f1,c1,i1 in new_basis:
+        assert(new_basis[f1][c1] == full_basis[f1][c1])
+    for f1,c1,i1 in old_basis:
+        old_basis[f1][c1] = full_basis[f1][c1]
+        if f1 in new_basis:
+            assert(c1 not in new_basis[f1])
+ 
+    _h  = clustered_ham
+    new_basis_id    = ray.put(new_basis)
+
+    try:
+        assert(np.amax(np.abs(H-H.T))<1e-14)
+    except AssertionError:
+        for f1,c1,i1 in full_basis:
+            for f2,c2,i2 in full_basis:
+                if abs(H[i1,i2] - H[i2,i1])>1e-14:
+                    print(f1,c1,i1)
+                    print(f2,c2,i2)
+                    print(H[i1,i2] - H[i2,i1])
+        raise AssertionError
+  
+
+    def do_parallel_work(fock_l, conf_l, idx_l, basis_r):
+        out = []
+        for fock_r in basis_r.fblocks():
+            confs_r = basis_r[fock_r]
+            delta_fock= tuple([(fock_l[ci][0]-fock_r[ci][0], fock_l[ci][1]-fock_r[ci][1]) for ci in range(len(_h.clusters))])
+            if delta_fock in _h.terms:
+                for conf_r in confs_r:        
+                    idx_r =  basis_r[fock_r][conf_r]
+                    if idx_l <= idx_r:
+                        me = 0
+                        for term in _h.terms[delta_fock]:
+                            me += term.matrix_element(fock_l,conf_l,fock_r,conf_r)
+                        out.append( (idx_r, me) )
+
+        return (idx_l,out)
+
+
+    import multiprocessing as mp
+    from pathos.multiprocessing import ProcessingPool as Pool
+    if nproc == None:
+        pool = Pool()
+    else:
+        pool = Pool(processes=nproc)
+
+    jobs = [(i[0],i[1],i[2],new_basis) for i in new_basis]
+    jobs.extend( [(i[0],i[1],i[2],new_basis) for i in old_basis])
+    jobs.extend( [(i[0],i[1],i[2],old_basis) for i in new_basis])
+    
+    results = pool.map(do_parallel_work, jobs)
+    
+    pool.close()
+    pool.join()
+    pool.clear()
+
+    for row_idx, row in enumerate(results):
+        for col_idx, term in row:
+            assert( col_idx >= row_idx)
+            assert( abs(H[row_idx,col_idx])<1e-16)
+            assert( abs(H[col_idx,row_idx])<1e-16)
+            H[row_idx, col_idx] = term
+            H[col_idx, row_idx] = term
+    
     return H
     
 
