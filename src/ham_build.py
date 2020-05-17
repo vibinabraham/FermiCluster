@@ -649,6 +649,9 @@ def grow_hamiltonian_parallel(h_old,clustered_ham,ci_vector,ci_vector_old,iprint
     parallelized over matrix elements
     """
 # {{{
+    ci_vector_old.prune_empty_fock_spaces()
+    ci_vector.prune_empty_fock_spaces()
+
     old_dim = len(ci_vector_old) 
     old_basis = ci_vector_old.copy()
     new_basis = ci_vector.copy()
@@ -680,6 +683,8 @@ def grow_hamiltonian_parallel(h_old,clustered_ham,ci_vector,ci_vector_old,iprint
                 for c2,i2 in old_basis[f2].items():
                     H[full_basis[f1][c1],full_basis[f2][c2]] = h_old[i1,i2]
 
+    if len(new_basis) == 0:
+        return H
     for f1,c1,i1 in new_basis:
         assert(new_basis[f1][c1] == full_basis[f1][c1])
     for f1,c1,i1 in old_basis:

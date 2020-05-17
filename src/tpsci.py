@@ -315,6 +315,7 @@ def tp_cipsi(ci_vector, clustered_ham,
     print("     |pt_type        : ", pt_type        )
     print("     |nproc          : ", nproc          )
 
+    
     pt_vector = ci_vector.copy()
     #Hd_vector = ClusteredState(ci_vector.clusters)
     Hd_vector = ClusteredState()
@@ -326,10 +327,13 @@ def tp_cipsi(ci_vector, clustered_ham,
         print(" ===================================================================")
         print(" Build full Hamiltonian",flush=True)
         start = time.time()
-        if nproc==1:
-            H = build_full_hamiltonian(clustered_ham, ci_vector)
+        
+        if it>0:
+            H = grow_hamiltonian_parallel(H, clustered_ham, ci_vector, ci_vector_old)
         else:
             H = build_full_hamiltonian_parallel2(clustered_ham, ci_vector, nproc=nproc)
+        
+        ci_vector_old = ci_vector.copy()
         stop = time.time()
         print(" Time spent building Hamiltonian matrix: %12.2f" %(stop-start))
         print(" Diagonalize Hamiltonian Matrix:",flush=True)
@@ -371,6 +375,7 @@ def tp_cipsi(ci_vector, clustered_ham,
 
                 ci_vector.zero()
                 ci_vector.set_vector(v0)
+                ci_vector_old = ci_vector.copy()
         
         ecore = clustered_ham.core_energy
         print(" Core energy: %16.12f" %ecore)
