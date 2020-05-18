@@ -693,7 +693,13 @@ def grow_hamiltonian_parallel(h_old,clustered_ham,ci_vector,ci_vector_old,iprint
             assert(c1 not in new_basis[f1])
  
     global _h
+    global _old_basis
+    global _new_basis
+    global _full_basis
     _h  = clustered_ham
+    _old_basis  = old_basis 
+    _new_basis  = new_basis 
+    _full_basis  = full_basis 
 
     try:
         assert(np.amax(np.abs(H-H.T))<1e-14)
@@ -712,21 +718,33 @@ def grow_hamiltonian_parallel(h_old,clustered_ham,ci_vector,ci_vector_old,iprint
         fock_l = inp[0]
         conf_l = inp[1]
         idx_l  = inp[2]
-        basis_r= inp[3]
+        new    = inp[3] # which subspace is _l in? this is 0 for old and 1 for new
 
         out = []
-        for fock_r in basis_r.fblocks():
-            confs_r = basis_r[fock_r]
-            delta_fock= tuple([(fock_l[ci][0]-fock_r[ci][0], fock_l[ci][1]-fock_r[ci][1]) for ci in range(len(_h.clusters))])
-            if delta_fock in _h.terms:
-                for conf_r in confs_r:        
-                    idx_r =  basis_r[fock_r][conf_r]
-                    if idx_l <= idx_r:
-                        me = 0
-                        for term in _h.terms[delta_fock]:
-                            me += term.matrix_element(fock_l,conf_l,fock_r,conf_r)
-                        out.append( (idx_r, me) )
-
+        if new:
+            for fock_r in _full_basis.fblocks():
+                confs_r = _full_basis[fock_r]
+                delta_fock= tuple([(fock_l[ci][0]-fock_r[ci][0], fock_l[ci][1]-fock_r[ci][1]) for ci in range(len(_h.clusters))])
+                if delta_fock in _h.terms:
+                    for conf_r in confs_r:        
+                        idx_r =  _full_basis[fock_r][conf_r]
+                        if idx_l <= idx_r:
+                            me = 0
+                            for term in _h.terms[delta_fock]:
+                                me += term.matrix_element(fock_l,conf_l,fock_r,conf_r)
+                            out.append( (idx_r, me) )
+        else:
+            for fock_r in _new_basis.fblocks():
+                confs_r = _new_basis[fock_r]
+                delta_fock= tuple([(fock_l[ci][0]-fock_r[ci][0], fock_l[ci][1]-fock_r[ci][1]) for ci in range(len(_h.clusters))])
+                if delta_fock in _h.terms:
+                    for conf_r in confs_r:        
+                        idx_r =  _new_basis[fock_r][conf_r]
+                        if idx_l <= idx_r:
+                            me = 0
+                            for term in _h.terms[delta_fock]:
+                                me += term.matrix_element(fock_l,conf_l,fock_r,conf_r)
+                            out.append( (idx_r, me) )
         return ([idx_l,out])
 
 
@@ -737,11 +755,12 @@ def grow_hamiltonian_parallel(h_old,clustered_ham,ci_vector,ci_vector_old,iprint
     else:
         pool = Pool(processes=nproc)
 
-    jobs = [(i[0],i[1],i[2],new_basis) for i in new_basis]
-    jobs.extend( [(i[0],i[1],i[2],new_basis) for i in old_basis])
-    jobs.extend( [(i[0],i[1],i[2],old_basis) for i in new_basis])
-    
+    jobs = [(i[0],i[1],i[2],0) for i in old_basis]
+    jobs.extend( [(i[0],i[1],i[2],1) for i in new_basis])
+   
+    print(" start working",flush=True)
     results = pool.map(do_parallel_work, jobs)
+    print(" done working",flush=True)
     
     pool.close()
     pool.join()
