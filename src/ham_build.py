@@ -693,13 +693,13 @@ def grow_hamiltonian_parallel(h_old,clustered_ham,ci_vector,ci_vector_old,iprint
             assert(c1 not in new_basis[f1])
  
     global _h
-    global _old_basis
     global _new_basis
-    global _full_basis
+    #global _old_basis
+    #global _full_basis
     _h  = clustered_ham
-    _old_basis  = old_basis 
     _new_basis  = new_basis 
-    _full_basis  = full_basis 
+    #_old_basis  = old_basis 
+    #_full_basis  = full_basis 
 
     try:
         assert(np.amax(np.abs(H-H.T))<1e-14)
@@ -722,12 +722,12 @@ def grow_hamiltonian_parallel(h_old,clustered_ham,ci_vector,ci_vector_old,iprint
 
         out = []
         if new:
-            for fock_r in _full_basis.fblocks():
-                confs_r = _full_basis[fock_r]
+            for fock_r in _new_basis.fblocks():
+                confs_r = _new_basis[fock_r]
                 delta_fock= tuple([(fock_l[ci][0]-fock_r[ci][0], fock_l[ci][1]-fock_r[ci][1]) for ci in range(len(_h.clusters))])
                 if delta_fock in _h.terms:
                     for conf_r in confs_r:        
-                        idx_r =  _full_basis[fock_r][conf_r]
+                        idx_r =  _new_basis[fock_r][conf_r]
                         if idx_l <= idx_r:
                             me = 0
                             for term in _h.terms[delta_fock]:
@@ -740,11 +740,10 @@ def grow_hamiltonian_parallel(h_old,clustered_ham,ci_vector,ci_vector_old,iprint
                 if delta_fock in _h.terms:
                     for conf_r in confs_r:        
                         idx_r =  _new_basis[fock_r][conf_r]
-                        if idx_l <= idx_r:
-                            me = 0
-                            for term in _h.terms[delta_fock]:
-                                me += term.matrix_element(fock_l,conf_l,fock_r,conf_r)
-                            out.append( (idx_r, me) )
+                        me = 0
+                        for term in _h.terms[delta_fock]:
+                            me += term.matrix_element(fock_l,conf_l,fock_r,conf_r)
+                        out.append( (idx_r, me) )
         return ([idx_l,out])
 
 
@@ -772,7 +771,7 @@ def grow_hamiltonian_parallel(h_old,clustered_ham,ci_vector,ci_vector_old,iprint
         for col in row:
             col_idx = col[0]
             term = col[1]
-            assert( col_idx >= row_idx)
+            #assert( col_idx >= row_idx)
             assert( abs(H[row_idx,col_idx])<1e-16)
             assert( abs(H[col_idx,row_idx])<1e-16)
             H[row_idx, col_idx] = term
