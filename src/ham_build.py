@@ -755,8 +755,8 @@ def grow_hamiltonian_parallel(h_old,clustered_ham,ci_vector,ci_vector_old,iprint
     else:
         pool = Pool(processes=nproc)
 
-    jobs = [(i[0],i[1],i[2],0) for i in old_basis]
-    jobs.extend( [(i[0],i[1],i[2],1) for i in new_basis])
+    jobs = [(i[0],i[1],i[2],1) for i in new_basis]
+    jobs.extend( [(i[0],i[1],i[2],0) for i in old_basis])
    
     print(" start working",flush=True)
     results = pool.map(do_parallel_work, jobs)
