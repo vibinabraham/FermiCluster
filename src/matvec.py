@@ -992,12 +992,14 @@ def matvec1_parallel4(h_in,v,thresh_search=1e-12, nproc=None, opt_einsum=True, n
     print(" thresh_search   :   ", thresh_search)
     print(" nbody_limit     :   ", nbody_limit)
     print(" opt_einsum      :   ", opt_einsum, flush=True)
+    print(" shared_mem      :   ", shared_mem, flush=True)
     print(" nproc           :   ", nproc, flush=True)
 
 
     import ray
     if nproc==None:
         ray.init(object_store_memory=shared_mem)
+        #ray.init(object_store_memory=shared_mem, driver_object_store_memory=20e9)
     else:
         ray.init(num_cpus=nproc, object_store_memory=shared_mem)
 
@@ -1005,85 +1007,13 @@ def matvec1_parallel4(h_in,v,thresh_search=1e-12, nproc=None, opt_einsum=True, n
     if len(v) == 0:
         print(" Empty vector!")
         exit()  
-    #h = h_in
     
     h_id        = ray.put(h_in)
-
+   
     sigma = ClusteredState()
     sigma = v.copy() 
     sigma.zero()
     
-    def matvec_update_with_new_configs2(coeff_tensor, new_configs, configs, active, thresh_search=1e-12):
-       # {{{
-        nactive = len(active) 
-       
-        _abs = abs
-    
-    
-        config_curr = [i[0] for i in new_configs]
-        count = 0
-        if nactive==2:
-   
-            for I in np.argwhere(np.abs(coeff_tensor) > thresh_search):
-                try:
-                    config_curr[active[0]] = new_configs[active[0]][I[0]] 
-                    config_curr[active[1]] = new_configs[active[1]][I[1]] 
-                except:
-                    print()
-                    print(" Tensor: ", coeff_tensor.shape)
-                    print(" Nz Idx: ", I)
-                    print(" new_co: ", new_configs)
-                    print(" active: ", active,flush=True)
-                    exit()
-                key = tuple(config_curr)
-                if key not in configs:
-                    configs[key] = coeff_tensor[I[0],I[1]]
-                else:
-                    configs[key] += coeff_tensor[I[0],I[1]]
-                #count += 1
-            #print(" nb2: size: %8i nonzero: %8i" %(coeff_tensor.size, count))
-    
-                        
-        elif nactive==3:
-    
-            for I in np.argwhere(np.abs(coeff_tensor) > thresh_search):
-                config_curr[active[0]] = new_configs[active[0]][I[0]] 
-                config_curr[active[1]] = new_configs[active[1]][I[1]] 
-                config_curr[active[2]] = new_configs[active[2]][I[2]] 
-                key = tuple(config_curr)
-                if key not in configs:
-                    configs[key] = coeff_tensor[I[0],I[1],I[2]]
-                else:
-                    configs[key] += coeff_tensor[I[0],I[1],I[2]]
-                #count += 1
-            #print(" nb3: size: %8i nonzero: %8i" %(coeff_tensor.size, count))
-    
-        elif nactive==4:
-    
-            for I in np.argwhere(np.abs(coeff_tensor) > thresh_search):
-                config_curr[active[0]] = new_configs[active[0]][I[0]] 
-                config_curr[active[1]] = new_configs[active[1]][I[1]] 
-                config_curr[active[2]] = new_configs[active[2]][I[2]] 
-                config_curr[active[3]] = new_configs[active[3]][I[3]] 
-                key = tuple(config_curr)
-                if key not in configs:
-                    configs[key] = coeff_tensor[I[0],I[1],I[2],I[3]]
-                else:
-                    configs[key] += coeff_tensor[I[0],I[1],I[2],I[3]]
-                #count += 1
-            #print(" nb4: size: %8i nonzero: %8i" %(coeff_tensor.size, count))
-    
-        else:
-            # local terms should trigger a fail since they are handled separately 
-            print(" Wrong value in update_with_new_configs")
-            exit()
-   
-        #print(" Size of ndarray:   ", sys.getsizeof(coeff_tensor))
-        #print(" Size of dictionary:", sys.getsizeof(configs))
-    
-        return 
-    # }}}
-
     def matvec_update_with_new_configs1(coeff_tensor, new_configs, configs, active, thresh_search=1e-12):
        # {{{
         nactive = len(active) 
@@ -1168,19 +1098,90 @@ def matvec1_parallel4(h_in,v,thresh_search=1e-12, nproc=None, opt_einsum=True, n
     # }}}
 
     @ray.remote
-    def do_batch(batch):
+    def do_batch(batch,_h):
         sigma_out = {} 
-        h = ray.get(h_id)
+        #_h = ray.get(h_id)
+        def matvec_update_with_new_configs2(coeff_tensor, new_configs, configs, active, thresh_search=1e-12):
+           # {{{
+            nactive = len(active) 
+           
+            _abs = abs
+        
+        
+            config_curr = [i[0] for i in new_configs]
+            count = 0
+            if nactive==2:
+       
+                for I in np.argwhere(np.abs(coeff_tensor) > thresh_search):
+                    try:
+                        config_curr[active[0]] = new_configs[active[0]][I[0]] 
+                        config_curr[active[1]] = new_configs[active[1]][I[1]] 
+                    except:
+                        print()
+                        print(" Tensor: ", coeff_tensor.shape)
+                        print(" Nz Idx: ", I)
+                        print(" new_co: ", new_configs)
+                        print(" active: ", active,flush=True)
+                        exit()
+                    key = tuple(config_curr)
+                    if key not in configs:
+                        configs[key] = coeff_tensor[I[0],I[1]]
+                    else:
+                        configs[key] += coeff_tensor[I[0],I[1]]
+                    #count += 1
+                #print(" nb2: size: %8i nonzero: %8i" %(coeff_tensor.size, count))
+        
+                            
+            elif nactive==3:
+        
+                for I in np.argwhere(np.abs(coeff_tensor) > thresh_search):
+                    config_curr[active[0]] = new_configs[active[0]][I[0]] 
+                    config_curr[active[1]] = new_configs[active[1]][I[1]] 
+                    config_curr[active[2]] = new_configs[active[2]][I[2]] 
+                    key = tuple(config_curr)
+                    if key not in configs:
+                        configs[key] = coeff_tensor[I[0],I[1],I[2]]
+                    else:
+                        configs[key] += coeff_tensor[I[0],I[1],I[2]]
+                    #count += 1
+                #print(" nb3: size: %8i nonzero: %8i" %(coeff_tensor.size, count))
+        
+            elif nactive==4:
+        
+                for I in np.argwhere(np.abs(coeff_tensor) > thresh_search):
+                    config_curr[active[0]] = new_configs[active[0]][I[0]] 
+                    config_curr[active[1]] = new_configs[active[1]][I[1]] 
+                    config_curr[active[2]] = new_configs[active[2]][I[2]] 
+                    config_curr[active[3]] = new_configs[active[3]][I[3]] 
+                    key = tuple(config_curr)
+                    if key not in configs:
+                        configs[key] = coeff_tensor[I[0],I[1],I[2],I[3]]
+                    else:
+                        configs[key] += coeff_tensor[I[0],I[1],I[2],I[3]]
+                    #count += 1
+                #print(" nb4: size: %8i nonzero: %8i" %(coeff_tensor.size, count))
+        
+            else:
+                # local terms should trigger a fail since they are handled separately 
+                print(" Wrong value in update_with_new_configs")
+                exit()
+       
+            #print(" Size of ndarray:   ", sys.getsizeof(coeff_tensor))
+            #print(" Size of dictionary:", sys.getsizeof(configs))
+        
+            return 
+        # }}}
+
         for v_curr in batch:
             fock_r = v_curr[0]
             conf_r = v_curr[1]
             coeff  = v_curr[2]
             
             #sigma_out = ClusteredState(clusters)
-            for terms in h.terms:
-                fock_l= tuple([(terms[ci][0]+fock_r[ci][0], terms[ci][1]+fock_r[ci][1]) for ci in range(len(h.clusters))])
+            for terms in _h.terms:
+                fock_l= tuple([(terms[ci][0]+fock_r[ci][0], terms[ci][1]+fock_r[ci][1]) for ci in range(len(_h.clusters))])
                 good = True
-                for c in h.clusters:
+                for c in _h.clusters:
                     if min(fock_l[c.idx]) < 0 or max(fock_l[c.idx]) > c.n_orb:
                         good = False
                         break
@@ -1196,7 +1197,7 @@ def matvec1_parallel4(h_in,v,thresh_search=1e-12, nproc=None, opt_einsum=True, n
                 
                 configs_l = sigma_out[fock_l] 
                 
-                for term in h.terms[terms]:
+                for term in _h.terms[terms]:
                     if len(term.active) > nbody_limit:
                         continue
                     
@@ -1205,11 +1206,11 @@ def matvec1_parallel4(h_in,v,thresh_search=1e-12, nproc=None, opt_einsum=True, n
                         
                         ci = term.active[0]
                             
-                        tmp = h.clusters[ci].ops['H'][(fock_l[ci],fock_r[ci])][:,conf_r[ci]] * coeff 
+                        tmp = _h.clusters[ci].ops['H'][(fock_l[ci],fock_r[ci])][:,conf_r[ci]] * coeff 
                         
                         new_configs = [[i] for i in conf_r] 
                         
-                        new_configs[ci] = range(h.clusters[ci].ops['H'][(fock_l[ci],fock_r[ci])].shape[0])
+                        new_configs[ci] = range(_h.clusters[ci].ops['H'][(fock_l[ci],fock_r[ci])].shape[0])
                         
                         for sp_idx, spi in enumerate(itertools.product(*new_configs)):
                             if abs(tmp[sp_idx]) > thresh_search:
@@ -1238,7 +1239,7 @@ def matvec1_parallel4(h_in,v,thresh_search=1e-12, nproc=None, opt_einsum=True, n
                             if op == "":
                                 continue
                             opii += 1
-                            ci = h.clusters[opi]
+                            ci = _h.clusters[opi]
                             try:
                                 oi = ci.ops[op][(fock_l[ci.idx],fock_r[ci.idx])][:,conf_r[ci.idx],:]
             
@@ -1279,6 +1280,7 @@ def matvec1_parallel4(h_in,v,thresh_search=1e-12, nproc=None, opt_einsum=True, n
                             
                         matvec_update_with_new_configs2(tmp, new_configs, configs_l, term.active, thresh_search)
             #print(" Size of sigma_out:", sys.getsizeof(sigma_out))
+            #sigma_out = {} 
         return sigma_out
     
     # define batches
@@ -1307,13 +1309,15 @@ def matvec1_parallel4(h_in,v,thresh_search=1e-12, nproc=None, opt_einsum=True, n
 
 
 
-    result_ids = [do_batch.remote(i) for i in conf_batches]
+    #result_ids = [do_batch.remote(i) for i in conf_batches]
+    result_ids = [do_batch.remote(i,h_id) for i in conf_batches]
 
      
     if 0:
         out = ray.get(result_ids)
         for o in out:
             sigma.add(o)
+            o = {}
     else:
 
         # Combine results as soon as they finish
