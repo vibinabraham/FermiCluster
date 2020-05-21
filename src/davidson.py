@@ -151,7 +151,7 @@ class Davidson:
         print("|",end='')
         for r in range(0,self.n_roots):
             print(" %6.1e " % self.res_vals[r],end='') 
-        print()
+        print("",flush=True)
 
     def converged(self):
         """

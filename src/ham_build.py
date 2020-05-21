@@ -701,16 +701,18 @@ def grow_hamiltonian_parallel(h_old,clustered_ham,ci_vector,ci_vector_old,iprint
     #_old_basis  = old_basis 
     #_full_basis  = full_basis 
 
-    try:
-        assert(np.amax(np.abs(H-H.T))<1e-14)
-    except AssertionError:
-        for f1,c1,i1 in full_basis:
-            for f2,c2,i2 in full_basis:
-                if abs(H[i1,i2] - H[i2,i1])>1e-14:
-                    print(f1,c1,i1)
-                    print(f2,c2,i2)
-                    print(H[i1,i2] - H[i2,i1])
-        raise AssertionError
+    debug = 0
+    if debug:
+        try:
+            assert(np.amax(np.abs(H-H.T))<1e-14)
+        except AssertionError:
+            for f1,c1,i1 in full_basis:
+                for f2,c2,i2 in full_basis:
+                    if abs(H[i1,i2] - H[i2,i1])>1e-14:
+                        print(f1,c1,i1)
+                        print(f2,c2,i2)
+                        print(H[i1,i2] - H[i2,i1])
+            raise AssertionError
   
 
     #def do_parallel_work(fock_l, conf_l, idx_l, basis_r):

@@ -450,6 +450,7 @@ class ci_solver:
             self.Apr = self.build_spin_tdms(bra_a,ket_a)
             self.Bpr = self.build_spin_tdms(bra_b,ket_b)
             self.Bpr = np.einsum('KLqs,prqs->KLpr',self.Bpr,self.H.V)
+            print(" done.",flush=True)
             self.run_davidson()
             return
         elif self.algorithm == "davidson2":

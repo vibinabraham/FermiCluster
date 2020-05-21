@@ -1040,7 +1040,7 @@ class Cluster(object):
         print(" Time spent building TDMs Total %12.2f" %(stop_tot-start_tot))
 # }}}
 
-    def form_schmidt_basis(self,h,g,Da,Db,thresh_orb=1e-8,thresh_schmidt=1e-3,iprint=1,ecore=0,do_embedding=True):
+    def form_schmidt_basis(self,h,g,Da,Db,thresh_orb=1e-8,thresh_schmidt=1e-3,thresh_ci=1e-5,iprint=1,ecore=0,do_embedding=True):
         """
         thresh_orb      :   threshold for determining how many bath orbitals to include
         thresh_schmidt  :   threshold for determining how many singular vectors to include for cluster basis
@@ -1200,6 +1200,7 @@ class Cluster(object):
       
         ci = ci_solver()
         ci.init(H,na_actv,nb_actv,1)
+        ci.thresh = thresh_ci 
         print(ci,flush=True)
         if ci.full_dim > 10000:
             ci.algorithm = "davidson"
