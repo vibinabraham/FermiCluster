@@ -649,6 +649,9 @@ def grow_hamiltonian_parallel(h_old,clustered_ham,ci_vector,ci_vector_old,iprint
     parallelized over matrix elements
     """
 # {{{
+    print(" In grow_hamiltonian_parallel. nproc=",nproc) 
+    
+    start = time.time()
     ci_vector_old.prune_empty_fock_spaces()
     ci_vector.prune_empty_fock_spaces()
 
@@ -661,6 +664,7 @@ def grow_hamiltonian_parallel(h_old,clustered_ham,ci_vector,ci_vector_old,iprint
     full_basis.set_vector(np.array(range(len(full_basis))))
     for f,c,v in old_basis:
         del new_basis[f][c]
+
     new_basis.prune_empty_fock_spaces()
     print(" Size of old space:", len(old_basis))
     print(" Size of new space:", len(new_basis))
@@ -668,20 +672,29 @@ def grow_hamiltonian_parallel(h_old,clustered_ham,ci_vector,ci_vector_old,iprint
     assert(len(full_basis)==len(old_basis)+len(new_basis))
     
     clusters = clustered_ham.clusters
-    print(" In grow_hamiltonian_parallel. nproc=",nproc) 
 
     H = np.zeros((len(ci_vector),len(ci_vector)))
     n_clusters = len(clusters)
-
-    #for f1,c1,i1 in old_basis:
-    #    for f2,c2,i2 in old_basis:
-    #        H[full_basis[f1][c1],full_basis[f2][c2]] = h_old[i1,i2]
-    #        print(full_basis[f1][c1],full_basis[f2][c2] , i1,i2)
+    
+    # find locations of old basis is full basis
+    t1=time.time()
+    full_inds = np.zeros((len(old_basis)),dtype=int) 
+    count = 0
     for f1,cs1 in old_basis.items():
         for c1,i1 in old_basis[f1].items():
-            for f2,cs2 in old_basis.items():
-                for c2,i2 in old_basis[f2].items():
-                    H[full_basis[f1][c1],full_basis[f2][c2]] = h_old[i1,i2]
+            full_inds[count] = full_basis[f1][c1]
+            count += 1
+    for idx,i in enumerate(full_inds):
+        H[i,full_inds] = h_old[idx,:]
+    print(" updating matrix:",time.time()-t1,flush=True)
+
+    t1=time.time()
+    #for f1,cs1 in old_basis.items():
+    #    for c1,i1 in old_basis[f1].items():
+    #        for f2,cs2 in old_basis.items():
+    #            for c2,i2 in old_basis[f2].items():
+    #                H[full_basis[f1][c1],full_basis[f2][c2]] = h_old[i1,i2]
+    #print("t:",time.time()-t1,flush=True)
 
     if len(new_basis) == 0:
         return H
@@ -746,6 +759,7 @@ def grow_hamiltonian_parallel(h_old,clustered_ham,ci_vector,ci_vector_old,iprint
                         for term in _h.terms[delta_fock]:
                             me += term.matrix_element(fock_l,conf_l,fock_r,conf_r)
                         out.append( (idx_r, me) )
+        print(".",end='',flush=True)
         return ([idx_l,out])
 
 
@@ -758,10 +772,15 @@ def grow_hamiltonian_parallel(h_old,clustered_ham,ci_vector,ci_vector_old,iprint
 
     jobs = [(i[0],i[1],i[2],1) for i in new_basis]
     jobs.extend( [(i[0],i[1],i[2],0) for i in old_basis])
-   
-    print(" start working",flush=True)
+  
+    stop = time.time()
+    print(" Time spent finding new subspace:", stop-start)
+    start = time.time()
+    print(" Number of jobs to do:",len(jobs),flush=True)
     results = pool.map(do_parallel_work, jobs)
-    print(" done working",flush=True)
+    print("")
+    stop = time.time()
+    print(" Time spent building new subspace:", stop-start)
     
     pool.close()
     pool.join()

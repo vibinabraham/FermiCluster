@@ -385,13 +385,14 @@ class ClusteredState(OrderedDict):
         self = a * other
         """
         for fockspace,configs in other.items():
-            if fockspace not in self.fblocks():
-                self.add_fockspace(fockspace)
-            for config,coeff in configs.items():
-                if config in self.data[fockspace]:
-                    self.data[fockspace][config] += scalar * coeff
-                else:
-                    self.data[fockspace][config] = scalar * coeff
+            if fockspace in self.fblocks():
+                for config,coeff in configs.items():
+                    if config in self.data[fockspace]:
+                        self.data[fockspace][config] += scalar * coeff
+                    else:
+                        self.data[fockspace][config] = scalar * coeff
+            else:
+                self.data[fockspace] = other[fockspace] 
         return 
 
     def dot(self,other):
