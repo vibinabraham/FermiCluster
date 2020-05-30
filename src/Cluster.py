@@ -140,8 +140,17 @@ class Cluster(object):
         self.Hlocal = {}
         for na,nb in spaces:
             ci = ci_solver()
-            ci.algorithm = "direct"
             ci.init(H,na,nb,max_roots)
+
+            print(ci.full_dim)
+            if ci.full_dim > 10000:
+                ci.thresh = 1e-5
+                ci.init(H,na,nb,1)
+                ci.algorithm = "davidson"
+            else:
+                ci.algorithm = "direct"
+
+
             print(ci)
             Hci = ci.run()
             #self.basis[(na,nb)] = np.eye(ci.results_v.shape[0])
@@ -151,6 +160,7 @@ class Cluster(object):
             fock = (na,nb)
             
             C = ci.results_v
+            #print(Hci)
             #if np.amax(np.abs(C.T@C - np.eye(C.shape[1]))) > 1e-14:
             #    S = C.T @ C
             #    S = scipy.linalg.inv( scipy.linalg.sqrtm(S))
@@ -158,8 +168,15 @@ class Cluster(object):
             #    print(np.amax(np.abs(C.T@C - np.eye(C.shape[1]))))
             #    assert(np.amax(np.abs(C.T@C - np.eye(C.shape[1]))) < 1e-14)
             self.basis[fock] = C 
-            self.Hlocal[fock] =  Hci 
-            self.ops['H_mf'][(fock,fock)] = C.T @ Hci @ C 
+            if ci.algorithm == "davidson":
+                #self.Hlocal[fock] =  Hci 
+                sigma = Hci
+                self.ops['H_mf'][(fock,fock)] = C.T @ sigma
+                
+
+            elif ci.algorithm == "direct":
+                self.Hlocal[fock] =  Hci 
+                self.ops['H_mf'][(fock,fock)] = C.T @ Hci @ C 
     # }}}
 
     #remove:

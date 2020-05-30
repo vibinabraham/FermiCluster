@@ -451,8 +451,8 @@ class ci_solver:
             self.Bpr = self.build_spin_tdms(bra_b,ket_b)
             self.Bpr = np.einsum('KLqs,prqs->KLpr',self.Bpr,self.H.V)
             print(" done.",flush=True)
-            self.run_davidson()
-            return
+            sigma = self.run_davidson()
+            return sigma
         elif self.algorithm == "davidson2":
             #slowest
             self.run_davidson()
@@ -576,7 +576,7 @@ class ci_solver:
 
         dav = Davidson(self.full_dim, self.n_roots)
         dav.thresh      = self.thresh 
-        dav.max_vecs    = 100 
+        dav.max_vecs    = 200 
         dav.max_iter    = self.max_iter 
         dav.form_rand_guess()
         dav.sig_curr = np.zeros((self.full_dim, self.n_roots))
@@ -649,6 +649,7 @@ class ci_solver:
             self.results_e.append(l[s])
             self.results_v.append(v[:,s])
             """
+        return dav.sig_curr
 
 # }}}
 
