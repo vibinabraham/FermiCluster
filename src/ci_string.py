@@ -723,13 +723,15 @@ class ci_solver:
 # }}}
 
     
-    def svd_state(self,norbs1,norbs2, max_dim=None, thresh=-1):
+    def svd_state(self,norbs1,norbs2, max_dim=None, thresh=-1, both=False):
         """
         Do an SVD of the FCI vector partitioned into clusters with (norbs1 | norbs2)
         where the orbitals are assumed to be ordered for cluster 1| cluster 2 haveing norbs1 and 
         norbs2, respectively.
         """
         # {{{
+        
+        print(" In svd_state",flush=True)
         assert(norbs1+norbs2==self.no)
         from collections import OrderedDict
         
@@ -738,7 +740,6 @@ class ci_solver:
         ket_b = ci_string(self.no,self.neb)
         v = self.results_v
         v.shape = (ket_a.max(), ket_b.max())
-        print(v.shape)
         from bisect import bisect
 
         fock_labels_a = [[None,None] for i in range(ket_a.max())]
@@ -759,6 +760,7 @@ class ci_solver:
                     vector[fock_labels_a[I],fock_labels_b[J]] = [v[I,J]]
 
         schmidt_basis = {}
+        schmidt_basis_r = {}
         norm = 0
         for fock in vector:
             print()
@@ -778,6 +780,7 @@ class ci_solver:
             norm_curr = vector[fock].T @ vector[fock]
             print(" Norm: %12.8f"%(np.sqrt(norm_curr)))
             vector[fock].shape = (ket_a1.max(), ket_a2.max(), ket_b1.max(), ket_b2.max())
+            #vector[fock] = np.ascontiguousarray(np.swapaxes(vector[fock],1,2))
             vector[fock] = sign*np.ascontiguousarray(np.swapaxes(vector[fock],1,2))
             vector[fock].shape = (ket_a1.max()*ket_b1.max(), ket_a2.max()*ket_b2.max())
             norm += norm_curr
@@ -801,9 +804,14 @@ class ci_solver:
             
             if nkeep > 0:
                 schmidt_basis[fock] = U[:,:nkeep]
+                if both:
+                    fock_r = (self.nea-fock[0],self.neb-fock[1])
+                    schmidt_basis_r[fock_r] = V[:nkeep,:].T
             
         norm = np.sqrt(norm)
         assert(abs(norm - 1) < 1e-14)
+        if both:
+            return schmidt_basis, schmidt_basis_r 
         return schmidt_basis 
     # }}}
 

@@ -667,7 +667,7 @@ class Cluster(object):
         print(" Time spent TDM 0: %12.2f" %(stop-start))
 
 
-    def build_op_matrices(self, iprint=1):
+    def build_op_matrices(self, iprint=0):
         """
         build all operators needed
         """
@@ -1045,6 +1045,7 @@ class Cluster(object):
         thresh_orb      :   threshold for determining how many bath orbitals to include
         thresh_schmidt  :   threshold for determining how many singular vectors to include for cluster basis
         """
+        # {{{
         print()
         print(" Form Schmidt-style basis for ", self)
         D = Da+Db
@@ -1221,7 +1222,33 @@ class Cluster(object):
             print(" We will have these fock spaces present")
             for na,nb in self.basis:
                 print(na,nb)
-        
+        # }}}
+
+
+    def split(self,fock,n_orbs1,h,g,thresh_schmidt=0):
+        """
+        Split cluster into two new clusters, using the SVD of the ground state (of fock space sector = fock) as the new cluster states,
+        then build the operators
+        """
+        assert(n_orbs1<self.n_orb)
+        n_orbs2 = self.n_orb-n_orbs1
+        H = Hamiltonian()
+        H.C = np.eye(self.n_orb)
+        ci = ci_solver()
+        ci.init(H,fock[0],fock[1],1)
+        ci.results_v = self.basis[fock][:,0]
+
+        c1 = Cluster(-1,self.orb_list[:n_orbs1])
+        c2 = Cluster(-1,self.orb_list[n_orbs1:])
+        print(c1)
+        print(c2)
+        c1.basis, c2.basis = ci.svd_state(n_orbs1, n_orbs2, thresh=thresh_schmidt, both=True)
+        # build cluster basis and operator matrices using CMF optimized density matrices
+        #c1.build_op_matrices()
+        #c1.build_local_terms(h,g)
+        #c2.build_op_matrices()
+        #c2.build_local_terms(h,g)
+        return c1, c2
 
 
 
