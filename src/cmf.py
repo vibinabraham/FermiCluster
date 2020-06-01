@@ -98,7 +98,7 @@ def cmf(clustered_ham, ci_vector, h, g,
                     max_roots=1, 
                     ecore=ecore,
                     rdm1_a=rdm_a, 
-                    rdm1_b=rdm_b, 
+                    rdm1_b=rdm_b,
                     iprint=1)
         
             print(" Build new operators for cluster ",ci.idx)

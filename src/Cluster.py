@@ -96,7 +96,7 @@ class Cluster(object):
         else:
             self.ops[op] = {}
 
-    def form_fockspace_eigbasis(self, hin, vin, spaces, max_roots=1000, rdm1_a=None, rdm1_b=None, ecore=0, iprint=0):
+    def form_fockspace_eigbasis(self, hin, vin, spaces, max_roots=1000, rdm1_a=None, rdm1_b=None, ecore=0, iprint=0, subspace=False):
         """
         Get matrices of local Hamiltonians embedded in the system 1rdm and diagonalize to form
         the cluster basis vectors. This is the main step in CMF
@@ -105,6 +105,11 @@ class Cluster(object):
         Hlocal is the same operator but stored in the full determinant basis (we'll probably want to remove this soon) 
         This data is used to obtain the cluster 
         energies for an MP2 like correction rather than a EN correction.
+        
+        subspace    :   Should the cluster state rotations only mix states within the current cluster basis? 
+                        Generally this would be set to False. However, sometimes one might want to find the CMF basis
+                        inside of an already truncated basis, i.e., doing cleaner MP2 like perturbations after doing 
+                        a schmidt-truncation
 
         """
 # {{{
@@ -132,226 +137,63 @@ class Cluster(object):
         H.t = h
         H.V = v
         H.ecore = ecore
-        self.basis = {}
         self.ops['H_mf'] = {}
+                
+        if subspace == False:
+            self.basis = {}
       
         #print(np.trace(da))
         #print(np.trace(db))
         self.Hlocal = {}
         for na,nb in spaces:
+            fock = (na,nb)
             ci = ci_solver()
             ci.algorithm = "direct"
             ci.init(H,na,nb,max_roots)
-            print(ci)
-            Hci = ci.run()
-            #self.basis[(na,nb)] = np.eye(ci.results_v.shape[0])
-            if iprint>0:
-                for i,ei in enumerate(ci.results_e):
-                    print(" Local State %5i: Local E: %12.8f Embedded E: %12.8f Total E: %12.8f" %(i, ei, ei+Eenv, ei+ecore+Eenv))
-            fock = (na,nb)
-            
-            C = ci.results_v
-            #if np.amax(np.abs(C.T@C - np.eye(C.shape[1]))) > 1e-14:
-            #    S = C.T @ C
-            #    S = scipy.linalg.inv( scipy.linalg.sqrtm(S))
-            #    C = C@S
-            #    print(np.amax(np.abs(C.T@C - np.eye(C.shape[1]))))
-            #    assert(np.amax(np.abs(C.T@C - np.eye(C.shape[1]))) < 1e-14)
-            self.basis[fock] = C 
-            self.Hlocal[fock] =  Hci 
-            self.ops['H_mf'][(fock,fock)] = C.T @ Hci @ C 
-    # }}}
-
-    #remove:
-    def form_eigbasis_from_ints(self,hin,vin,max_roots=1000, max_elec=None, min_elec=0, rdm1_a=None, rdm1_b=None, ecore=0):
-        """
-        grab integrals acting locally and form eigenbasis by FCI
-
-        rdm1 is the spin summed density matrix
-        """
-# {{{
-        h = np.zeros([self.n_orb]*2)
-        f = np.zeros([self.n_orb]*2)
-        v = np.zeros([self.n_orb]*4)
-        
-        for pidx,p in enumerate(self.orb_list):
-            for qidx,q in enumerate(self.orb_list):
-                h[pidx,qidx] = hin[p,q]
-        
-        for pidx,p in enumerate(self.orb_list):
-            for qidx,q in enumerate(self.orb_list):
-                for ridx,r in enumerate(self.orb_list):
-                    for sidx,s in enumerate(self.orb_list):
-                        v[pidx,qidx,ridx,sidx] = vin[p,q,r,s]
-
-
-        if rdm1_a is not None and rdm1_b is not None:
-            print(" Compute single particle embedding potential")
-            denv_a = 1*rdm1_a
-            denv_b = 1*rdm1_b
-            for pidx,p in enumerate(self.orb_list):
-                for qidx,q in enumerate(range(rdm1_a.shape[0])):
-                    denv_a[p,q] = 0
-                    denv_b[p,q] = 0
-                    denv_a[q,p] = 0
-                    denv_b[q,p] = 0
-           
-            print(" Environment 1RDM:")
-            print_mat(denv_a+denv_b)
-            print(" Trace of env 1RDM: %12.8f" %np.trace(denv_a + denv_b))
-            print(" Compute energy of 1rdm:")
-            e1 =  np.trace(hin @ rdm1_a )
-            e1 += np.trace(hin @ rdm1_b )
-            e2 =  np.einsum('pqrs,pq,rs->',vin,rdm1_a,rdm1_a)
-            e2 -= np.einsum('pqrs,ps,qr->',vin,rdm1_a,rdm1_a)
-            
-            e2 += np.einsum('pqrs,pq,rs->',vin,rdm1_b,rdm1_b)
-            e2 -= np.einsum('pqrs,ps,qr->',vin,rdm1_b,rdm1_b)
-            
-            e2 += np.einsum('pqrs,pq,rs->',vin,rdm1_a,rdm1_b)
-            e2 += np.einsum('pqrs,pq,rs->',vin,rdm1_b,rdm1_a)
-            #e += np.einsum('pqrs,pq,rs->',vin,d,d)
-           
-            e = e1 + .5*e2
-            print(" E: %12.8f" %(e+ecore))
-           
-            fa =  hin*0 
-            fb =  hin*0
-            fa += np.einsum('pqrs,pq->rs',vin,denv_a)
-            fa += np.einsum('pqrs,pq->rs',vin,denv_b)
-            fa -= np.einsum('pqrs,ps->qr',vin,denv_a)
-            fb += np.einsum('pqrs,pq->rs',vin,denv_b)
-            fb += np.einsum('pqrs,pq->rs',vin,denv_a)
-            fb -= np.einsum('pqrs,ps->qr',vin,denv_b)
-
-        
-            for pidx,p in enumerate(self.orb_list):
-                for qidx,q in enumerate(self.orb_list):
-                    f[pidx,qidx] = .5*(fa[p,q] + fb[p,q])
-           
-
-        if max_elec == None:
-            max_elec == self.n_orb
-
-        H = Hamiltonian()
-        H.S = np.eye(h.shape[0])
-        H.C = H.S
-        H.t = h + f
-        H.V = v
-        self.basis = {}
-        print(" Do CI for each particle number block")
-        for na in range(self.n_orb+1):
-            for nb in range(self.n_orb+1):
-                if (na+nb) > max_elec or (na+nb) < min_elec:
+            if subspace:
+                if fock not in self.basis:
                     continue
-                ci = ci_solver()
-                ci.algorithm = "direct"
-                ci.init(H,na,nb,max_roots)
+                Hci = ci.build_H_matrix(self.basis[fock])
+                print(" Nick: ", self.idx, fock, self.basis[fock].shape,flush=True)
+                if Hci.shape[0] > 1 and Hci.shape[0] > ci.n_roots:
+                    l,C = scipy.sparse.linalg.eigsh(Hci, ci.n_roots,which='SA')
+                    sort_ind = np.argsort(l)
+                    l = l[sort_ind]
+                    C = C[:,sort_ind]
+                elif Hci.shape[0] > 1 and Hci.shape[0] <= ci.n_roots:
+                    l,C = np.linalg.eigh(Hci)
+                    sort_ind = np.argsort(l)
+                    l = l[sort_ind]
+                    C = C[:,sort_ind]
+                elif Hci.shape[0] == 1:
+                    l = [Hci[0,0]]
+                    C = np.array([[1.0]])
+                else:
+                    print(" Problem with Hci dimension")
+                    exit()
+                self.basis[fock] = self.basis[fock] @ C
+                self.ops['H_mf'][(fock,fock)] = C.T @ Hci @ C 
+                self.Hlocal[fock] =  Hci 
+
+            else:
                 print(ci)
                 Hci = ci.run()
-                #self.basis[(na,nb)] = np.eye(ci.results_v.shape[0])
-                self.basis[(na,nb)] = ci.results_v
-                #self.Hci[(na,nb)] = ci.results_v.T @ Hci @ ci.results_v
+                if iprint>0:
+                    for i,ei in enumerate(ci.results_e):
+                        print(" Local State %5i: Local E: %12.8f Embedded E: %12.8f Total E: %12.8f" %(i, ei, ei+Eenv, ei+ecore+Eenv))
+                
+                C = ci.results_v
+                #if np.amax(np.abs(C.T@C - np.eye(C.shape[1]))) > 1e-14:
+                #    S = C.T @ C
+                #    S = scipy.linalg.inv( scipy.linalg.sqrtm(S))
+                #    C = C@S
+                #    print(np.amax(np.abs(C.T@C - np.eye(C.shape[1]))))
+                #    assert(np.amax(np.abs(C.T@C - np.eye(C.shape[1]))) < 1e-14)
+                self.basis[fock] = C 
+                self.Hlocal[fock] =  Hci 
+                self.ops['H_mf'][(fock,fock)] = C.T @ Hci @ C 
     # }}}
-    
-    #remove:
-    def form_eigbasis_from_local_operator(self,local_op,max_roots=1000,ratio = 1,s2_shift=False):
-        """
-        grab integrals acting locally and form eigenbasis by FCI
-        """
-# {{{
-        h = np.zeros([self.n_orb]*2)
-        v = np.zeros([self.n_orb]*4)
-        for t in local_op.terms:
-            if t.ops[0] == "Aa":
-                h += t.ints 
-            if t.ops[0] == "AAaa":
-                v = 2*t.ints 
 
-        H = Hamiltonian()
-        H.S = np.eye(h.shape[0])
-        H.C = H.S
-        H.t = h
-        H.V = v
-        self.basis = {}
-        print(" Do CI for each particle number block")
-        for na in range(self.n_orb+1):
-            for nb in range(self.n_orb+1):
-
-                dim = calc_nchk(self.n_orb, na)*calc_nchk(self.n_orb, nb)
-                max_roots = int(((ratio * dim) //1) +1 )
-
-                ci = ci_solver()
-                ci.algorithm = "direct"
-                ci.init(H,na,nb,max_roots)
-                print(ci)
-                Hci = ci.run()
-                #self.basis[(na,nb)] = np.eye(ci.results_v.shape[0])
-                self.basis[(na,nb)] = ci.results_v
-                #self.Hci[(na,nb)] = Hci
-                #print(ci.results_v)
-                if s2_shift == True:
-                    S2 = form_S2(self.n_orb,na,nb)
-
-                    eva,evec = np.linalg.eigh(Hci + 0.3 * S2)
-                    self.basis[(na,nb)] = evec
-
-
-                if 0: #basis deteminant ordering not same yet, so cant use pyscf 
-                    from pyscf import gto, scf, ao2mo, fci, cc
-                    np.set_printoptions(suppress=True, precision=3, linewidth=1500)
-                    cisolver = fci.direct_spin1.FCI()
-                    e, civ = cisolver.kernel(h, v, h.shape[1], (na,nb), ecore=0,nroots=max_roots)
-                    print(e)
-                    civ = np.array(civ)
-                    civ = civ.reshape(dim,dim)
-                    self.basis[(na,nb)] = civ
-                    #self.basis[(na,nb)] = np.eye(civ.shape[0])
-
-                if 0:
-                    ci.init(H,na,nb,dim)
-                    print(ci.results_v[:,-max_roots:] )
-                    ci.run()
-                    self.basis[(na,nb)] = ci.results_v[:,-max_roots:]
-                    # }}}
-
-    #remove:
-    def form_eigbasis_from_local_operator_nanb(self,local_op,n_max,max_roots=1000,ratio = 1):
-        """
-        grab integrals acting locally and form eigenbasis by FCI
-        """
-# {{{
-        h = np.zeros([self.n_orb]*2)
-        v = np.zeros([self.n_orb]*4)
-        for t in local_op.terms:
-            if t.ops[0] == "Aa":
-                h += t.ints 
-            if t.ops[0] == "AAaa":
-                v = 2*t.ints 
-
-        H = Hamiltonian()
-        H.S = np.eye(h.shape[0])
-        H.C = H.S
-        H.t = h
-        H.V = v
-        self.basis = {}
-        print(" Do CI for each particle number block")
-        for na in range(n_max+1):
-            for nb in range(n_max+1):
-                if na+nb < n_max:
-                    dim = calc_nchk(self.n_orb, na)*calc_nchk(self.n_orb, nb)
-                    #max_roots = int(((ratio * dim) //1) +1 )
-
-                    ci = ci_solver()
-                    ci.algorithm = "direct"
-                    ci.init(H,na,nb,max_roots)
-                    print(ci)
-                    Hci = ci.run()
-                    #self.basis[(na,nb)] = np.eye(ci.results_v.shape[0])
-                    self.basis[(na,nb)] = ci.results_v
-                    #self.Hci[(na,nb)] = Hci
-# }}}
-                    
             
     def rotate_basis(self,U):
         """
