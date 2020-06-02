@@ -945,7 +945,7 @@ def build_hamiltonian_diagonal_parallel2(clustered_ham, ci_vector, nproc=None, b
     Build hamiltonian diagonal in basis in ci_vector
     """
 # {{{
-    print(" In build_hamiltonian_diagonal_parallel1. nproc=",nproc) 
+    print(" In build_hamiltonian_diagonal_parallel2. nproc=",nproc) 
 
     
     global _clustered_ham
