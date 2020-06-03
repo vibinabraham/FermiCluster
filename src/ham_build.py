@@ -939,6 +939,121 @@ def build_hamiltonian_diagonal_parallel1(clustered_ham_in, ci_vector, nproc=None
 # }}}
 
 
+
+def build_hamiltonian_diagonal_parallel2(clustered_ham, ci_vector, nproc=None, batch_size=100):
+    """
+    Build hamiltonian diagonal in basis in ci_vector
+    """
+# {{{
+    print(" In build_hamiltonian_diagonal_parallel2. nproc=",nproc) 
+
+    
+    global _clustered_ham
+    global _delta_fock
+    _clustered_ham = clustered_ham
+    _delta_fock= tuple([(0,0) for ci in range(len(clustered_ham.clusters))])
+  
+    
+    def do_parallel_work(v_batch):
+        tmpout = []
+        for v_curr in v_batch:
+            tmp = 0
+            fockspace = v_curr[0]
+            config = v_curr[1]
+            
+            terms = _clustered_ham.terms[_delta_fock]
+            ## add diagonal energies
+            
+            for term in terms:
+                #tmp += term.matrix_element(fockspace,config,fockspace,config)
+                #tmp += term.diag_matrix_element(fockspace,config,opt_einsum=False)
+                
+                mats = []
+                # state sign is always 1 here, since an even number of creation/annihilation operators can only 
+                # contribute to diagonal
+                
+                state_sign = 1
+                n_active = 0
+                for oi,o in enumerate(term.ops):
+                    if o == '':
+                        continue
+                    n_active+=1
+
+                if n_active == 1:
+                    ci = term.active[0]
+                    tmp += term.clusters[ci].ops['H'][(fockspace[ci],fockspace[ci])][config[ci],config[ci]]
+                elif n_active > 0:
+                    for oi,o in enumerate(term.ops):
+                        if o == '':
+                            continue
+                        try:
+                            do = term.clusters[oi].ops[o]
+                        except KeyError:
+                            print(" Couldn't find:", term)
+                            exit()
+                        try:
+                            d = do[(fockspace[oi],fockspace[oi])][config[oi],config[oi]] #D(I,J,:,:...)
+                        except KeyError:
+                            continue 
+                        mats.append(d)
+                    
+                    if len(mats) < n_active:
+                        continue 
+                    tmp += np.einsum(term.contract_string,*mats, term.ints, optimize=False)
+            tmpout.append(tmp)
+        print(".",end="",flush=True)
+        return tmpout
+
+    import multiprocessing as mp
+    from pathos.multiprocessing import ProcessingPool as Pool
+    
+    if nproc == None:
+        pool = Pool()
+    else:
+        pool = Pool(processes=nproc)
+
+    print(" Using Pathos library for parallelization. Number of workers: ", pool.ncpus)
+    
+    # define batches
+    conf_batches = []
+    batch_size = min(batch_size,len(ci_vector))  
+    batch = []
+    print(" Form batches. Max batch size: ", batch_size)
+    for i,j,k in ci_vector:
+        if len(batch) < batch_size:
+            batch.append((i,j))
+        else:
+            conf_batches.append(batch)
+            batch = []
+            batch.append((i,j))
+    if len(batch) > 0:
+        conf_batches.append(batch)
+        batch = []
+
+    if len(ci_vector) == 0:
+        return np.array([])
+
+    print(" Number of configs: ", len(ci_vector))
+    print(" Number of batches: ", len(conf_batches))
+    print(" Batches complete : " )
+    out = pool.map(do_parallel_work, conf_batches)
+    print()
+    pool.close()
+    pool.join()
+    pool.clear()
+   
+    Hdv = np.zeros((len(ci_vector),))
+    count = 0
+    for oi in out:
+        for oij in oi:
+            Hdv[count] = oij
+            count += 1
+
+    return Hdv 
+
+# }}}
+
+
 def update_hamiltonian_diagonal(clustered_ham,ci_vector,Hd_vector):
     """
     Build hamiltonian diagonal in basis in ci_vector, 

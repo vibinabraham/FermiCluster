@@ -186,6 +186,7 @@ def compute_pt2_correction(ci_vector, clustered_ham, e0,
         pt_type         = 'en',
         nbody_limit     = 4,
         matvec          = 4,
+        diag_func       = 2,
         batch_size      = 1,
         shared_mem      = 3e9, #1GB holds clustered_ham
         nproc           = None): 
@@ -271,10 +272,13 @@ def compute_pt2_correction(ci_vector, clustered_ham, e0,
         # Build Denominator
         if pt_type == 'en':
             start = time.time()
-            if nproc==1:
-                Hd = update_hamiltonian_diagonal(clustered_ham, pt_vector, Hd_vector)
-            else:
+            if diag_func==1:
                 Hd = build_hamiltonian_diagonal_parallel1(clustered_ham, pt_vector, nproc=nproc)
+            elif diag_func==2:
+                Hd = build_hamiltonian_diagonal_parallel2(clustered_ham, pt_vector, nproc=nproc, batch_size=1000)
+            else:
+                print(" Wrong val for diag_func")
+                exit()
             #pr.disable()
             #pr.print_stats(sort='time')
             end = time.time()

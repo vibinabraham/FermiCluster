@@ -31,6 +31,10 @@ def system_setup(h, g, ecore, blocks, init_fspace,
         ):
 # {{{
     
+    """
+    If an input list of Cluster objects is provided for clusters_in, then the CMF will be restricted to that space spanned by that
+    current basis
+    """
     print(" System setup option:")
     print("     |init_fspace    : ", init_fspace)
     print("     |max_roots      : ", max_roots)
@@ -44,7 +48,6 @@ def system_setup(h, g, ecore, blocks, init_fspace,
     print("     |Ecore          : ", ecore)
     n_blocks = len(blocks)
     clusters = [Cluster(ci,c) for ci,c in enumerate(blocks)]
-    
     print(" Clusters:")
     [print(ci) for ci in clusters]
     
@@ -77,6 +80,7 @@ def system_setup(h, g, ecore, blocks, init_fspace,
     
 
     # build cluster basis and operator matrices using CMF optimized density matrices
+            
     for ci_idx, ci in enumerate(clusters):
         if delta_elec != None:
             fspaces_i = init_fspace[ci_idx]
