@@ -217,7 +217,7 @@ class ci_solver:
         self.H          = Hamiltonian() 
         self.no         = 0 
         self.thresh     = 1e-5 
-        self.max_iter   = 100 
+        self.max_iter   = 300 
         self.full_dim   = 0
         self.n_roots    = 1
         self.status     = "uninitialized"
@@ -383,7 +383,7 @@ class ci_solver:
 # }}}
 
     def build_H_matrix(self, basis):
-        
+
         #print(" Compute spin diagonals")
         self.Hdiag_s[0] = self.precompute_spin_diagonal_block(self.nea)
         self.Hdiag_s[1] = self.precompute_spin_diagonal_block(self.neb)
@@ -400,24 +400,64 @@ class ci_solver:
 
         ket_a.fill_ca_lookup()
         ket_b.fill_ca_lookup()
-        
-        Hci = np.zeros((self.full_dim,self.full_dim))
+
         ket_a = self.ket_a
         ket_b = self.ket_b
-       
-       
-        #   
-        #   Add spin diagonal components
-        #print(" Add spin diagonals")
-        Hci += np.kron(np.eye(ket_a.max()), self.Hdiag_s[1])
-        Hci += np.kron(self.Hdiag_s[0],np.eye(ket_b.max()))
+            
+        if self.algorithm=='direct':
+            
+            Hci = np.zeros((self.full_dim,self.full_dim))
+           
+            #   
+            #   Add spin diagonal components
+            #print(" Add spin diagonals")
+            Hci += np.kron(np.eye(ket_a.max()), self.Hdiag_s[1])
+            Hci += np.kron(self.Hdiag_s[0],np.eye(ket_b.max()))
 
-        #print(" Do alpha/beta terms")
-        self.compute_ab_terms_direct(Hci)
+            #print(" Do alpha/beta terms")
+            self.compute_ab_terms_direct(Hci)
 
-        Hci = .5*(Hci+Hci.T)
+            Hci = .5*(Hci+Hci.T)
+
+            return basis.T @ Hci @ basis
+
+        elif self.algorithm == 'davidson':
+
+
+            self.Apr = self.build_spin_tdms(bra_a,ket_a)
+            self.Bpr = self.build_spin_tdms(bra_b,ket_b)
+            self.Bpr = np.einsum('KLqs,prqs->KLpr',self.Bpr,self.H.V)
+
+            vec = 1.0 * basis
+            nvecs = vec.shape[1]
+            c = vec*1
+
+            c.shape = (ket_a.max(), ket_b.max(), nvecs)
+            sigma = np.zeros((ket_a.max(),ket_b.max(),nvecs))
+            sigma += np.einsum('IJpr,KLpr,JLt->IKt',self.Apr,self.Bpr,c,optimize=True)
+            sigma.shape = (ket_a.max()*ket_b.max(),nvecs)
+
+                
+            for s in range(nvecs):
+                sig_curr = cp.deepcopy(sigma[:,s])
+                vec_curr = cp.deepcopy(vec[:,s])
+                sig_curr.shape = (ket_a.max(), ket_b.max())
+                vec_curr.shape = (ket_a.max(), ket_b.max())
+                #sig_curr.shape = (ket_b.max(), ket_a.max())
+                #vec_curr.shape = (ket_b.max(), ket_a.max())
+                       
+                # (I x A)c = vec(AC)
+                sig_curr += self.Hdiag_s[0].dot(vec_curr);
+                # (B x I)c = vec(CB)
+                sig_curr += vec_curr.dot(self.Hdiag_s[1]);
+                
+                sig_curr.shape = (self.full_dim)
+                vec_curr.shape = (self.full_dim)
+                
+                sigma[:,s] = cp.deepcopy(sig_curr)
+                vec[:,s] = cp.deepcopy(vec_curr)
         
-        return basis.T @ Hci @ basis
+            return basis.T @ sigma
        
 
     def run(self,iprint=0):
@@ -576,7 +616,7 @@ class ci_solver:
 
         dav = Davidson(self.full_dim, self.n_roots)
         dav.thresh      = self.thresh 
-        dav.max_vecs    = 200 
+        dav.max_vecs    = 150 
         dav.max_iter    = self.max_iter 
         dav.form_rand_guess()
         dav.sig_curr = np.zeros((self.full_dim, self.n_roots))

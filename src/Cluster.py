@@ -142,7 +142,6 @@ class Cluster(object):
             ci = ci_solver()
             ci.init(H,na,nb,max_roots)
 
-            print(ci.full_dim)
             if ci.full_dim > 10000:
                 ci.thresh = 1e-5
                 ci.init(H,na,nb,1)
@@ -640,16 +639,22 @@ class Cluster(object):
         H.V = v
        
         for fock in self.basis:
+
             ci = ci_solver()
-            ci.algorithm = "direct"
             na = fock[0]
             nb = fock[1]
             ci.init(H,na,nb,1)
-            #print(ci)
-            self.ops['H'][(fock,fock)] = ci.build_H_matrix(self.basis[fock])
-            self.ops['H'][(fock,fock)] = .5*(self.ops['H'][(fock,fock)] + self.ops['H'][(fock,fock)].T)
+            if ci.full_dim > 10000:
+                ci.thresh = 1e-5
+                ci.algorithm = "davidson"
+                self.ops['H'][(fock,fock)] = ci.build_H_matrix(self.basis[fock])
+                self.ops['H'][(fock,fock)] = .5*(self.ops['H'][(fock,fock)] + self.ops['H'][(fock,fock)].T)
+            else:
+                ci.algorithm = "direct"
+                #print(ci)
+                self.ops['H'][(fock,fock)] = ci.build_H_matrix(self.basis[fock])
+                self.ops['H'][(fock,fock)] = .5*(self.ops['H'][(fock,fock)] + self.ops['H'][(fock,fock)].T)
             #print(" GS Energy: %12.8f" %self.ops['H'][(fock,fock)][0,0])
-        
 
         stop = time.time()
         print(" Time spent TDM 0: %12.2f" %(stop-start))
