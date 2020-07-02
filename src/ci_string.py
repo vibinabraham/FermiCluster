@@ -460,7 +460,7 @@ class ci_solver:
             return basis.T @ sigma
        
 
-    def run(self,iprint=0):
+    def run(self,s2=False,iprint=0):
         if iprint>0:
             print(" Compute spin diagonals",flush=True)
         self.Hdiag_s[0] = self.precompute_spin_diagonal_block(self.nea)
@@ -482,7 +482,7 @@ class ci_solver:
         ket_b.fill_ca_lookup()
 
         if self.algorithm == "direct":
-            Hci = self.run_direct()
+            Hci = self.run_direct(s2)
             return Hci
         elif self.algorithm == "davidson":
             #faster (still crazy slow) 
@@ -529,7 +529,7 @@ class ci_solver:
         return A
     # }}}
 
-    def run_direct(self, iprint=0):
+    def run_direct(self,s2=False, iprint=0):
 # {{{
         #print(" self.H.e_core: %12.8f" %self.H.e_core)
         #print(" self.H.e_nuc : %12.8f" %self.H.e_nuc)
@@ -555,24 +555,46 @@ class ci_solver:
         #helpers.print_mat(Hci)
         if iprint>0:
             print(" Diagonalize Matrix for %i roots" %self.n_roots)
-
-        Hci = .5*(Hci+Hci.T)
-        if Hci.shape[0] > 1 and Hci.shape[0] > self.n_roots:
-            l,C = scipy.sparse.linalg.eigsh(Hci,self.n_roots,which='SA')
-            sort_ind = np.argsort(l)
-            l = l[sort_ind]
-            C = C[:,sort_ind]
-        elif Hci.shape[0] > 1 and Hci.shape[0] <= self.n_roots:
-            l,C = np.linalg.eigh(Hci)
-            sort_ind = np.argsort(l)
-            l = l[sort_ind]
-            C = C[:,sort_ind]
-        elif Hci.shape[0] == 1:
-            l = [Hci[0,0]]
-            C = np.array([[1.0]])
+        
+        if s2:
+            S2 = self.build_S2_matrix()
+            Hci = .5*(Hci+Hci.T)
+            if Hci.shape[0] > 1 and Hci.shape[0] > self.n_roots:
+                l,C = scipy.sparse.linalg.eigsh(Hci+0.089*S2,self.n_roots,which='SA')
+                l = np.diag(C.T @ Hci @ C)
+                sort_ind = np.argsort(l)
+                l = l[sort_ind]
+                C = C[:,sort_ind]
+            elif Hci.shape[0] > 1 and Hci.shape[0] <= self.n_roots:
+                l,C = np.linalg.eigh(Hci+0.089*S2)
+                l = np.diag(C.T @ Hci @ C)
+                sort_ind = np.argsort(l)
+                l = l[sort_ind]
+                C = C[:,sort_ind]
+            elif Hci.shape[0] == 1:
+                l = [Hci[0,0]]
+                C = np.array([[1.0]])
+            else:
+                print(" Problem with Hci dimension")
+                exit()
         else:
-            print(" Problem with Hci dimension")
-            exit()
+            Hci = .5*(Hci+Hci.T)
+            if Hci.shape[0] > 1 and Hci.shape[0] > self.n_roots:
+                l,C = scipy.sparse.linalg.eigsh(Hci,self.n_roots,which='SA')
+                sort_ind = np.argsort(l)
+                l = l[sort_ind]
+                C = C[:,sort_ind]
+            elif Hci.shape[0] > 1 and Hci.shape[0] <= self.n_roots:
+                l,C = np.linalg.eigh(Hci)
+                sort_ind = np.argsort(l)
+                l = l[sort_ind]
+                C = C[:,sort_ind]
+            elif Hci.shape[0] == 1:
+                l = [Hci[0,0]]
+                C = np.array([[1.0]])
+            else:
+                print(" Problem with Hci dimension")
+                exit()
         #print(" Diagonalize Matrix")
         #l,C = np.linalg.eigh(Hci)
         #sort_ind = np.argsort(l)
@@ -856,6 +878,119 @@ class ci_solver:
         return schmidt_basis 
     # }}}
 
+    def build_S2_matrix(self):
+    # {{{
+
+        #   Create local references to ci_strings
+        ket_a = self.ket_a
+        ket_b = self.ket_b
+        bra_a = self.bra_a
+        bra_b = self.bra_b
+
+        
+        # avoid python function call overhead
+        ket_a_max = ket_a.max()
+        ket_b_max = ket_b.max()
+        bra_a_max = bra_a.max()
+        bra_b_max = bra_b.max()
+
+        dim = ket_a_max * ket_b_max
+        assert(bra_a_max* bra_b_max == dim)
+        S2 = np.zeros((dim,dim)) 
+
+        range_ket_a_no = list(range(ket_a.no))
+        range_ket_b_no = list(range(ket_b.no))
+
+        ket_a.reset()
+        for Ka in range(ket_a_max): 
+            
+            ket_b.reset()
+            for Kb in range(ket_b_max): 
+                
+
+                K = Kb + Ka * ket_b_max
+
+                # Sz.Sz
+                for ai in ket_a._config:
+                    for aj in ket_a._config:
+                        if ai != aj:
+                            S2[K,K] += 0.25
+
+                for bi in ket_b._config:
+                    for bj in ket_b._config:
+                        if bi != bj:
+                            S2[K,K] += 0.25
+
+                for ai in ket_a._config:
+                    for bj in ket_b._config:
+                        if ai != bj:
+                            S2[K,K] -= 0.5
+                
+                #Sp.Sm + Sm.Sp 
+                for ai in ket_a._config:
+                    if ai in ket_b._config:
+                        a = 10
+                    else:
+                        S2[K,K] += 0.75
+
+                for bi in ket_b._config:
+                    if bi in ket_a._config:
+                        a = 10
+                    else:
+                        S2[K,K] += 0.75
+
+                #ket_a2 = self.ket_a # dont use
+                #ket_b2 = self.ket_b
+
+                ket_a2 = ci_string(ket_a.no, ket_a.ne)
+                ket_b2 = ci_string(ket_b.no, ket_b.ne)
+
+
+                for ai in ket_a._config:
+                    for bj in ket_b._config:
+                        if ai not in ket_b._config:
+                            if bj not in ket_a._config:
+
+                                ket_a2.dcopy(ket_a)
+                                ket_b2.dcopy(ket_b)
+
+
+                                #print("b",ket_a2._config,ket_b2._config)
+                                ket_a2.a(ai)  
+
+                                if ket_a2.sign() == 0:
+                                    continue
+
+                                ket_b2.c(ai)  
+                                if ket_b2.sign() == 0:
+                                    continue
+
+                                ket_a2.c(bj)  
+                                if ket_a2.sign() == 0:
+                                    continue
+                                ket_b2.a(bj)  
+                                if ket_b2.sign() == 0:
+                                    continue
+
+                                sign_a = ket_a2.sign()
+                                sign_b = ket_b2.sign()
+
+                                La =ket_a2.linear_index()
+                                Lb = ket_b2.linear_index()
+                                #print("a",ket_a2._config,ket_b2._config)
+                                
+                                L = Lb + La * ket_b_max
+                               
+                                S2[K,L] += 1 * sign_a * sign_b 
+
+                ket_b.incr()
+                #   end Ka 
+
+            ket_a.incr()
+            #   end Kb 
+        self.S2 = S2
+        return S2
+    # }}}
 
 
 ################################################################################33
@@ -2273,5 +2408,332 @@ def build_caa_os(no,bra_space,ket_space,basis,spin_case):
     v2.shape = (ket_a_max*ket_b_max,nv2)
     v1.shape = (bra_a_max*bra_b_max,nv1)
    
+    return tdm
+# }}}
+
+
+def build_1tdm_costly(no,bra_space,ket_space,basis,spin_case):
+    """
+    Copy of ca_ss
+
+    Compute a(v1,v2,j) = <v1|a_j|v2>
+
+    Input: 
+        no = n_orbs
+        bra_space = (n_alpha,n_beta) for bra
+        ket_space = (n_alpha,n_beta) for ket
+        spin_case: 'a' or 'b'
+        basis = dict of basis vectors
+    """
+    # {{{ 
+    bra_a = ci_string(no, bra_space[0])
+    bra_b = ci_string(no, bra_space[1])
+    ket_a = ci_string(no, ket_space[0])
+    ket_b = ci_string(no, ket_space[1])
+   
+    assert(ket_a.no == ket_b.no) 
+    assert(bra_a.no == ket_a.no) 
+   
+    # avoid python function call overhead
+    ket_a_max = ket_a.max()
+    ket_b_max = ket_b.max()
+    bra_a_max = bra_a.max()
+    bra_b_max = bra_b.max()
+    
+    range_no = range(no)
+  
+    _abs = abs
+   
+    v1 = basis
+    v2 = basis
+
+    assert(v1.shape[0] == len(bra_a)*len(bra_b))
+    assert(v2.shape[0] == len(ket_a)*len(ket_b))
+    nv1 = v1.shape[1]
+    nv2 = v2.shape[1]
+
+    
+    #alpha term 
+    if spin_case == "a":
+        ket = cp.deepcopy(ket_a)
+        bra = cp.deepcopy(bra_a)
+    elif spin_case == "b":
+        ket = cp.deepcopy(ket_b)
+        bra = cp.deepcopy(bra_b)
+    
+    tdm_1spin = np.zeros((bra.max(),ket.max(),no,no))
+    ket.reset()
+    bra.reset()
+    for K in range(ket.max()): 
+        for p in range_no:
+            for q in range_no:
+                bra.dcopy(ket)
+                bra.a(q)
+                if bra.sign() == 0:
+                    continue
+                bra.c(p)
+                if bra.sign() == 0:
+                    continue
+                L = bra.linear_index()
+                sign = bra.sign()
+                tdm_1spin[L,K,p,q] += sign
+
+        ket.incr()
+  
+    v2.shape = (ket_a_max,ket_b_max,nv2)
+    v1.shape = (bra_a_max,bra_b_max,nv1)
+
+    
+    if spin_case == "a":
+        # v(IJs) <IJ|pq|KL> v(KLt)   = v(IJs) tdm(IKpq) v(KJt) = A(stpq)
+        tmp = np.einsum('ikpq,kjt->ipqjt',tdm_1spin,v2)
+        tdm = np.einsum('ijs,ipqjt->stpq',v1,tmp)
+    elif spin_case == "b":
+        # v(IJs) <IJ|pq|KL> v(KLt)   = v(IJs) tdm(JLpq) v(ILt) = A(stpq)
+        tmp = np.einsum('jlpq,ilt->jpqit',tdm_1spin,v2)
+        tdm = np.einsum('ijs,jpqit->stpq',v1,tmp) 
+
+    
+    v2.shape = (ket_a_max*ket_b_max,nv2)
+    v1.shape = (bra_a_max*bra_b_max,nv1)
+   
+    tdm = tdm.reshape(tdm.shape[2],tdm.shape[3])
+
+    print(tdm)
+    print(tdm.shape)
+
+    return tdm
+# }}}
+
+def build_2tdmss_costly(no,bra_space,ket_space,basis,spin_case):
+    """
+    Copy of ccaa_ss
+
+    Compute a(v1,v2,pqrs) = <v1|p'q'rs|v2>
+    
+    if spin_case a
+    D(v1,v2,pqrs) =          v(I,J,s) <IJ|p'q'rs|I'J'> v(I',J',t)
+                             v(I,J,s) <I|p'q'rs|I'> v(I',J',t) 
+    if spin_case b
+    D(v1,v2,pqrs) =          v(I,J,s) <IJ|p'q'rs|I'J'> v(I',J',t)
+                             v(I,J,s) <J|p'q'rs|J'> v(I',J',t) 
+
+    Input: 
+        no = n_orbs
+        bra_space = (n_alpha,n_beta) for bra
+        ket_space = (n_alpha,n_beta) for ket
+        spin_case: 'a' or 'b'
+        basis = dict of basis vectors
+    """
+    # {{{ 
+    bra_a = ci_string(no, bra_space[0])
+    bra_b = ci_string(no, bra_space[1])
+    ket_a = ci_string(no, ket_space[0])
+    ket_b = ci_string(no, ket_space[1])
+   
+    assert(ket_a.no == ket_b.no) 
+    assert(bra_a.no == ket_a.no) 
+    assert(bra_a.ne == ket_a.ne) 
+    assert(bra_b.ne == ket_b.ne) 
+   
+    # avoid python function call overhead
+    ket_a_max = ket_a.max()
+    ket_b_max = ket_b.max()
+    bra_a_max = bra_a.max()
+    bra_b_max = bra_b.max()
+    
+    range_no = range(no)
+  
+    _abs = abs
+   
+    v1 = basis
+    v2 = basis
+
+    assert(v1.shape[0] == len(bra_a)*len(bra_b))
+    assert(v2.shape[0] == len(ket_a)*len(ket_b))
+    nv1 = v1.shape[1]
+    nv2 = v2.shape[1]
+
+    
+    #alpha term 
+    if spin_case == "a":
+        ket = cp.deepcopy(ket_a)
+        bra = cp.deepcopy(bra_a)
+    elif spin_case == "b":
+        ket = cp.deepcopy(ket_b)
+        bra = cp.deepcopy(bra_b)
+    
+    tdm_1spin = np.zeros((bra.max(),ket.max(),no,no,no,no))
+    ket.reset()
+    bra.reset()
+    for K in range(ket.max()): 
+        for p in range_no:
+            for q in range_no:
+                for r in range_no:
+                    for s in range_no:
+                        bra.dcopy(ket)
+
+                        bra.a(s)
+                        if bra.sign() == 0:
+                            continue
+                        
+                        bra.a(r)
+                        if bra.sign() == 0:
+                            continue
+                        
+                        bra.c(q)
+                        if bra.sign() == 0:
+                            continue
+                        
+                        bra.c(p)
+                        if bra.sign() == 0:
+                            continue
+                        
+                        L = bra.linear_index()
+                        sign = bra.sign()
+                        tdm_1spin[L,K,p,q,r,s] += sign
+
+        ket.incr()
+  
+    v2.shape = (ket_a_max,ket_b_max,nv2)
+    v1.shape = (bra_a_max,bra_b_max,nv1)
+    
+    if spin_case == "a":
+        # v(IJt) <IJ|pqrs|KL> v(KLu)  = v(IJt) <I|pqrs|K> v(KJu) = A(tupqrs)
+        tdm = oe.contract('ijt,ikpqrs,kju->tupqrs',v1,tdm_1spin,v2)
+    elif spin_case == "b":
+        # v(IJt) <IJ|pqrs|KL> v(KLu)   = v(IJt) tdm(JLpqrs) v(ILu) = A(tupqrs)
+        tdm = oe.contract('ijt,jlpqrs,ilu->tupqrs',v1,tdm_1spin,v2)
+
+ 
+    v2.shape = (ket_a_max*ket_b_max,nv2)
+    v1.shape = (bra_a_max*bra_b_max,nv1)
+   
+    tdm = tdm.reshape(tdm.shape[2],tdm.shape[3],tdm.shape[4],tdm.shape[5])
+    print(tdm.shape)
+    return tdm
+# }}}
+
+def build_2tdmos_costly(no,bra_space,ket_space,basis,spin_case):
+    """
+    Copy of ccaa_os
+
+    Compute D(v1,v2,pqrs) = <v1|p'q'r s|v2> where p,q have different spins
+
+    if spin_case abba
+    D(v1,v2,p,q,r,s) =          v(I,J,m) <IJ|p'q'r s|I'J'> v(I',J',n)
+                           v(I,J,m) <I|p's|I'><J|q'r|J'> v(I',J',n) * sign 
+                           sign = (-1)^2*(N(I')+1)
+    
+    if spin_case ba
+    D(v1,v2,p,q,r,s) =          v(I,J,m) <IJ|p'q'r s|I'J'> v(I',J',n)
+                          v(I,J,m) <I|q'r|I'><J|p's|J'> v(I',J',n) * sign
+                          sign = (-1)^2*(N(I'))+2
+
+    where N(I') is Number of Alpha electrons in the ket_space
+        
+    Input: 
+        no = n_orbs
+        bra_space = (n_alpha,n_beta) for bra
+        ket_space = (n_alpha,n_beta) for ket
+        basis = dict of basis vectors
+        spin_case: 'abba' or 'baab'
+
+    """
+    # {{{ 
+    bra_a = ci_string(no, bra_space[0])
+    bra_b = ci_string(no, bra_space[1])
+    ket_a = ci_string(no, ket_space[0])
+    ket_b = ci_string(no, ket_space[1])
+  
+
+    assert(spin_case == 'abba' or spin_case == 'baab')
+    assert(ket_a.no == ket_b.no) 
+    assert(bra_a.no == ket_a.no)
+    assert(bra_a.ne == ket_a.ne) 
+    assert(bra_b.ne == ket_b.ne) 
+   
+    # avoid python function call overhead
+    ket_a_max = ket_a.max()
+    ket_b_max = ket_b.max()
+    bra_a_max = bra_a.max()
+    bra_b_max = bra_b.max()
+    
+    range_no = range(no)
+  
+    _abs = abs
+   
+    v1 = basis
+    v2 = basis
+
+    assert(v1.shape[0] == len(bra_a)*len(bra_b))
+    assert(v2.shape[0] == len(ket_a)*len(ket_b))
+    nv1 = v1.shape[1]
+    nv2 = v2.shape[1]
+
+    NAK = ket_space[0]
+    
+    #alpha term 
+    Da = np.zeros((bra_a.max(),ket_a.max(),no,no))
+
+    ket_a.reset()
+    bra_a.reset()
+    for K in range(ket_a.max()): 
+        for p in range_no:
+            for q in range_no:
+                bra_a.dcopy(ket_a)
+                bra_a.a(q)
+                if bra_a.sign() == 0:
+                    continue
+                bra_a.c(p)
+                if bra_a.sign() == 0:
+                    continue
+                L = bra_a.linear_index()
+                sign = bra_a.sign()
+                Da[L,K,p,q] += sign
+
+        ket_a.incr()
+
+
+    #beta term 
+    Db = np.zeros((bra_b.max(),ket_b.max(),no,no))
+
+    ket_b.reset()
+    bra_b.reset()
+    for K in range(ket_b.max()): 
+        for p in range_no:
+            for q in range_no:
+                bra_b.dcopy(ket_b)
+                bra_b.a(q)
+                if bra_b.sign() == 0:
+                    continue
+                bra_b.c(p)
+                if bra_b.sign() == 0:
+                    continue
+
+                L = bra_b.linear_index()
+                sign = bra_b.sign()
+                #print(ket_b._config,bra_b._config,sign)
+                Db[L,K,p,q] += sign
+        ket_b.incr()
+
+    v2.shape = (ket_a_max,ket_b_max,nv2)
+    v1.shape = (bra_a_max,bra_b_max,nv1)
+   
+
+    # v(IJm) Da(IKps) Db(JLqr) v(KLn) = D(mnpqrs)
+    if spin_case == 'abba':
+        sig = (-1)**(2*(NAK+1))
+        tdm = sig*  oe.contract('ijm,ikps,jlqr,kln->mnpqrs',v1,Da,Db,v2)
+
+    if spin_case == 'baab':
+        sig = (-1)**(2*(NAK+1))
+        tdm = sig * oe.contract('ijm,ikqr,jlps,kln->mnpqrs',v1,Da,Db,v2)
+
+    v2.shape = (ket_a_max*ket_b_max,nv2)
+    v1.shape = (bra_a_max*bra_b_max,nv1)
+   
+    tdm = tdm.reshape(tdm.shape[2],tdm.shape[3],tdm.shape[4],tdm.shape[5])
+    print(tdm.shape)
     return tdm
 # }}}

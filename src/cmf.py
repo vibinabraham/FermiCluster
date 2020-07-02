@@ -583,6 +583,103 @@ def build_tdm(r_vector,l_vector,clustered_ham):
 
 # }}}
 
+def gen_12rdms_cmf(ci_vector,clusters):
+# {{{
+    """
+    Generates the 1 and 2 rdm for the orbital optimization calculation for cmf. 
+    """
+    assert len(ci_vector) == 1,"ci_vector larger than 1 vector. Code implemented for a single cMF state only"
+    norb = ci_vector.n_orb
+    fspace = list(ci_vector.data.keys())[0]
+    #print(fspace)
+
+    # define orbital index shift
+    tmp = 0
+    sh = []
+    for ci in range(len(clusters)):
+        sh.append(tmp)
+        tmp += clusters[ci].n_orb
+
+    opdm_a = np.zeros((norb,norb))
+    opdm_b = np.zeros((norb,norb))
+    tpdm_aa = np.zeros((norb,norb,norb,norb))
+    tpdm_ab = np.zeros((norb,norb,norb,norb))
+    tpdm_ba = np.zeros((norb,norb,norb,norb))
+    tpdm_bb = np.zeros((norb,norb,norb,norb))
+    for ci_idx, ci in enumerate(clusters):
+        fock = fspace[ci_idx]
+        cvec = ci.basis[fock][:,0]
+        dim = cvec.shape[0]
+        cvec = cvec.reshape(dim,1)
+
+        # for 1DM
+        oia = build_1tdm_costly(ci.n_orb,fock,fock,cvec,spin_case='a')
+        oib = build_1tdm_costly(ci.n_orb,fock,fock,cvec,spin_case='b')
+
+        opdm_a[sh[ci.idx]:sh[ci.idx]+ci.n_orb, sh[ci.idx]:sh[ci.idx]+ci.n_orb] = oia
+        opdm_b[sh[ci.idx]:sh[ci.idx]+ci.n_orb, sh[ci.idx]:sh[ci.idx]+ci.n_orb] = oib
+
+        rangei = range(sh[ci.idx],sh[ci.idx]+ci.n_orb)
+
+
+        taa = build_2tdmss_costly(ci.n_orb,fock,fock,cvec,spin_case='a')
+        tbb = build_2tdmss_costly(ci.n_orb,fock,fock,cvec,spin_case='b')
+        tab = build_2tdmos_costly(ci.n_orb,fock,fock,cvec,spin_case='abba')
+        tba = build_2tdmos_costly(ci.n_orb,fock,fock,cvec,spin_case='baab')
+
+        tpdm_aa[sh[ci.idx]:sh[ci.idx]+ci.n_orb, sh[ci.idx]:sh[ci.idx]+ci.n_orb, sh[ci.idx]:sh[ci.idx]+ci.n_orb, sh[ci.idx]:sh[ci.idx]+ci.n_orb]  += taa
+        tpdm_ab[sh[ci.idx]:sh[ci.idx]+ci.n_orb, sh[ci.idx]:sh[ci.idx]+ci.n_orb, sh[ci.idx]:sh[ci.idx]+ci.n_orb, sh[ci.idx]:sh[ci.idx]+ci.n_orb]  += tab
+        tpdm_bb[sh[ci.idx]:sh[ci.idx]+ci.n_orb, sh[ci.idx]:sh[ci.idx]+ci.n_orb, sh[ci.idx]:sh[ci.idx]+ci.n_orb, sh[ci.idx]:sh[ci.idx]+ci.n_orb]  += tba
+        tpdm_bb[sh[ci.idx]:sh[ci.idx]+ci.n_orb, sh[ci.idx]:sh[ci.idx]+ci.n_orb, sh[ci.idx]:sh[ci.idx]+ci.n_orb, sh[ci.idx]:sh[ci.idx]+ci.n_orb]  += tbb
+
+
+        for cj_idx, cj in enumerate(clusters):
+            if ci_idx == cj_idx:
+                continue
+
+            fock = fspace[cj_idx]
+            cvec = cj.basis[fock][:,0]
+            dim = cvec.shape[0]
+            cvec = cvec.reshape(dim,1)
+            oja = build_1tdm_costly(cj.n_orb,fock,fock,cvec,spin_case='a')
+            ojb = build_1tdm_costly(cj.n_orb,fock,fock,cvec,spin_case='b')
+            rangej = range(sh[cj.idx],sh[cj.idx]+cj.n_orb)
+
+            for p,a in enumerate(rangei):
+                for q,b in enumerate(rangej):
+                    for r,c in enumerate(rangej):
+                        for s,d in enumerate(rangei):
+                            tpdm_aa[a,b,c,d] +=   oia[p,s] * oja[q,r]  #aaaa
+                            tpdm_ab[a,b,c,d] +=   oia[p,s] * ojb[q,r]  #abba
+                            tpdm_ba[a,b,c,d] +=   oib[p,s] * oja[q,r]  #baab
+                            tpdm_bb[a,b,c,d] +=   oib[p,s] * ojb[q,r]  #bbbb
+            
+
+            for p,a in enumerate(rangei):
+                for q,b in enumerate(rangej):
+                    for r,c in enumerate(rangei):
+                        for s,d in enumerate(rangej):
+                            tpdm_aa[a,b,c,d] +=  -oia[p,r] * oja[q,s]  #aaaa
+                            tpdm_bb[a,b,c,d] +=  -oib[p,r] * ojb[q,s]  #bbbb
+
+    # density is being made in a reindexed fasion - reorder now 
+    new_index = []
+    for ci in clusters:
+        for cij in ci.orb_list:
+            new_index.append(cij)
+    new_index = np.array(new_index)
+
+    idx = new_index.argsort()
+    opdm_a = opdm_a[:,idx][idx,:]
+    opdm_b = opdm_b[:,idx][idx,:]
+
+    tpdm_aa = tpdm_aa[:,:,:,idx][:,:,idx,:][:,idx,:,:][idx,:,:,:]
+    tpdm_ba = tpdm_ba[:,:,:,idx][:,:,idx,:][:,idx,:,:][idx,:,:,:]
+    tpdm_ab = tpdm_ab[:,:,:,idx][:,:,idx,:][:,idx,:,:][idx,:,:,:]
+    tpdm_bb = tpdm_bb[:,:,:,idx][:,:,idx,:][:,idx,:,:][idx,:,:,:]
+
+    return opdm_a,opdm_b,tpdm_aa,tpdm_ab,tpdm_ba,tpdm_bb
+# }}}
 
 class CmfSolver:
     """
@@ -969,31 +1066,45 @@ class CmfSolver:
             ci.build_local_terms(h,g)
 
 
+        opdm_a,opdm_b, tpdm_aa, tpdm_ab, tpdm_ba, tpdm_bb = gen_12rdms_cmf(ci_vector,clusters)
+        ## Compare energy using density to reference energy
+        #compute energy
+        opdm = opdm_a + opdm_b
+        tpdm = tpdm_aa + tpdm_ab + tpdm_ba + tpdm_bb
+        E = np.einsum('pq,pq',h,opdm)
+        E += 0.5 * np.einsum('tvuw,tuwv',g,tpdm)
 
+        #reference energy
+        assert(abs(e_curr-E)<1e-8)
+        #Generalized Fock
+        Gf = np.einsum('pr,rq->pq',h,opdm) + np.einsum('pvuw,quwv->pq',g,tpdm) 
+        #Gradient
+        Gpq = Gf - Gf.T
 
-        if self.matvec==1:
-            h1_vector = matvec.matvec1(clustered_ham, ci_vector, thresh_search=0, nbody_limit=3)
-        elif self.matvec==2:
-            pt_vector = matvec.matvec1_parallel2(clustered_ham, ci_vector, nproc=self.nproc, nbody_limit=3)
-        elif self.matvec==3:
-            pt_vector = matvec.matvec1_parallel3(clustered_ham, ci_vector, nproc=self.nproc, nbody_limit=3)
-        #elif matvec==4:
-        #    pt_vector = matvec.matvec1_parallel4(clustered_ham, ci_vector, nproc=self.nproc, nbody_limit=3,
-        #            shared_mem=shared_mem, batch_size=batch_size)
-        else:
-            print(" Wrong option for matvec")
-            exit()
-        #h1_vector.print_configs()
-        rdm_a1, rdm_b1 = build_tdm(ci_vector,h1_vector,clustered_ham)
-        rdm_a2, rdm_b2 = build_tdm(h1_vector,ci_vector,clustered_ham)
-        print("Gradient")
-        Gpq = rdm_a1+rdm_b1-rdm_a2-rdm_b2
+        if 0:
+            if self.matvec==1:
+                h1_vector = matvec.matvec1(clustered_ham, ci_vector, thresh_search=0, nbody_limit=3)
+            elif self.matvec==2:
+                pt_vector = matvec.matvec1_parallel2(clustered_ham, ci_vector, nproc=self.nproc, nbody_limit=3)
+            elif self.matvec==3:
+                pt_vector = matvec.matvec1_parallel3(clustered_ham, ci_vector, nproc=self.nproc, nbody_limit=3)
+            #elif matvec==4:
+            #    pt_vector = matvec.matvec1_parallel4(clustered_ham, ci_vector, nproc=self.nproc, nbody_limit=3,
+            #            shared_mem=shared_mem, batch_size=batch_size)
+            else:
+                print(" Wrong option for matvec")
+                exit()
+            #h1_vector.print_configs()
+            rdm_a1, rdm_b1 = build_tdm(ci_vector,h1_vector,clustered_ham)
+            rdm_a2, rdm_b2 = build_tdm(h1_vector,ci_vector,clustered_ham)
+            print("Gradient")
+            Gpq = rdm_a1+rdm_b1-rdm_a2-rdm_b2
+
+            #print("CurrCMF:%12.8f       Grad:%12.8f    dE:%10.6f"%(e_curr,np.linalg.norm(grad),e_curr-self.e))
+            #print("CurrCMF:%12.8f       Grad:%12.8f   "%(e_curr,np.linalg.norm(Gpq)))
+            
         print(Gpq)
         print("NormGrad1",np.linalg.norm(Gpq))
-
-        #print("CurrCMF:%12.8f       Grad:%12.8f    dE:%10.6f"%(e_curr,np.linalg.norm(grad),e_curr-self.e))
-        #print("CurrCMF:%12.8f       Grad:%12.8f   "%(e_curr,np.linalg.norm(Gpq)))
-        
 
         # remove frozen rotations
         for freeze in self.to_freeze:

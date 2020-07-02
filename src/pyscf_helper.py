@@ -547,6 +547,15 @@ def get_pi_space(mol,mf,cas_norb,cas_nel,local=True):
         C[:,cas_list] = cl_a
     else:
         C = mf.mo_coeff
+        mo_energy = mf.mo_energy[cas_list]
+
+        if mol.symmetry == True:
+            from pyscf import symm
+            mo = symm.symmetrize_orb(mol, C[:,cas_list])
+            osym = symm.label_orb_symm(mol, mol.irrep_name, mol.symm_orb, mo)
+            #symm.addons.symmetrize_space(mol, mo, s=None, check=True, tol=1e-07)
+            for i in range(len(osym)):
+                print("%4d %8s %16.8f"%(i+1,osym[i],mo_energy[i]))
 
     # reorder the orbitals to get docc,active,vir ordering  (Note:sort mo takes orbital ordering from 1)
     mycas = mcscf.CASCI(mf, cas_norb, cas_nel)
