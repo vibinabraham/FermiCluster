@@ -122,9 +122,7 @@ def test_1():
 
         print()
         print(" Form basis by diagonalizing local Hamiltonian for cluster: ",ci_idx)
-        ci.form_fockspace_eigbasis(h, g, fspaces_i, max_roots=50, rdm1_a=rdm_a, rdm1_b=rdm_b, ecore=ecore,cs_solver=0)
-        #ci.form_fockspace_eigbasis(h, g, fspaces_i, max_roots=50, ecore=ecore,cs_solver=0,iprint=1)
-        #ci.form_fockspace_eigbasis(h, g, fspaces_i, max_roots=5, ecore=ecore,cs_solver=1,iprint=1)
+        ci.form_fockspace_eigbasis(h, g, fspaces_i, max_roots=50, rdm1_a=rdm_a, rdm1_b=rdm_b, ecore=ecore)
 
         print(" Build operator matrices for cluster ",ci.idx)
         ci.build_op_matrices(iprint=1)
@@ -132,7 +130,7 @@ def test_1():
         
 
 
-    opdm_a,opdm_b, tpdm_aa, tpdm_ab, tpdm_ba, tpdm_bb = gen_12rdms_cmf(ci_vector,clusters)
+    opdm_a,opdm_b, tpdm_aa, tpdm_ab, tpdm_ba, tpdm_bb = build_12rdms_cmf(ci_vector,clusters)
 
     ## Compare energy using density to reference energy
 

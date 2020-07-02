@@ -583,7 +583,7 @@ def build_tdm(r_vector,l_vector,clustered_ham):
 
 # }}}
 
-def gen_12rdms_cmf(ci_vector,clusters):
+def build_12rdms_cmf(ci_vector,clusters):
 # {{{
     """
     Generates the 1 and 2 rdm for the orbital optimization calculation for cmf. 
@@ -782,7 +782,7 @@ class CmfSolver:
         
             print()
             print(" Form basis by diagonalizing local Hamiltonian for cluster: ",ci_idx)
-            ci.form_fockspace_eigbasis(h, g, fspaces_i, max_roots=self.max_roots, rdm1_a=rdm_a, rdm1_b=rdm_b, ecore=self.ecore)
+            ci.form_fockspace_eigbasis(h, g, fspaces_i, max_roots=1, rdm1_a=rdm_a, rdm1_b=rdm_b, ecore=self.ecore)
             
             print(" Build operator matrices for cluster ",ci.idx)
             ci.build_op_matrices()
@@ -876,7 +876,7 @@ class CmfSolver:
         
             print()
             print(" Form basis by diagonalizing local Hamiltonian for cluster: ",ci_idx)
-            ci.form_fockspace_eigbasis(h, g, fspaces_i, max_roots=self.max_roots, rdm1_a=rdm_a, rdm1_b=rdm_b, ecore=self.ecore)
+            ci.form_fockspace_eigbasis(h, g, fspaces_i, max_roots=1, rdm1_a=rdm_a, rdm1_b=rdm_b, ecore=self.ecore)
             
             print(" Build operator matrices for cluster ",ci.idx)
             ci.build_op_matrices()
@@ -1059,14 +1059,14 @@ class CmfSolver:
         
             print()
             print(" Form basis by diagonalizing local Hamiltonian for cluster: ",ci_idx)
-            ci.form_fockspace_eigbasis(h, g, fspaces_i, max_roots=self.max_roots, rdm1_a=rdm_a, rdm1_b=rdm_b, ecore=self.ecore)
+            ci.form_fockspace_eigbasis(h, g, fspaces_i, max_roots=1, rdm1_a=rdm_a, rdm1_b=rdm_b, ecore=self.ecore)
             
             print(" Build operator matrices for cluster ",ci.idx)
             ci.build_op_matrices()
             ci.build_local_terms(h,g)
 
 
-        opdm_a,opdm_b, tpdm_aa, tpdm_ab, tpdm_ba, tpdm_bb = gen_12rdms_cmf(ci_vector,clusters)
+        opdm_a,opdm_b, tpdm_aa, tpdm_ab, tpdm_ba, tpdm_bb = build_12rdms_cmf(ci_vector,clusters)
         ## Compare energy using density to reference energy
         #compute energy
         opdm = opdm_a + opdm_b
