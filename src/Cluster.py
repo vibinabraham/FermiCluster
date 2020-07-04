@@ -183,7 +183,7 @@ class Cluster(object):
                     ci.algorithm = "direct"
                 
                 
-                Hci = ci.run()
+                Hci = ci.run(s2=True)
                 #self.basis[(na,nb)] = np.eye(ci.results_v.shape[0])
                 if iprint>0:
                     for i,ei in enumerate(ci.results_e):

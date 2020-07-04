@@ -77,9 +77,13 @@ def cmf(clustered_ham, ci_vector, h, g,
     if diis==True:
         diis_start = diis_start
         max_diis = max_diis
-        diis_vals_dm = [rdm_a.copy()]
-        diis_errors = []
-        diis_size = 0
+        diis_vals_dm_a = [rdm_a.copy()]
+        diis_errors_a = []
+        diis_size_a = 0
+
+        diis_vals_dm_b = [rdm_b.copy()]
+        diis_errors_b = []
+        diis_size_b = 0
 
     ecore = clustered_ham.core_energy
     for cmf_iter in range(max_iter):
@@ -128,34 +132,40 @@ def cmf(clustered_ham, ci_vector, h, g,
             if diis==True:
                 ###  DIIS  ###
                 # form 1rdm from reference state
-                old_dm = rdm_a.copy()
+                old_dm_a = rdm_a.copy()
+                old_dm_b = rdm_b.copy()
                 rdm_a, rdm_b = build_1rdm(ci_vector, clustered_ham.clusters)
-                dm_new = rdm_a.copy()
+                dm_new_a = rdm_a.copy()
+                dm_new_b = rdm_b.copy()
 
-                diis_vals_dm.append(dm_new.copy())
-                error_dm = (dm_new - old_dm).ravel()
-                diis_errors.append(error_dm)
+                diis_vals_dm_a.append(dm_new_a.copy())
+                error_dm_a = (dm_new_a - old_dm_a).ravel()
+                diis_errors_a.append(error_dm_a)
+
+                diis_vals_dm_b.append(dm_new_b.copy())
+                error_dm_b = (dm_new_b - old_dm_b).ravel()
+                diis_errors_b.append(error_dm_b)
 
                 if cmf_iter > diis_start:
                     # Limit size of DIIS vector
-                    if (len(diis_vals_dm) > max_diis):
-                        del diis_vals_dm[0]
-                        del diis_errors[0]
-                    diis_size = len(diis_vals_dm) - 1
+                    if (len(diis_vals_dm_a) > max_diis):
+                        del diis_vals_dm_a[0]
+                        del diis_errors_a[0]
+                    diis_size_a = len(diis_vals_dm_a) - 1
 
                     # Build error matrix B, [Pulay:1980:393], Eqn. 6, LHS
-                    B = np.ones((diis_size + 1, diis_size + 1)) * -1
+                    B = np.ones((diis_size_a + 1, diis_size_a + 1)) * -1
                     B[-1, -1] = 0
 
-                    for n1, e1 in enumerate(diis_errors):
-                        for n2, e2 in enumerate(diis_errors):
+                    for n1, e1 in enumerate(diis_errors_a):
+                        for n2, e2 in enumerate(diis_errors_a):
                             # Vectordot the error vectors
                             B[n1, n2] = np.dot(e1, e2)
                     B[:-1, :-1] /= np.abs(B[:-1, :-1]).max()
 
 
                     # Build residual vector, [Pulay:1980:393], Eqn. 6, RHS
-                    resid = np.zeros(diis_size + 1)
+                    resid = np.zeros(diis_size_a + 1)
                     resid[-1] = -1
 
                     #print("B")
@@ -166,15 +176,54 @@ def cmf(clustered_ham, ci_vector, h, g,
                     ci = np.linalg.solve(B, resid)
 
                     # Calculate new amplitudes
-                    dm_new[:] = 0
+                    dm_new_a[:] = 0
 
-                    for num in range(diis_size):
-                        dm_new += ci[num] * diis_vals_dm[num + 1]
+                    for num in range(diis_size_a):
+                        dm_new_a += ci[num] * diis_vals_dm_a[num + 1]
+
                     # End DIIS amplitude update
-                    
-                    rdm_a = dm_new.copy()
-                    rdm_b = dm_new.copy()
-                    #print(rdm_a)
+                    rdm_a = dm_new_a.copy()
+
+                    ### Beta Electron
+                    # Limit size of DIIS vector
+                    if (len(diis_vals_dm_b) > max_diis):
+                        del diis_vals_dm_b[0]
+                        del diis_errors_b[0]
+                    diis_size_b = len(diis_vals_dm_b) - 1
+
+                    # Build error matrix B, [Pulay:1980:393], Eqn. 6, LHS
+                    B = np.ones((diis_size_b + 1, diis_size_b + 1)) * -1
+                    B[-1, -1] = 0
+
+                    for n1, e1 in enumerate(diis_errors_b):
+                        for n2, e2 in enumerate(diis_errors_b):
+                            # Vectordot the error vectors
+                            B[n1, n2] = np.dot(e1, e2)
+                    B[:-1, :-1] /= np.abs(B[:-1, :-1]).max()
+
+
+                    # Build residual vector, [Pulay:1980:393], Eqn. 6, RHS
+                    resid = np.zeros(diis_size_b + 1)
+                    resid[-1] = -1
+
+                    #print("B")
+                    #print(B)
+                    #print("resid")
+                    #print(resid)
+                    # Solve Pulay equations, [Pulay:1980:393], Eqn. 6
+                    ci = np.linalg.solve(B, resid)
+
+                    # Calculate new amplitudes
+                    dm_new_b[:] = 0
+
+                    for num in range(diis_size_b):
+                        dm_new_b += ci[num] * diis_vals_dm_b[num + 1]
+
+                    # End DIIS amplitude update
+                    rdm_b = dm_new_b.copy()
+
+
+
             elif diis==False:
                 # form 1rdm from reference state
                 rdm_a, rdm_b = build_1rdm(ci_vector, clustered_ham.clusters)
@@ -772,6 +821,8 @@ class CmfSolver:
         # store rdm
         self.cmf_dm_guess = (rdm_a,rdm_b)
 
+        print(" CMF In Init: %12.8f" %e_curr)
+
         # build cluster basis and operator matrices using CMF optimized density matrices
         for ci_idx, ci in enumerate(clustered_ham.clusters):
             #if delta_elec != None:
@@ -832,7 +883,7 @@ class CmfSolver:
         g = np.einsum("lmns,so->lmno",g,U)
 
 
-        cmf_dm_guess =  (U.T @ self.cmf_dm_guess[0] @ U,U.T @ self.cmf_dm_guess[0] @ U)
+        cmf_dm_guess =  (U.T @ self.cmf_dm_guess[0] @ U,U.T @ self.cmf_dm_guess[1] @ U)
 
         n_blocks = len(blocks)
         clusters = [Cluster(ci,c) for ci,c in enumerate(blocks)]
@@ -866,6 +917,7 @@ class CmfSolver:
         self.cmf_dm_guess =  (U @ rdm_a @ U.T, U @ rdm_b @ U.T)
 
         print(" CMF In energy: %12.8f" %e_curr)
+
         # build cluster basis and operator matrices using CMF optimized density matrices
         for ci_idx, ci in enumerate(clusters):
             #if delta_elec != None:
@@ -924,7 +976,7 @@ class CmfSolver:
         g = np.einsum("lmrs,rn->lmns",g,U)
         g = np.einsum("lmns,so->lmno",g,U)
 
-        cmf_dm_guess =  (U.T @ self.cmf_dm_guess[0] @ U,U.T @ self.cmf_dm_guess[0] @ U)
+        cmf_dm_guess =  (U.T @ self.cmf_dm_guess[0] @ U,U.T @ self.cmf_dm_guess[1] @ U)
 
         n_blocks = len(blocks)
         clusters = [Cluster(ci,c) for ci,c in enumerate(blocks)]
@@ -948,7 +1000,7 @@ class CmfSolver:
         if self.cmf_dm_guess != None:
             e_curr, converged, rdm_a, rdm_b = cmf(clustered_ham, ci_vector, h, g, 
                     diis        = True,
-                    dm_guess    = self.cmf_dm_guess,
+                    dm_guess    = cmf_dm_guess,
                     max_iter    = 20, 
                     thresh      = self.cmf_ci_thresh)
 
@@ -1014,7 +1066,7 @@ class CmfSolver:
         g = np.einsum("lmns,so->lmno",g,U)
 
 
-        cmf_dm_guess =  (U.T @ self.cmf_dm_guess[0] @ U,U.T @ self.cmf_dm_guess[0] @ U)
+        cmf_dm_guess =  (U.T @ self.cmf_dm_guess[0] @ U,U.T @ self.cmf_dm_guess[1] @ U)
 
         n_blocks = len(blocks)
         clusters = [Cluster(ci,c) for ci,c in enumerate(blocks)]
@@ -1040,12 +1092,12 @@ class CmfSolver:
         if self.cmf_dm_guess != None:
             e_curr, converged, rdm_a, rdm_b = cmf(clustered_ham, ci_vector, h, g, 
                     diis        = True,
-                    dm_guess    = self.cmf_dm_guess,
+                    dm_guess    = cmf_dm_guess,
                     max_iter    = 20, 
                     thresh      = self.cmf_ci_thresh)
         
         # store rdm (but first rotate them back to the reference basis
-        self.cmf_dm_guess =  (U @ rdm_a @ U.T, U @ rdm_b @ U.T)
+        #self.cmf_dm_guess =  (U @ rdm_a @ U.T, U @ rdm_b @ U.T)
 
         
         print(" CMF In grad  : %12.8f" %e_curr)
@@ -1066,6 +1118,7 @@ class CmfSolver:
             ci.build_local_terms(h,g)
 
 
+        tm1,tm2 = build_1rdm(ci_vector, clusters)
         opdm_a,opdm_b, tpdm_aa, tpdm_ab, tpdm_ba, tpdm_bb = build_12rdms_cmf(ci_vector,clusters)
         ## Compare energy using density to reference energy
         #compute energy
@@ -1073,8 +1126,14 @@ class CmfSolver:
         tpdm = tpdm_aa + tpdm_ab + tpdm_ba + tpdm_bb
         E = np.einsum('pq,pq',h,opdm)
         E += 0.5 * np.einsum('tvuw,tuwv',g,tpdm)
+        print("Energy with D %16.10f"%E)
+        print("Reference W   %16.10f"%e_curr)
 
         #reference energy
+        print(opdm_a)
+        print(rdm_a)
+        print(tm1)
+        print(opdm_a - tm1)
         assert(abs(e_curr-E)<1e-8)
         #Generalized Fock
         Gf = np.einsum('pr,rq->pq',h,opdm) + np.einsum('pvuw,quwv->pq',g,tpdm) 
@@ -1113,7 +1172,7 @@ class CmfSolver:
                     for bii in self.blocks[bi]:
                         for bjj in self.blocks[bj]:
                             Gpq[bii,bjj] = 0
-
+        
         self.gradient = Gpq.ravel()
         return Gpq.ravel()
 
