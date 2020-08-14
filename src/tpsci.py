@@ -11,6 +11,7 @@ from hubbard_fn import *
 from Cluster import *
 from ClusteredOperator import *
 from ClusteredState import *
+from DenseClusteredState import *
 
 from tools import *
 
