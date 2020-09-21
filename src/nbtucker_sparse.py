@@ -13,6 +13,8 @@ from ClusteredOperator import *
 from ClusteredState import *
 from Cluster import *
 
+from ham_build import *
+
 def compute_rspt2_correction(ci_vector, clustered_ham, e0, nproc=1):
     # {{{
     print(" Compute Matrix Vector Product:", flush=True)

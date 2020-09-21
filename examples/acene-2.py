@@ -68,8 +68,12 @@ if do_fci:
     print(" CASCI           %12.8f      Dim:%6d" % (ecas,vcas.shape[0]*vcas.shape[1]))
     print(ecore)
 
+print(C.shape[0])
+print(C.shape[1])
 ## TPSCI 
 mc = mulliken_ordering(mol,h.shape[0],C)
+print(mc.shape)
+exit()
 idx = np.where(mc>.9)[1]  #gives index map from atom to local orbital corresponding to that orbital
 
 # Reorder 

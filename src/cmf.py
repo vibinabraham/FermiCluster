@@ -833,7 +833,7 @@ class CmfSolver:
         
             print()
             print(" Form basis by diagonalizing local Hamiltonian for cluster: ",ci_idx)
-            ci.form_fockspace_eigbasis(h, g, fspaces_i, max_roots=1, rdm1_a=rdm_a, rdm1_b=rdm_b, ecore=self.ecore)
+            ci.form_fockspace_eigbasis(h, g, fspaces_i, max_roots=self.max_roots, rdm1_a=rdm_a, rdm1_b=rdm_b, ecore=self.ecore)
             
             print(" Build operator matrices for cluster ",ci.idx)
             ci.build_op_matrices()
