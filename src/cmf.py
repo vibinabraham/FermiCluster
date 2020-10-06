@@ -20,6 +20,7 @@ def cmf(clustered_ham, ci_vector, h, g,
             max_iter    = 20, 
             thresh      = 1e-8, 
             dm_guess    = None,
+            cs_solver   = 0,
             diis        = False,
             diis_start  = 1,
             max_diis    = 6):
@@ -42,6 +43,7 @@ def cmf(clustered_ham, ci_vector, h, g,
                             after the potential is optimized?
         dm_guess    :   Use initial guess for 1rdm? Typically one would use HF density matrix here. Input is a 
                         tuple of density matrices for alpha/beta: (Pa, Pb)
+        cs_solver   : solver to use: 0 for our python fci code and 1 for pyscf.
 
         Returns:
         energy      :   Final CMF energy
@@ -60,7 +62,6 @@ def cmf(clustered_ham, ci_vector, h, g,
     for f in ci_vector.fblocks():
         fspace = f
 
-    
     if dm_guess == None:
         rdm_a = np.zeros(h.shape)
         rdm_b = np.zeros(h.shape)
@@ -103,10 +104,10 @@ def cmf(clustered_ham, ci_vector, h, g,
                     ecore=ecore,
                     rdm1_a=rdm_a, 
                     rdm1_b=rdm_b,
-                    iprint=1)
+                    cs_solver=cs_solver)
         
             print(" Build new operators for cluster ",ci.idx)
-            ci.build_op_matrices(iprint=0)
+            ci.build_op_matrices_cmf(iprint=0)
             ci.build_local_terms(h,g)
       
         print(" Compute CMF energy")

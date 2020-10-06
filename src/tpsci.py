@@ -464,6 +464,9 @@ def tp_cipsi(ci_vector, clustered_ham,
         print(" Norm of CI vector = %12.8f" %ci_vector.norm())
         print(" Dimension of CI space: ", len(ci_vector))
         print(" Dimension of PT space: ", len(pt_vector))
+        if len(pt_vector) == 0:
+            print("No more connecting config found")
+            break
         print(" Compute Denominator",flush=True)
         #exit()
         pt_vector.prune_empty_fock_spaces()

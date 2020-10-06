@@ -21,6 +21,9 @@ beta2 = 0.2
 n_orb = dim_a * dim_b
 
 h, g = make_2d_lattice(dim_a,dim_b,beta1,beta2,U)
+np.random.seed(2)
+tmp = np.random.rand(h.shape[0],h.shape[1])*0.5
+h -= tmp + tmp.T
 
 
 blocks = [[0,1,4,5],[2,3,6,7],[8,9,12,13],[10,11,14,15]]
@@ -44,7 +47,7 @@ if do_hci:
 if do_tci:
     ecore = 0
     # Initialize the CMF solver. 
-    oocmf = CmfSolver(h, g, ecore, blocks, init_fspace,C,max_roots=100)
+    oocmf = CmfSolver(h, g, ecore, blocks, init_fspace,C,max_roots=1)
     oocmf.init() # runs a single step CMF calculation
 
     oo = False
@@ -75,7 +78,7 @@ if do_tci:
                         pt_type             = 'en',
                         thresh_cipsi        = 1e-6,
                         thresh_ci_clip      = 1e-7,
-                        max_tucker_iter     = 3,
+                        max_tucker_iter     = 1,
                         nbody_limit         = 4,
                         shared_mem          = 1e9,
                         thresh_search       = 1e-6,

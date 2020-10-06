@@ -9,6 +9,7 @@ from Hamiltonian import *
 from davidson import *
 from helpers import *
 from myfci import *
+from pyscf_helper import *
 import tools
 
 class Cluster(object):
@@ -54,6 +55,7 @@ class Cluster(object):
         self.ops    = {}
 
         self.energies = {}                  # Diagonal of local operators
+        self.cs_solver = 0   # 0 for defaul,1 for pyscf
 
     def __len__(self):
         return len(self.orb_list)
@@ -96,7 +98,7 @@ class Cluster(object):
         else:
             self.ops[op] = {}
 
-    def form_fockspace_eigbasis(self, hin, vin, spaces, max_roots=1000, rdm1_a=None, rdm1_b=None, ecore=0, iprint=0, subspace=False):
+    def form_fockspace_eigbasis(self, hin, vin, spaces, max_roots=1000, rdm1_a=None, rdm1_b=None, ecore=0, iprint=0, subspace=False,cs_solver=0):
         """
         Get matrices of local Hamiltonians embedded in the system 1rdm and diagonalize to form
         the cluster basis vectors. This is the main step in CMF
@@ -116,6 +118,8 @@ class Cluster(object):
         for f in spaces:
             assert(len(f)==2)
 
+        self.cs_solver = cs_solver
+
         if len(spaces) == 0:
             print(" No spaces requested - certainly a mistake")
             exit()
@@ -131,76 +135,133 @@ class Cluster(object):
 
         Eenv,h,v = tools.build_1rdm_dressed_integrals(hin,vin,self.orb_list,rdm1_a,rdm1_b)
 
-        H = Hamiltonian()
-        H.S = np.eye(h.shape[0])
-        H.C = H.S
-        H.t = h
-        H.V = v
-        H.ecore = ecore
-        self.ops['H_mf'] = {}
 
-        if subspace == False:
-            self.basis = {}
+        #local integrals
+        hc = np.zeros([self.n_orb]*2)
+        vc = np.zeros([self.n_orb]*4)
 
-        self.Hlocal = {}
-        for na,nb in spaces:
-            fock = (na,nb)
-            ci = ci_solver()
-            ci.init(H,na,nb,max_roots)
+        for pidx,p in enumerate(self.orb_list):
+            for qidx,q in enumerate(self.orb_list):
+                hc[pidx,qidx] = hin[p,q]
 
-            if subspace:
-                ci.algorithm = "direct" # this is probably not needed here
-                if fock not in self.basis:
-                    continue
-                Hci = ci.build_H_matrix(self.basis[fock])
-                #print(" Nick: ", self.idx, fock, self.basis[fock].shape,flush=True)
-                if Hci.shape[0] > 1 and Hci.shape[0] > ci.n_roots:
-                    l,C = scipy.sparse.linalg.eigsh(Hci, ci.n_roots,which='SA')
-                    sort_ind = np.argsort(l)
-                    l = l[sort_ind]
-                    C = C[:,sort_ind]
-                elif Hci.shape[0] > 1 and Hci.shape[0] <= ci.n_roots:
-                    l,C = np.linalg.eigh(Hci)
-                    sort_ind = np.argsort(l)
-                    l = l[sort_ind]
-                    C = C[:,sort_ind]
-                elif Hci.shape[0] == 1:
-                    l = [Hci[0,0]]
-                    C = np.array([[1.0]])
-                else:
-                    print(" Problem with Hci dimension")
-                    exit()
-                self.basis[fock] = self.basis[fock] @ C
-                self.ops['H_mf'][(fock,fock)] = C.T @ Hci @ C 
-                #self.Hlocal[fock] =  Hci 
+        for pidx,p in enumerate(self.orb_list):
+            for qidx,q in enumerate(self.orb_list):
+                for ridx,r in enumerate(self.orb_list):
+                    for sidx,s in enumerate(self.orb_list):
+                        vc[pidx,qidx,ridx,sidx] = vin[p,q,r,s]
 
+
+        if self.cs_solver== 1:
+            from pyscf import fci
+            if subspace == True:
+                print("Can't do with pyscf")
+                exit()
             else:
-                if ci.full_dim > 10000:
-                    ci.thresh = 1e-5
-                    ci.init(H,na,nb,1)
-                    ci.algorithm = "davidson"
-                else:
-                    ci.algorithm = "direct"
-                
-                
-                Hci = ci.run(s2=True)
-                #self.basis[(na,nb)] = np.eye(ci.results_v.shape[0])
-                if iprint>0:
-                    for i,ei in enumerate(ci.results_e):
-                        print(" Local State %5i: Local E: %12.8f Embedded E: %12.8f Total E: %12.8f" %(i, ei, ei+Eenv, ei+ecore+Eenv))
+                self.basis = {}
+            self.ops['H_mf'] = {}
+            for na,nb in spaces:
                 fock = (na,nb)
+                norb = h.shape[0]
                 
-                C = ci.results_v
-                self.basis[fock] = C
-                if ci.algorithm == "davidson":
-                    #self.Hlocal[fock] =  Hci
-                    sigma = Hci
-                    self.ops['H_mf'][(fock,fock)] = C.T @ sigma
-                
-                
-                elif ci.algorithm == "direct":
-                    self.Hlocal[fock] =  Hci
-                    self.ops['H_mf'][(fock,fock)] = C.T @ Hci @ C
+                #Hci = fci.direct_spin1.pspace(h, v, h.shape[0], fock, np=10000)[1]
+                #l,C = np.linalg.eigh(Hci)
+                #sort_ind = np.argsort(l)
+                #l = l[sort_ind]
+                #C = C[:,sort_ind]
+                #C = C[:,:max_roots]
+                #self.basis[fock] = C
+                #self.ops['H_mf'][(fock,fock)] = C.T @ Hci @ C
+
+                cisolver = fci.direct_spin1.FCI()
+                cisolver.max_cycle = 200
+                cisolver.conv_tol = 1e-13
+                efci, ci = cisolver.kernel(h, v, norb, fock, ecore=0,nroots =1,verbose=100)
+                fci_dim = ci.shape[0]*ci.shape[1]
+                DA,DB = cisolver.make_rdm1s(ci, norb, fock)
+                self.ops['Aa'][(na,nb),(na,nb)] = DA.reshape(1,1,DA.shape[0],DA.shape[1])
+                self.ops['Bb'][(na,nb),(na,nb)] = DB.reshape(1,1,DA.shape[0],DA.shape[1])
+                self.ops['H_mf'][(fock,fock)] = efci.reshape(1,1)
+
+                #local
+                h2eff = cisolver.absorb_h1e(hc, vc, norb, fock, .5)
+                ci1 = cisolver.contract_2e(h2eff, ci, norb, fock)
+                e = np.einsum('pq,pq',ci1,ci).reshape(1,1)
+                self.ops['H'][(fock,fock)] = e
+
+                self.basis[fock] = ci.reshape(ci.shape[0]*ci.shape[1],1)
+                #print("fock",fock,self.ops['H'][(fock,fock)])
+
+        if self.cs_solver== 0:
+            H = Hamiltonian()
+            H.S = np.eye(h.shape[0])
+            H.C = H.S
+            H.t = h
+            H.V = v
+            H.ecore = ecore
+            self.ops['H_mf'] = {}
+
+            if subspace == False:
+                self.basis = {}
+
+            self.Hlocal = {}
+            for na,nb in spaces:
+                fock = (na,nb)
+                ci = ci_solver()
+                ci.init(H,na,nb,max_roots)
+
+                if subspace:
+                    ci.algorithm = "direct" # this is probably not needed here
+                    if fock not in self.basis:
+                        continue
+                    Hci = ci.build_H_matrix(self.basis[fock])
+                    #print(" Nick: ", self.idx, fock, self.basis[fock].shape,flush=True)
+                    if Hci.shape[0] > 1 and Hci.shape[0] > ci.n_roots:
+                        l,C = scipy.sparse.linalg.eigsh(Hci, ci.n_roots,which='SA')
+                        sort_ind = np.argsort(l)
+                        l = l[sort_ind]
+                        C = C[:,sort_ind]
+                    elif Hci.shape[0] > 1 and Hci.shape[0] <= ci.n_roots:
+                        l,C = np.linalg.eigh(Hci)
+                        sort_ind = np.argsort(l)
+                        l = l[sort_ind]
+                        C = C[:,sort_ind]
+                    elif Hci.shape[0] == 1:
+                        l = [Hci[0,0]]
+                        C = np.array([[1.0]])
+                    else:
+                        print(" Problem with Hci dimension")
+                        exit()
+                    self.basis[fock] = self.basis[fock] @ C
+                    self.ops['H_mf'][(fock,fock)] = C.T @ Hci @ C 
+                    #self.Hlocal[fock] =  Hci 
+
+                else:
+                    if ci.full_dim > 10000:
+                        ci.thresh = 1e-5
+                        ci.init(H,na,nb,1)
+                        ci.algorithm = "davidson"
+                    else:
+                        ci.algorithm = "direct"
+                    
+                    
+                    Hci = ci.run(s2=True)
+                    #self.basis[(na,nb)] = np.eye(ci.results_v.shape[0])
+                    if iprint>0:
+                        for i,ei in enumerate(ci.results_e):
+                            print(" Local State %5i: Local E: %12.8f Embedded E: %12.8f Total E: %12.8f" %(i, ei, ei+Eenv, ei+ecore+Eenv))
+                    fock = (na,nb)
+                    
+                    C = ci.results_v
+                    self.basis[fock] = C
+                    if ci.algorithm == "davidson":
+                        #self.Hlocal[fock] =  Hci
+                        sigma = Hci
+                        self.ops['H_mf'][(fock,fock)] = C.T @ sigma
+                    
+                    
+                    elif ci.algorithm == "direct":
+                        self.Hlocal[fock] =  Hci
+                        self.ops['H_mf'][(fock,fock)] = C.T @ Hci @ C
     # }}}
 
     #remove:
@@ -569,7 +630,7 @@ class Cluster(object):
 
     def build_local_terms(self,hin,vin):
         start = time.time()
-        self.ops['H'] = {}
+        #self.ops['H'] = {}
         """
         grab integrals acting locally and form precontracted operator in current eigenbasis
         """
@@ -588,31 +649,39 @@ class Cluster(object):
                     for sidx,s in enumerate(self.orb_list):
                         v[pidx,qidx,ridx,sidx] = vin[p,q,r,s]
 
+        if self.cs_solver == 1:
+            # already done in fockspace build
+            htemp = 1
 
 
-        H = Hamiltonian()
-        H.S = np.eye(h.shape[0])
-        H.C = H.S
-        H.t = h
-        H.V = v
+            
 
-        for fock in self.basis:
+        if self.cs_solver == 0:
+            self.ops['H'] = {}
+            H = Hamiltonian()
+            H.S = np.eye(h.shape[0])
+            H.C = H.S
+            H.t = h
+            H.V = v
 
-            ci = ci_solver()
-            na = fock[0]
-            nb = fock[1]
-            ci.init(H,na,nb,1)
-            if ci.full_dim > 10000:
-                ci.thresh = 1e-5
-                ci.algorithm = "davidson"
-                self.ops['H'][(fock,fock)] = ci.build_H_matrix(self.basis[fock])
-                self.ops['H'][(fock,fock)] = .5*(self.ops['H'][(fock,fock)] + self.ops['H'][(fock,fock)].T)
-            else:
-                ci.algorithm = "direct"
-                #print(ci)
-                self.ops['H'][(fock,fock)] = ci.build_H_matrix(self.basis[fock])
-                self.ops['H'][(fock,fock)] = .5*(self.ops['H'][(fock,fock)] + self.ops['H'][(fock,fock)].T)
-            #print(" GS Energy: %12.8f" %self.ops['H'][(fock,fock)][0,0])
+            for fock in self.basis:
+
+                ci = ci_solver()
+                na = fock[0]
+                nb = fock[1]
+                ci.init(H,na,nb,1)
+                if ci.full_dim > 10000:
+                    ci.thresh = 1e-5
+                    ci.algorithm = "davidson"
+                    self.ops['H'][(fock,fock)] = ci.build_H_matrix(self.basis[fock])
+                    self.ops['H'][(fock,fock)] = .5*(self.ops['H'][(fock,fock)] + self.ops['H'][(fock,fock)].T)
+                else:
+                    ci.algorithm = "direct"
+                    #print(ci)
+                    self.ops['H'][(fock,fock)] = ci.build_H_matrix(self.basis[fock])
+                    self.ops['H'][(fock,fock)] = .5*(self.ops['H'][(fock,fock)] + self.ops['H'][(fock,fock)].T)
+                #print(" GS Energy: %12.8f" %self.ops['H'][(fock,fock)][0,0])
+                #print("fock",fock,Hci)
 
         stop = time.time()
         print(" Time spent TDM 0: %12.2f" %(stop-start))
@@ -652,6 +721,8 @@ class Cluster(object):
         build all operators needed
         """
 # {{{
+
+        assert(self.cs_solver == 0)
         start = time.time()
         self.ops['A'] = {}
         self.ops['a'] = {}
@@ -661,10 +732,10 @@ class Cluster(object):
         self.ops['Bb'] = {}
         self.ops['Ab'] = {}
         self.ops['Ba'] = {}
-        #self.ops['AAaa'] = {}
-        #self.ops['BBbb'] = {}
-        #self.ops['ABba'] = {}
-        #self.ops['BAab'] = {}
+        #self.ops['tAAaa'] = {}
+        #self.ops['tBBbb'] = {}
+        #self.ops['tABba'] = {}
+        #self.ops['tBAab'] = {}
         self.ops['AA'] = {}
         self.ops['BB'] = {}
         self.ops['AB'] = {}
@@ -687,8 +758,6 @@ class Cluster(object):
         self.ops['Bab'] = {}
 
         start_tot = time.time()
-
-
         #  a, A
         start = time.time()
         for na in range(1,self.n_orb+1):
@@ -764,36 +833,6 @@ class Cluster(object):
             print(" Time spent TDM 5: %12.2f" %(stop-start))
 
 
-        """
-        #  AAaa,BBbb
-        start = time.time()
-        for na in range(0,self.n_orb+1):
-            for nb in range(0,self.n_orb+1):
-                try:
-                    self.ops['AAaa'][(na,nb),(na,nb)] = build_ccaa_ss(self.n_orb, (na,nb),(na,nb),self.basis,'a')
-                    self.ops['BBbb'][(na,nb),(na,nb)] = build_ccaa_ss(self.n_orb, (na,nb),(na,nb),self.basis,'b')
-                except KeyError:
-                    continue
-        stop = time.time()
-        if iprint>0:
-            print(" Time spent TDM 6: %12.2f" %(stop-start))
-
-
-
-        #  ABba
-        #  BAab
-        start = time.time()
-        for na in range(1,self.n_orb+1):
-            for nb in range(1,self.n_orb+1):
-                try:
-                    self.ops['ABba'][(na,nb),(na,nb)] = build_ccaa_os(self.n_orb, (na,nb),(na,nb),self.basis,'abba')
-                    self.ops['BAab'][(na,nb),(na,nb)] = build_ccaa_os(self.n_orb, (na,nb),(na,nb),self.basis,'baab')
-                except KeyError:
-                    continue
-        stop = time.time()
-        if iprint>0:
-            print(" Time spent TDM 7: %12.2f" %(stop-start))
-        """
 
 
         #  AA
@@ -1018,6 +1057,59 @@ class Cluster(object):
 
         stop_tot = time.time()
         print(" Time spent building TDMs Total %12.2f" %(stop_tot-start_tot))
+# }}}
+
+    def build_op_matrices_cmf(self, iprint=0):
+        """
+        build all operators needed
+        """
+# {{{
+        if self.cs_solver == 0:
+            self.ops['Aa'] = {}
+            self.ops['Bb'] = {}
+
+            fspace = list(self.basis.keys())[0]
+            vec =    list(self.basis.values())[0]
+
+
+            start_tot = time.time()
+
+            #  Aa
+            start = time.time()
+            self.ops['Aa'][fspace,fspace] = build_ca_ss(self.n_orb, fspace,fspace,self.basis,'a')
+            stop = time.time()
+            if iprint>0:
+                print(" Time spent TDM 3: %12.2f" %(stop-start))
+
+            #  Bb
+            start = time.time()
+            self.ops['Bb'][fspace,fspace] = build_ca_ss(self.n_orb, fspace,fspace,self.basis,'b')
+            stop = time.time()
+            if iprint>0:
+                print(" Time spent TDM 4: %12.2f" %(stop-start))
+
+
+
+            if iprint>0:
+                print(" Swapping axes to get contiguous data")
+            start = time.time()
+            for o in self.ops:
+                for f in self.ops[o]:
+                    self.ops[o][f] = np.ascontiguousarray(self.ops[o][f])
+                    #self.ops[o][f] = np.ascontiguousarray(np.swapaxes(self.ops[o][f],0,1))
+            stop = time.time()
+            if iprint>0:
+                print(" Time spent making data contiguous: %12.2f" %(stop-start))
+
+
+            stop_tot = time.time()
+            print(" Time spent building TDMs Total %12.2f" %(stop_tot-start_tot))
+
+
+        if self.cs_solver == 1:
+            # already done in fockspace code
+            htemp = 1
+
 # }}}
 
     def form_schmidt_basis(self,h,g,Da,Db,thresh_orb=1e-8,thresh_schmidt=1e-3,thresh_ci=1e-5,iprint=1,ecore=0,do_embedding=True):
