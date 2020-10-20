@@ -1,7 +1,7 @@
 import scipy
 import pyscf
 
-from tpsci import *
+from fermicluster import *
 from pyscf_helper import *
 
 

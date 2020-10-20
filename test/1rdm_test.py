@@ -8,7 +8,7 @@ import copy as cp
 import sys
 import tools 
 
-from tpsci import *
+from fermicluster import *
 from pyscf_helper import *
 import pyscf
 ttt = time.time()

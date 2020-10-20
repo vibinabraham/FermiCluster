@@ -1,6 +1,4 @@
 import sys, os
-sys.path.append('../')
-sys.path.append('../src/')
 
 import numpy as np
 import scipy
@@ -10,13 +8,7 @@ from math import factorial
 import copy as cp
 import sys
 
-from hubbard_fn import *
-
-from Cluster import *
-from ClusteredOperator import *
-from ClusteredState import *
-from tools import *
-from tpsci import *
+from fermicluster import *
 import pyscf
 ttt = time.time()
 

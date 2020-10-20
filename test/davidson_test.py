@@ -8,7 +8,7 @@ import copy as cp
 import sys
 import tools 
 
-from tpsci import *
+from fermicluster import *
 
 N = 1000
 np.random.seed(2)

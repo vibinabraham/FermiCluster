@@ -19,7 +19,7 @@ requirements = [r.strip() for r in requirements]
 
 setup(name='FermiCluster',
         version=0.1,
-        description='Tensor product methods in cluster state representations',
+        description='A python library to run fermionic many body problem by partitioning the system into strongly interacting clusters and using approximate methods to capture the interactions between them.',
         url='https://github.com/vibinabraham/FermiCluster',
         author='Vibin Abraham',
         author_email='vibin1@vt.edu',

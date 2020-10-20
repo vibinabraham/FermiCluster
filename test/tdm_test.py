@@ -6,8 +6,7 @@ from math import factorial
 import copy as cp
 import sys
 
-from tpsci import *
-from tpsci import *
+from fermicluster import *
 from pyscf_helper import *
 import pyscf
 ttt = time.time()

@@ -9,7 +9,7 @@ import sys
 import tools 
 import pickle
 
-from tpsci import *
+from fermicluster import *
 from pyscf_helper import *
 import pyscf
 ttt = time.time()

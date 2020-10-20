@@ -9,6 +9,7 @@ import sys
 
 from tpsci import *
 from pyscf_helper import *
+from fermicluster import *
 import pyscf
 ttt = time.time()
 

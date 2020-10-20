@@ -6,8 +6,12 @@ from math import factorial
 import copy as cp
 import sys
 
-from tpsci import *
+
+from fermicluster import *
+
 from pyscf_helper import *
+#from tpsci import *
+
 import pyscf
 ttt = time.time()
 np.set_printoptions(suppress=True, precision=3, linewidth=1500)
