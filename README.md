@@ -1,8 +1,8 @@
 [![Build Status](https://travis-ci.com/vibinabraham/tpsci.svg?token=xQgyGGx6x2UXYitmpAwa&branch=master)](https://travis-ci.com/vibinabraham/tpsci)
 
-# Tensor Product Selected Configuration Interaction
-Python program to run the TPSCI program.
-Uses pyscf as a back-end for molecular systems
+# Fermi-Cluster 
+Fermi-Cluster is an open source program to run tensor product based quantum chemistry by partitioning the system into clusters. 
+Fermi-Cluster uses pyscf as a back-end for molecular systems and [ray] (https://ray.io/) for parallelization
 
 ### Installation
 1. Download
