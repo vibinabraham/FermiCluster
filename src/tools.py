@@ -723,3 +723,42 @@ def run_hierarchical_sci(h,g,blocks,init_fspace,dimer_threshold,ecore):
     print(" TPSCI:          %12.8f      Dim:%6d" % (etci+ecore, len(ci_vector)))
     print(" TPSCI(2):       %12.8f      Dim:%6d" % (etci2+ecore,len(pt_vector)))
 # }}}
+
+def join_blocks(ind_to_join,blocks,fspace):
+    """
+    ind_to_join:    indices of clusters to join
+    blocks:         cluster block input
+    fspace:         fock space of each clusters 
+    """
+# {{{
+    fb = ind_to_join[0] #first block
+    nb = ind_to_join[1:]#rest of the blocks
+
+    # blocks
+    print(nb)
+    print(blocks)
+    nblocks = len(blocks)
+    newblocks = cp.deepcopy(blocks)
+    for ai,a in enumerate(nb):
+        newblocks[fb].extend(blocks[a])
+    for ai in range(nblocks,-1,-1):
+        if ai in nb:
+            del newblocks[ai]
+    print(newblocks)
+
+    # fock space
+    flist = [list(x) for x in fspace]
+    flist = np.array(flist)
+    actflist = [flist[a]  for a in ind_to_join]
+    for fi,fl in enumerate(actflist):
+        if fi >0:
+            flist[fb] += fl
+    flist = list(flist)
+    for ai in range(nblocks,-1,-1):
+        if ai in nb:
+            del flist[ai]
+
+    fspace = tuple([tuple(x) for x in flist])
+    print(fspace)
+    return newblocks,fspace
+# }}}

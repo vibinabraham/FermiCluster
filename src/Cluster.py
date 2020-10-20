@@ -134,6 +134,9 @@ class Cluster(object):
             rdm1_b = np.zeros_like(hin)
 
         Eenv,h,v = tools.build_1rdm_dressed_integrals(hin,vin,self.orb_list,rdm1_a,rdm1_b)
+        print("ENVVV",Eenv)
+        print()
+        print(h)
 
 
         #local integrals
@@ -159,6 +162,9 @@ class Cluster(object):
             else:
                 self.basis = {}
             self.ops['H_mf'] = {}
+            self.ops['H'] = {}
+            self.ops['Aa'] = {}
+            self.ops['Bb'] = {}
             for na,nb in spaces:
                 fock = (na,nb)
                 norb = h.shape[0]
@@ -172,12 +178,13 @@ class Cluster(object):
                 #self.basis[fock] = C
                 #self.ops['H_mf'][(fock,fock)] = C.T @ Hci @ C
 
-                cisolver = fci.direct_spin1.FCI()
+                cisolver = fci.direct_spin0.FCI()
                 cisolver.max_cycle = 200
                 cisolver.conv_tol = 1e-13
                 efci, ci = cisolver.kernel(h, v, norb, fock, ecore=0,nroots =1,verbose=100)
                 fci_dim = ci.shape[0]*ci.shape[1]
                 DA,DB = cisolver.make_rdm1s(ci, norb, fock)
+
                 self.ops['Aa'][(na,nb),(na,nb)] = DA.reshape(1,1,DA.shape[0],DA.shape[1])
                 self.ops['Bb'][(na,nb),(na,nb)] = DB.reshape(1,1,DA.shape[0],DA.shape[1])
                 self.ops['H_mf'][(fock,fock)] = efci.reshape(1,1)
@@ -187,6 +194,7 @@ class Cluster(object):
                 ci1 = cisolver.contract_2e(h2eff, ci, norb, fock)
                 e = np.einsum('pq,pq',ci1,ci).reshape(1,1)
                 self.ops['H'][(fock,fock)] = e
+                print("FFCI%16.12f"%efci)
 
                 self.basis[fock] = ci.reshape(ci.shape[0]*ci.shape[1],1)
                 #print("fock",fock,self.ops['H'][(fock,fock)])
