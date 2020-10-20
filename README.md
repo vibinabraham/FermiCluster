@@ -2,7 +2,7 @@
 
 # Fermi-Cluster 
 Fermi-Cluster is an open source program to run tensor product based quantum chemistry by partitioning the system into clusters. 
-Fermi-Cluster uses pyscf as a back-end for molecular systems and [ray] (https://ray.io/) for parallelization
+Fermi-Cluster uses pyscf as a back-end for molecular systems and [ray](https://ray.io/) for parallelization.
 
 ### Installation
 1. Download
