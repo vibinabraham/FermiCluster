@@ -17,6 +17,7 @@ from tools import *
 from cmf import *
 from matvec import *
 from ham_build import *
+from nbtucker_sparse  import *
 
 
 def system_setup(h, g, ecore, blocks, init_fspace,
