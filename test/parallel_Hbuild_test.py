@@ -1,6 +1,4 @@
 import sys, os
-sys.path.append('../')
-sys.path.append('../src/')
 import numpy as np
 import scipy
 import itertools
@@ -10,7 +8,7 @@ import copy as cp
 import sys
 from timeit import default_timer as timer
 
-from tpsci import *
+from fermicluster import *
 from pyscf_helper import *
 import pyscf
 ttt = time.time()

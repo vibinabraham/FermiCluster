@@ -181,27 +181,26 @@ def build_h0(clustered_ham,ci_vector,pt_vector):
     clusters = clustered_ham.clusters
     Hd = np.zeros((len(pt_vector)))
     
-    shift = 0 
-    idx = 0
-    E0 = 0
-    for fockspace, configs in ci_vector.items():
-        for config, coeff in configs.items():
-            delta_fock= tuple([(0,0) for ci in range(len(clusters))])
-            terms = clustered_ham.terms[delta_fock]
-            print(coeff,config)
-            # for EN:
-            for term in terms:
-                E0 += term.matrix_element(fockspace,config,fockspace,config)
-                #print(term.active)
-            idx += 1
+    E0 = build_full_hamiltonian(clustered_ham,ci_vector,iprint=0, opt_einsum=True)[0,0]
+    assert(len(ci_vector)==1)
     print("E0%16.8f"%E0)
-   
+
+    #idx = 0
+    #Hd1 = np.zeros((len(pt_vector)))
+    #for f,c,v in pt_vector:
+    #    e0_X = 0
+    #    for ci in clustered_ham.clusters:
+    #        e0_X += ci.ops['H_mf'][(f[ci.idx],f[ci.idx])][c[ci.idx],c[ci.idx]]
+    #    Hd1[idx] = e0_X
+    #    idx += 1
+
+
     idx = 0
     Hd = np.zeros((len(pt_vector)))
     for ci_fspace, ci_configs in ci_vector.items():
         for ci_config, ci_coeff in ci_configs.items():
             for fockspace, configs in pt_vector.items():
-                print("FS",fockspace)
+                #print("FS",fockspace)
                 active = []
                 inactive = []
                 for ind,fs in enumerate(fockspace):
@@ -219,22 +218,25 @@ def build_h0(clustered_ham,ci_vector,pt_vector):
                     delta_fock= tuple([(0,0) for ci in range(len(clusters))])
 
                     diff = tuple(x-y for x,y in zip(ci_config,config))
-                    print("CI",ci_config)
+                    #print("CI",ci_config)
                     for x in inactive:
                         if diff[x] != 0  and x not in active:
                             active.append(x)
-                    print("PT",config)
-                    print("d ",diff)
-                    print("ACTIVE",active)
+                    #print("PT",config)
+                    #print("d ",diff)
+                    #print("ACTIVE",active)
 
                     Hd[idx] = E0
                     for cidx in active:
                         fspace = fockspace[cidx]
                         conf = config[cidx]
-                        print(" Cluster: %4d  Fock Space:%s config:%4d Energies %16.8f"%(cidx,fspace,conf,clusters[cidx].energies[fspace][conf]))
-                        Hd[idx] += clusters[cidx].energies[fockspace[cidx]][config[cidx]]
-                        Hd[idx] -= clusters[cidx].energies[ci_fspace[cidx]][ci_config[cidx]]
-                        print("-Cluster: %4d  Fock Space:%s config:%4d Energies %16.8f"%(cidx,ci_fspace[cidx],ci_config[cidx],clusters[cidx].energies[ci_fspace[cidx]][ci_config[cidx]]))
+                        #print(" Cluster: %4d  Fock Space:%s config:%4d Energies %16.8f"%(cidx,fspace,conf,clusters[cidx].energies[fspace][conf]))
+                        #Hd[idx] += clusters[cidx].energies[fockspace[cidx]][config[cidx]]
+                        #Hd[idx] -= clusters[cidx].energies[ci_fspace[cidx]][ci_config[cidx]]
+
+                        Hd[idx] += clusters[cidx].ops['H_mf'][(fockspace[cidx],fockspace[cidx])][config[cidx],config[cidx]]
+                        Hd[idx] -= clusters[cidx].ops['H_mf'][(ci_fspace[cidx],ci_fspace[cidx])][ci_config[cidx],ci_config[cidx]]
+                        #print("-Cluster: %4d  Fock Space:%s config:%4d Energies %16.8f"%(cidx,ci_fspace[cidx],ci_config[cidx],clusters[cidx].energies[ci_fspace[cidx]][ci_config[cidx]]))
                     # for EN:
                     #for term in terms:
                     #    Hd[idx] += term.matrix_element(fockspace,config,fockspace,config)
@@ -243,7 +245,6 @@ def build_h0(clustered_ham,ci_vector,pt_vector):
 
                     # for RS
                     #Hd[idx] = E0 - term.active  
-                    print(coeff,config)
                     idx += 1
 
     return Hd
@@ -452,15 +453,14 @@ def truncated_ci(clustered_ham, ci_vector, pt_vector=None, nproc=1):
     return e,ci_vector
 # }}}
 
-def expand_doubles(ci_vector):
+def expand_doubles(ci_vector,clusters):
 # {{{
-    clusters = ci_vector.clusters
 
     ci_vector.print_configs()
 
     for fspace in ci_vector.keys():
-        for ci in ci_vector.clusters:
-            for cj in ci_vector.clusters:
+        for ci in clusters:
+            for cj in clusters:
                 if cj.idx != ci.idx:
 
                     #same fock space
@@ -651,9 +651,9 @@ def expand_doubles(ci_vector):
 
 # }}}
 
-def truncated_pt2(clustered_ham,ci_vector,pt_vector,method = 'mp2'):
+def truncated_pt2(clustered_ham,ci_vector,pt_vector,method = 'mp2',inf=False):
 # {{{
-    """ method: mp2,mplcc2,en2,enlcc"""
+    """ method: mp2,mplcc2,en2,enlcc, use the inf command to do infinite order PT when u have the full H"""
 
     clusters = clustered_ham.clusters
 
@@ -693,7 +693,7 @@ def truncated_pt2(clustered_ham,ci_vector,pt_vector,method = 'mp2'):
 
     elif method == 'mp2' or method == 'mplcc':
         Hd = build_h0(clustered_ham, ci_vector, pt_vector)
-        Hd += 10
+        #Hd += 10
         for i in range(0,Hdd.shape[0]):
             Hdd[i,i] -= (Hd[i])
     else:
@@ -734,8 +734,9 @@ def truncated_pt2(clustered_ham,ci_vector,pt_vector,method = 'mp2'):
             h1 = Hdd @ v_n[:,i-1]
 
             v_n[:,i] = h1.reshape(pt_dim)
-            #for k in range(0,i):
-            #    v_n[:,i] -= np.multiply(E_mpn[k-1],v_n[:,(i-k-1)].reshape(pt_dim))
+            if inf ==True:
+                for k in range(0,i):
+                    v_n[:,i] -= np.multiply(E_mpn[k-1],v_n[:,(i-k-1)].reshape(pt_dim))
 
             v_n[:,i] = np.multiply(R0,v_n[:,i])
             E_mpn[i] = H0d @ v_n[:,i].T
@@ -756,7 +757,5 @@ def truncated_pt2(clustered_ham,ci_vector,pt_vector,method = 'mp2'):
         print("MP2:%16.8f "%E_corr)
      
     return E_corr, pt_vector
-
-
 # }}}
 
