@@ -112,6 +112,7 @@ def tpsci_tucker(ci_vector, clustered_ham,
         max_cipsi_iter      = 30, 
         max_tucker_iter     = 20, 
         tucker_state_clip   = None,
+        tucker_truncate     = None,
         hshift              = 1e-8,
         pt_type             = 'en',
         nbody_limit         = 4, 
@@ -150,6 +151,7 @@ def tpsci_tucker(ci_vector, clustered_ham,
     print("     |thresh_tucker_conv : ", thresh_tucker_conv )
     print("     |max_tucker_iter    : ", max_tucker_iter    )
     print("     |tucker_state_clip  : ", tucker_state_clip  )
+    print("     |tucker_truncate    : ", tucker_truncate    )
     print("     |hshift             : ", hshift             )
     print("     |thresh_asci        : ", thresh_asci        )
     print("     |thresh_search      : ", thresh_search      )
@@ -236,10 +238,10 @@ def tpsci_tucker(ci_vector, clustered_ham,
             pt_vector.normalize()
             print(" After:",len(pt_vector),flush=True)
 
-            hosvd(pt_vector, clustered_ham, hshift=hshift)
+            hosvd(pt_vector, clustered_ham, hshift=hshift, truncate=tucker_truncate)
         
         elif selection == "heatbath":
-            hosvd(ci_vector, clustered_ham, hshift=hshift)
+            hosvd(ci_vector, clustered_ham, hshift=hshift, truncate=tucker_truncate)
 
     
         # Should we rebuild the operator matrices after rotating basis?
@@ -695,7 +697,7 @@ def tp_hbci(ci_vector, clustered_ham,
 # }}}
 
 
-def hosvd(ci_vector, clustered_ham, hshift=1e-8):
+def hosvd(ci_vector, clustered_ham, hshift=1e-8, truncate=False):
     """
     Peform HOSVD aka Tucker Decomposition of ClusteredState
     """
@@ -741,22 +743,33 @@ def hosvd(ci_vector, clustered_ham, hshift=1e-8):
                 idx = n.argsort()[::-1]
                 n = n[idx]
                 U = U[:,idx]
-                
-                remix = []
-                for ni in range(n.shape[0]):
-                    if n[ni] < 1e-8:
-                        remix.append(ni)
-                U2 = U[:,remix]
-                Hlocal = U2.T @ ci.ops['H_mf'][(fspace,fspace)] @ U2
-                n2,v2 = np.linalg.eigh(Hlocal)
-                U2 = U2@v2
-                idx = n2.argsort()
-                n2 = n2[idx]
-                U2 = U2[:,idx]
 
-                U[:,remix] = U2
 
-                assert(np.amax(np.abs(U.T@U - np.eye(U.shape[1]))) < 1e-14)
+                # Either truncate the unoccupied cluster states, or remix them with a hamiltonian to be unique
+                if truncate == False:
+                    remix = []
+                    for ni in range(n.shape[0]):
+                        if n[ni] < 1e-8:
+                            remix.append(ni)
+                    U2 = U[:,remix]
+                    Hlocal = U2.T @ ci.ops['H_mf'][(fspace,fspace)] @ U2
+                    n2,v2 = np.linalg.eigh(Hlocal)
+                    U2 = U2@v2
+                    idx = n2.argsort()
+                    n2 = n2[idx]
+                    U2 = U2[:,idx]
+                    
+                    U[:,remix] = U2
+                else:
+                    keep = []
+                    for ni in range(n.shape[0]):
+                        if abs(n[ni]) > truncate:
+                            keep.append(ni)
+                    print(" Truncated Tucker space. Starting: %5i Ending: %5i" %(n.shape[0],len(keep)))
+                    U = U[:,keep]
+            
+                if U.shape[1] > 0:
+                    assert(np.amax(np.abs(U.T@U - np.eye(U.shape[1]))) < 1e-14)
            
             
             n = np.diag(U.T @ rdm @ U)

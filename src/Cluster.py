@@ -467,7 +467,8 @@ class Cluster(object):
         for fspace,mat in self.basis.items():
             I = mat.T @ mat
             try:
-                assert(np.amax(np.abs(I - np.eye(I.shape[0]))) < thresh)
+                if mat.shape[1] > 0:
+                    assert(np.amax(np.abs(I - np.eye(I.shape[0]))) < thresh)
             except AssertionError:
                 print(" WARNING: in check_basis:")
                 print(" Cluster:", self)
