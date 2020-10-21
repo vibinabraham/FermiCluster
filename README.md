@@ -1,4 +1,4 @@
-[![Build Status](https://travis-ci.com/vibinabraham/tpsci.svg?token=xQgyGGx6x2UXYitmpAwa&branch=master)](https://travis-ci.com/vibinabraham/tpsci)
+[![Build Status](https://travis-ci.com/vibinabraham/fermicluster.svg?token=xQgyGGx6x2UXYitmpAwa&branch=master)](https://travis-ci.com/vibinabraham/fermicluster)
 
 # Fermi-Cluster 
 Fermi-Cluster is an open source program to run tensor product based quantum chemistry by partitioning the system into clusters. 
@@ -7,7 +7,7 @@ Fermi-Cluster uses [pyscf](http://pyscf.org/) as a back-end for molecular system
 ### Installation
 1. Download
     
-        git clone https://github.com/vibinabraham/tpsci.git
+        git clone https://github.com/vibinabraham/fermicluster.git
         cd tpsci/
 
 2. create virtual environment (optional)
