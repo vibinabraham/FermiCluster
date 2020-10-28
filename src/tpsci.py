@@ -113,7 +113,7 @@ def tpsci_tucker(ci_vector, clustered_ham,
         max_cipsi_iter      = 30, 
         max_tucker_iter     = 20, 
         tucker_state_clip   = None,
-        tucker_truncate     = None,
+        tucker_truncate     = -1,
         hshift              = 1e-8,
         pt_type             = 'en',
         nbody_limit         = 4, 
@@ -698,7 +698,7 @@ def tp_hbci(ci_vector, clustered_ham,
 # }}}
 
 
-def hosvd(ci_vector, clustered_ham, hshift=1e-8, truncate=False):
+def hosvd(ci_vector, clustered_ham, hshift=1e-8, truncate=-1):
     """
     Peform HOSVD aka Tucker Decomposition of ClusteredState
     """
@@ -747,7 +747,7 @@ def hosvd(ci_vector, clustered_ham, hshift=1e-8, truncate=False):
 
 
                 # Either truncate the unoccupied cluster states, or remix them with a hamiltonian to be unique
-                if truncate == False:
+                if truncate < 0:
                     remix = []
                     for ni in range(n.shape[0]):
                         if n[ni] < 1e-8:
