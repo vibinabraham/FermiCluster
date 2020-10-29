@@ -752,10 +752,156 @@ def truncated_pt2(clustered_ham,ci_vector,pt_vector,method = 'mp2',inf=False):
                 Eold = E_corr
                 #v_n[:,i] = 0.8 * v_n[:,i] + 0.2 * v_n[:,i-1]
 
-        print("LCC:%16.8f "%E_corr)
     elif method == 'en2' or method == 'mp2':
         print("MP2:%16.8f "%E_corr)
      
     return E_corr, pt_vector
 # }}}
 
+def pt2infty(clustered_ham,ci_vector,pt_vector):
+    """ 
+    The DMBPT infty equivalent for TPS methods. equvalent to CEPA/ LCCSD
+    Input:
+        clustered_ham:  clustered_ham for the system
+        ci_vector: single CMF state for now
+        pt_vector: the pt_vector generated using compute_pt2_correction function 
+    Output:
+        The correlation energy using cepa
+        pt_vector: which is the updated LCC vector
+    """
+# {{{
+
+    clusters = clustered_ham.clusters
+
+    ts = 0
+    print("len CI",len(ci_vector))
+    print("len PT",len(pt_vector))
+
+    pt_dim = len(pt_vector)
+    ci_dim = len(ci_vector)
+    pt_order = 500
+    
+    for fockspace,configs in ci_vector.items():
+        if fockspace in pt_vector:
+            for config,coeff in configs.items():
+                assert(config not in pt_vector[fockspace])
+
+    H0d = build_block_hamiltonian(clustered_ham,ci_vector,pt_vector,iprint=0)
+
+    H00 = build_full_hamiltonian(clustered_ham,ci_vector,iprint=0)
+    #Hdd = build_full_hamiltonian(clustered_ham,pt_vector,iprint=0)
+    print(H00)
+    E0,V0 = np.linalg.eigh(H00)
+    E0 = E0[ts]
+
+    Hd = build_hamiltonian_diagonal(clustered_ham,pt_vector)
+
+    print("E0 %16.8f"%E0)
+    
+    R0 = 1/(E0 - Hd)
+    print(R0)
+
+    v1 = np.multiply(R0,H0d)
+    pt_vector.set_vector(v1.T)
+
+    print(v1.shape)
+    print(H0d.shape)
+
+    e2 = H0d @ v1.T
+    print(e2)
+
+    v_n = np.zeros((pt_dim,pt_order+1))   #list of PT vectors
+    E_mpn = np.zeros((pt_order+1))         #PT energy
+
+    v_n[: ,0] = v1
+    E_mpn[0] = e2
+    E_corr = 0
+
+    print(" %6s  %16s  %16s "%("Order","Correction","Energy"))
+    #print(" %6i  %16.8f  %16.8f "%(1,first_order_E[0,s],E_mpn[0]))
+
+    E_corr = E_mpn[0] 
+    print(" %6i  %16.8f  %16.8f "%(2,E_mpn[0],E_corr))
+
+    Eold = E_corr
+    for i in range(1,pt_order-1):
+        #h1 = Hdd @ v_n[:,i-1]
+
+        sigma = build_sigma(clustered_ham,pt_vector,iprint=0, opt_einsum=True)
+        h1 = sigma.get_vector()
+
+        v_n[:,i] = h1.reshape(pt_dim)
+
+        #for k in range(0,i):
+        #    v_n[:,i] -= np.multiply(E_mpn[k-1],v_n[:,(i-k-1)].reshape(pt_dim))
+
+        v_n[:,i] = np.multiply(R0,v_n[:,i])
+        E_mpn[i] = H0d @ v_n[:,i].T
+        #print(E_mpn)
+        E_corr += E_mpn[i]
+        print(" %6i  %16.8f  %16.8f "%(i+2,E_mpn[i],E_corr))
+
+        pt_vector.set_vector(v_n[:,i])
+        if abs(E_corr - Eold) < 1e-10:
+            print("LCC:%16.8f "%E_corr)
+            break
+        else:
+            Eold = E_corr
+            #v_n[:,i] = 0.8 * v_n[:,i] + 0.2 * v_n[:,i-1]
+
+    return E_corr, pt_vector
+# }}}
+
+def build_sigma(clustered_ham,ci_vector,iprint=0, opt_einsum=True):
+    """
+    Form the sigma vector using the EN zero order hamiltonian
+    Cannot be used for davidson since this is for H0 of EN partitioning(diagonal of H is 0)
+    """
+# {{{
+    clusters = clustered_ham.clusters
+    sigma = np.zeros(len(ci_vector))
+    ci_v = ci_vector.get_vector()
+    
+    shift_l = 0 
+    for fock_li, fock_l in enumerate(ci_vector.data):
+        configs_l = ci_vector[fock_l]
+        if iprint > 0:
+            print(fock_l)
+       
+        for config_li, config_l in enumerate(configs_l):
+            idx_l = shift_l + config_li 
+            
+            shift_r = 0 
+            for fock_ri, fock_r in enumerate(ci_vector.data):
+                configs_r = ci_vector[fock_r]
+                delta_fock= tuple([(fock_l[ci][0]-fock_r[ci][0], fock_l[ci][1]-fock_r[ci][1]) for ci in range(len(clusters))])
+                if fock_ri<fock_li:
+                    shift_r += len(configs_r) 
+                    continue
+                try:
+                    terms = clustered_ham.terms[delta_fock]
+                except KeyError:
+                    shift_r += len(configs_r) 
+                    continue 
+                
+                for config_ri, config_r in enumerate(configs_r):        
+                    idx_r = shift_r + config_ri
+                    if idx_r<idx_l:
+                        continue
+                    
+                    for term in terms:
+                        me = term.matrix_element(fock_l,config_l,fock_r,config_r)
+                        if idx_r == idx_l:
+                            me = 0
+                        sigma[idx_l] += me  * ci_v[idx_r]
+                        if idx_r>idx_l:
+                            sigma[idx_r] += me  * ci_v[idx_l]
+
+                        #print(" %4i %4i = %12.8f"%(idx_l,idx_r,me),"  :  ",config_l,config_r, " :: ", term)
+                shift_r += len(configs_r) 
+        shift_l += len(configs_l)
+
+    sigma_vec = ci_vector.copy()
+    sigma_vec.set_vector(sigma)
+    return sigma_vec
+# }}}
