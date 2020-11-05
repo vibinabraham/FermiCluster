@@ -112,35 +112,7 @@ for ri in range(0,15):
 
         oocmf = CmfSolver(h, g, ecore, blocks, init_fspace,C,max_roots=100)
         oocmf.init((dm_aa,dm_bb))
-
-        oo =False
-        if oo:
-            from scipy import optimize
-
-            #don't allow this to mix with each other
-            #oocmf.freeze_cluster_mixing(0,(3,4))
-
-            x = np.zeros_like(h)
-            #edps = oocmf.energy_dps()
-            min_options = {'gtol': 1e-8, 'disp':False}
-            opt_result = scipy.optimize.minimize(oocmf.energy, x, jac=oocmf.grad, method = 'BFGS', callback=oocmf.callback, options=min_options)
-            print(opt_result.x)
-            Kpq = opt_result.x.reshape(h.shape)
-
-            e_fcmf = oocmf.energy_dps()
-            oocmf.rotate(Kpq)
-            e_ocmf = oocmf.energy_dps()
-            print("Orbital Optimized CMF:%12.8f"%e_ocmf)
-
-            from pyscf import molden
-            molden.from_mo(mol, 'clustering_9.hf.molden', C)
-            C = oocmf.C
-            molden.from_mo(mol, 'clustering_9.cmf.molden', C)
-
-            print(Kpq)
-
-            print("Orbital Frozen    CMF:%12.8f"%e_fcmf)
-            print("Orbital Optimized CMF:%12.8f"%e_ocmf)
+        oocmf.form_extra_fspace()  #form excited fock space configurations
 
 
         h = oocmf.h

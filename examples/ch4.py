@@ -76,23 +76,8 @@ for ri in range(0,20):
         # Initialize the CMF solver. 
         oocmf = CmfSolver(h, g, ecore, blocks, init_fspace,C,max_roots=100)
         oocmf.init() # runs a single step CMF calculation
-
-        oo = False
-        if oo:
-            x = np.zeros_like(h)
-            min_options = {'gtol': 1e-8, 'disp':False}
-            opt_result = scipy.optimize.minimize(oocmf.energy, x, jac=oocmf.grad, method = 'BFGS', options=min_options )
-            #opt_result = scipy.optimize.minimize(oocmf.energy, x, jac=oocmf.grad, method = 'BFGS', callback=oocmf.callback)
-            print(opt_result.x)
-            Kpq = opt_result.x.reshape(h.shape)
-            print(Kpq)
-
-            e_fcmf = oocmf.energy_dps()
-            oocmf.rotate(Kpq)
-            e_ocmf = oocmf.energy_dps()
-            print("Orbital Frozen    CMF:%12.8f"%(e_fcmf+ecore))
-            print("Orbital Optimized CMF:%12.8f"%(e_ocmf+ecore))
-
+        #oocmf.optimize_orbitals()  # optimize the orbitals using gradient
+        oocmf.form_extra_fspace()  #form excited fock space configurations
 
         clustered_ham = oocmf.clustered_ham  # clustered_ham used for TPSCI calculation
         ci_vector = oocmf.ci_vector   # lowest energy TPS using the given Fock space

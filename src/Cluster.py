@@ -134,7 +134,7 @@ class Cluster(object):
             rdm1_b = np.zeros_like(hin)
 
         Eenv,h,v = tools.build_1rdm_dressed_integrals(hin,vin,self.orb_list,rdm1_a,rdm1_b)
-        print("ENVVV",Eenv)
+        #print("ENVVV",Eenv)
         print()
         print(h)
 
@@ -178,7 +178,8 @@ class Cluster(object):
                 #self.basis[fock] = C
                 #self.ops['H_mf'][(fock,fock)] = C.T @ Hci @ C
 
-                cisolver = fci.direct_spin0.FCI()
+                #cisolver = fci.direct_spin0.FCI()
+                cisolver = fci.direct_spin1.FCI()
                 cisolver.max_cycle = 200
                 cisolver.conv_tol = 1e-13
                 efci, ci = cisolver.kernel(h, v, norb, fock, ecore=0,nroots =1,verbose=100)
@@ -189,12 +190,14 @@ class Cluster(object):
                 self.ops['Bb'][(na,nb),(na,nb)] = DB.reshape(1,1,DA.shape[0],DA.shape[1])
                 self.ops['H_mf'][(fock,fock)] = efci.reshape(1,1)
 
+                self.pyscf_solver = cisolver
+
                 #local
                 h2eff = cisolver.absorb_h1e(hc, vc, norb, fock, .5)
                 ci1 = cisolver.contract_2e(h2eff, ci, norb, fock)
                 e = np.einsum('pq,pq',ci1,ci).reshape(1,1)
                 self.ops['H'][(fock,fock)] = e
-                print("FFCI%16.12f"%efci)
+                #print("FFCI%16.12f"%efci)
 
                 self.basis[fock] = ci.reshape(ci.shape[0]*ci.shape[1],1)
                 #print("fock",fock,self.ops['H'][(fock,fock)])
@@ -731,7 +734,7 @@ class Cluster(object):
         """
 # {{{
 
-        assert(self.cs_solver == 0)
+        assert self.cs_solver == 0, "other fock space tdms are not supported using pyscf fci (cs_solver=1) method"
         start = time.time()
         self.ops['A'] = {}
         self.ops['a'] = {}
