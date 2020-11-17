@@ -716,7 +716,7 @@ def build_12rdms_cmf(ci_vector,clusters):
 
 
             rangej = range(sh[cj.idx],sh[cj.idx]+cj.n_orb)
-
+            
             for p,a in enumerate(rangei):
                 for q,b in enumerate(rangej):
                     for r,c in enumerate(rangej):

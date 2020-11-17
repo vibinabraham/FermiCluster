@@ -758,7 +758,7 @@ def truncated_pt2(clustered_ham,ci_vector,pt_vector,method = 'mp2',inf=False):
     return E_corr, pt_vector
 # }}}
 
-def pt2infty(clustered_ham,ci_vector,pt_vector):
+def pt2infty(clustered_ham,ci_vector,pt_vector,form_H=True,nproc=None):
     """ 
     The DMBPT infty equivalent for TPS methods. equvalent to CEPA/ LCCSD
     Input:
@@ -789,7 +789,15 @@ def pt2infty(clustered_ham,ci_vector,pt_vector):
     H0d = build_block_hamiltonian(clustered_ham,ci_vector,pt_vector,iprint=0)
 
     H00 = build_full_hamiltonian(clustered_ham,ci_vector,iprint=0)
-    #Hdd = build_full_hamiltonian(clustered_ham,pt_vector,iprint=0)
+    
+    if form_H:
+        print("Storage for H %8.4f GB"%(pt_dim*pt_dim*8/10e9))
+        if pt_dim > 60000:
+            print("Memory for just storing H is approx 29 GB")
+            exit()
+        Hdd = build_full_hamiltonian_parallel2(clustered_ham,pt_vector,iprint=0,nproc=nproc)
+        np.fill_diagonal(Hdd,0)
+
     print(H00)
     E0,V0 = np.linalg.eigh(H00)
     E0 = E0[ts]
@@ -827,8 +835,12 @@ def pt2infty(clustered_ham,ci_vector,pt_vector):
     for i in range(1,pt_order-1):
         #h1 = Hdd @ v_n[:,i-1]
 
-        sigma = build_sigma(clustered_ham,pt_vector,iprint=0, opt_einsum=True)
-        h1 = sigma.get_vector()
+        if form_H:
+            h1 = Hdd @ v_n[:,i-1]
+
+        else:
+            sigma = build_sigma(clustered_ham,pt_vector,iprint=0, opt_einsum=True)
+            h1 = sigma.get_vector()
 
         v_n[:,i] = h1.reshape(pt_dim)
 
@@ -905,3 +917,4 @@ def build_sigma(clustered_ham,ci_vector,iprint=0, opt_einsum=True):
     sigma_vec.set_vector(sigma)
     return sigma_vec
 # }}}
+
