@@ -558,6 +558,8 @@ class ci_solver:
         
         if s2:
             S2 = self.build_S2_matrix()
+            self.S2 = S2
+
             Hci = .5*(Hci+Hci.T)
             if Hci.shape[0] > 1 and Hci.shape[0] > self.n_roots:
                 l,C = scipy.sparse.linalg.eigsh(Hci+0.089*S2,self.n_roots,which='SA')

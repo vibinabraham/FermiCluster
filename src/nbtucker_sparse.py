@@ -791,7 +791,7 @@ def pt2infty(clustered_ham,ci_vector,pt_vector,form_H=True,nproc=None):
     H00 = build_full_hamiltonian(clustered_ham,ci_vector,iprint=0)
     
     if form_H:
-        print("Storage for H %8.4f GB"%(pt_dim*pt_dim*8/10e9))
+        print("Storage for H %8.4f GB"%((pt_dim*pt_dim*8)/10e9))
         if pt_dim > 60000:
             print("Memory for just storing H is approx 29 GB")
             exit()

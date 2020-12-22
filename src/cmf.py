@@ -1067,7 +1067,7 @@ class CmfSolver:
         print("*Orbital Optimized ooCMF:%16.12f"%(e_ocmf+ecore))
 
 
-    def form_extra_fspace(self):
+    def form_extra_fspace(self,delta_elec=None):
         
         h = self.h
         g = self.g
@@ -1083,7 +1083,11 @@ class CmfSolver:
 
         # build cluster basis and operator matrices using CMF optimized density matrices
         for ci_idx, ci in enumerate(clustered_ham.clusters):
-            fspaces_i = ci.possible_fockspaces()
+            if delta_elec != None:
+                fspaces_i = init_fspace[ci_idx]
+                fspaces_i = ci.possible_fockspaces( delta_elec=(fspaces_i[0], fspaces_i[1], delta_elec) )
+            else:
+                fspaces_i = ci.possible_fockspaces()
         
             print()
             print(" Form basis by diagonalizing local Hamiltonian for cluster: ",ci_idx)

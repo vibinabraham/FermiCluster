@@ -548,6 +548,9 @@ def get_pi_space(mol,mf,cas_norb,cas_nel,local=True):
     else:
         C = mf.mo_coeff
         mo_energy = mf.mo_energy[cas_list]
+        J,K = mf.get_jk()
+        K  = K[cas_list,:][:,cas_list]
+        print(K)
 
         if mol.symmetry == True:
             from pyscf import symm

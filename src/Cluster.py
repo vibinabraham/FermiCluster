@@ -264,6 +264,13 @@ class Cluster(object):
                     
                     C = ci.results_v
                     self.basis[fock] = C
+
+                    #S2
+                    s2_coupled = C.T @ ci.S2 @ C
+                    s2_label = np.diag(s2_coupled)
+                    sz_label =  (na - nb)/2
+                    #S_cluster = (na + nb)/2 # this will be different for different states. for each state S2 = S(S+1) so we can find using the S2 matrix
+
                     if ci.algorithm == "davidson":
                         #self.Hlocal[fock] =  Hci
                         sigma = Hci
@@ -273,6 +280,7 @@ class Cluster(object):
                     elif ci.algorithm == "direct":
                         self.Hlocal[fock] =  Hci
                         self.ops['H_mf'][(fock,fock)] = C.T @ Hci @ C
+
     # }}}
 
     #remove:
