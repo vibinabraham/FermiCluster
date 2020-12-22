@@ -809,4 +809,241 @@ def hosvd(ci_vector, clustered_ham, hshift=1e-8, truncate=-1):
 # }}}
 
 
+def ex_tp_cipsi(ci_vector, clustered_ham,  
+    thresh_cipsi    = 1e-4, 
+    thresh_conv     = 1e-8, 
+    max_iter        = 30, 
+    n_roots         = 3,
+    thresh_asci     = 0,
+    nbody_limit     = 4, 
+    pt_type         = 'en',
+    thresh_search   = 0, 
+    shared_mem      = 1e9,
+    batch_size      = 1,
+    matvec          = 4,
+    nproc           = None
+    ):
+    """
+    +====================================================================+
+                               Excited State TPSCI
+    +====================================================================+
+    
+    ci_vector: the configutation space for all the needed roots. this is tricky since a pre computation of a CIS type calculation
+        needs to be done for this. see test/excited_test.py
+
+
+    thresh_cipsi    :   include qspace configurations into pspace that have probabilities larger than this value
+    thresh_conv     :   stop selected CI when delta E is smaller than this value
+    thresh_asci     :   only consider couplings to pspace configs with probabilities larger than this value
+    thresh_search   :   delete couplings to pspace configs
+                        default: thresh_cipsi^1/2 / 1000
+    nbody_limit     :   only compute up to n-body interactions when searching for new configs
+    shared_mem      :   How much memory to allocate for shared object store for holding clustered_ham - only works with matvec4
+    matvec          :   Which version of matvec to use? [1:4]
+    """
+# {{{
+
+    print()
+    print(" Excited TPSCI options: ")
+    print("     |thresh_cipsi   : ", thresh_cipsi   )
+    print("     |thresh_conv    : ", thresh_conv    )
+    print("     |thresh_search  : ", thresh_search  )
+    print("     |max_iter       : ", max_iter       )
+    print("     |n_roots        : ", n_roots        )
+    print("     |thresh_asci    : ", thresh_asci    )
+    print("     |nbody_limit    : ", nbody_limit    )
+    print("     |pt_type        : ", pt_type        )
+    print("     |nproc          : ", nproc          )
+
+    ecore = clustered_ham.core_energy
+    print(" Core energy: %16.12f" %ecore)
+
+    
+    pt_vector = ci_vector.copy()
+    #Hd_vector = ClusteredState(ci_vector.clusters)
+    Hd_vector = ClusteredState()
+    e_prev = np.zeros(n_roots)
+    for it in range(max_iter+1):
+        print()
+        print(" ===================================================================")
+        print("     Selected CI Iteration: %4i epsilon: %12.8f" %(it,thresh_cipsi))
+        print(" ===================================================================")
+        print(" Build full Hamiltonian",flush=True)
+        start = time.time()
+        
+        if it>0:
+            H = grow_hamiltonian_parallel(H, clustered_ham, ci_vector, ci_vector_old)
+        else:
+            H = build_full_hamiltonian_parallel2(clustered_ham, ci_vector, nproc=nproc)
+        
+        ci_vector_old = ci_vector.copy()
+        stop = time.time()
+        print(" Time spent building Hamiltonian matrix: %12.2f" %(stop-start))
+        print(" Diagonalize Hamiltonian Matrix:",flush=True)
+        vguess = ci_vector.get_vector()
+        if H.shape[0] > 100 and abs(np.sum(vguess)) >0:
+            e,v = scipy.sparse.linalg.eigsh(H,n_roots,v0=vguess,which='SA')
+        else:
+            e,v = np.linalg.eigh(H)
+        idx = e.argsort()
+        e = e[idx]
+        v = v[:,idx]
+        v0 = v[:,:n_roots]
+        e0 = e[:n_roots]
+
+        old_dim = len(ci_vector)
+
+        # store all vectors for the excited states
+        all_vecs = []
+        for rn in range(n_roots):
+            print("Root:%4d     Energy:%12.8f  CI Dim: %4i "%(rn,e[rn].real,len(ci_vector)))
+            vec = ci_vector.copy()
+            vec.zero()
+            vec.set_vector(v[:,rn])
+            all_vecs.append(vec)
+            vec.print()
+        
+        #check convergence
+        e_diff = e0 - e_prev
+        delta_e = np.linalg.norm(e_diff)
+        e_prev = e0
+        if abs(delta_e) < thresh_conv:
+            print(" Converged: TPSCI")
+            break
+        print(" Next iteration CI space dimension", len(ci_vector))
+
+        all_pt_vecs = []
+        e2_energies = []
+        for rn,vec in enumerate(all_vecs):
+            start = time.time()
+            if nbody_limit != 4:
+                print(" Warning: nbody_limit set to %4i, resulting PT energies are meaningless" %nbody_limit)
+
+
+
+            asci_vector = vec.copy()
+            print(" Choose subspace from which to search for new configs. Thresh: ", thresh_asci)
+            print(" CI Dim          : %8i" % len(asci_vector))
+            kept_indices = asci_vector.clip(thresh_asci)
+            print(" Search Dim      : %8i Norm: %12.8f" %( len(asci_vector), asci_vector.norm()))
+
+
+            if matvec==1:
+                pt_vector = matvec1_parallel1(clustered_ham, asci_vector, nproc=nproc, thresh_search=thresh_search, nbody_limit=nbody_limit)
+            elif matvec==2:
+                pt_vector = matvec1_parallel2(clustered_ham, asci_vector, nproc=nproc, thresh_search=thresh_search, nbody_limit=nbody_limit)
+            elif matvec==3:
+                pt_vector = matvec1_parallel3(clustered_ham, asci_vector, nproc=nproc, thresh_search=thresh_search, nbody_limit=nbody_limit)
+            elif matvec==4:
+                pt_vector = matvec1_parallel4(clustered_ham, asci_vector, nproc=nproc, thresh_search=thresh_search, nbody_limit=nbody_limit,
+                        shared_mem=shared_mem, batch_size=batch_size)
+            stop = time.time()
+            print(" Time spent in matvec: %12.2f" %( stop-start))
+            
+            pt_vector.prune_empty_fock_spaces()
+
+
+            print(" Remove CI space from pt_vector vector")
+            for fockspace,configs in pt_vector.items():
+                if fockspace in vec.fblocks():
+                    for config,coeff in list(configs.items()):
+                        if config in vec[fockspace]:
+                            del pt_vector[fockspace][config]
+
+
+            for fockspace,configs in vec.items():
+                if fockspace in pt_vector:
+                    for config,coeff in configs.items():
+                        assert(config not in pt_vector[fockspace])
+
+            print(" Norm of CI vector = %12.8f" %vec.norm())
+            print(" Dimension of CI space: ", len(vec))
+            print(" Dimension of PT space: ", len(pt_vector))
+            if len(pt_vector) == 0:
+                print("No more connecting config found")
+                break
+            print(" Compute Denominator",flush=True)
+            #exit()
+            pt_vector.prune_empty_fock_spaces()
+                
+            #import cProfile
+            #pr = cProfile.Profile()
+            #pr.enable()
+
+
+            # Build Denominator
+            if pt_type == 'en':
+                start = time.time()
+                if nproc==1:
+                    Hd = update_hamiltonian_diagonal(clustered_ham, pt_vector, Hd_vector)
+                else:
+                    Hd = build_hamiltonian_diagonal_parallel1(clustered_ham, pt_vector, nproc=nproc)
+                #pr.disable()
+                #pr.print_stats(sort='time')
+                end = time.time()
+                print(" Time spent in denomimator: %12.2f" %( end - start), flush=True)
+                
+                denom = 1/(e0[rn] - Hd)
+            elif pt_type == 'mp':
+                start = time.time()
+                # get barycentric MP zeroth order energy
+                e0_mp = 0
+                for f,c,v in vec:
+                    for ci in clustered_ham.clusters:
+                        e0_mp += ci.ops['H_mf'][(f[ci.idx],f[ci.idx])][c[ci.idx],c[ci.idx]] * v * v
+                
+                print(" Zeroth-order MP energy: %12.8f" %e0_mp, flush=True)
+
+                #   This is not really MP once we have rotated away from the CMF basis.
+                #   H = F + (H - F), where F = sum_I F(I)
+                #
+                #   After Tucker basis, we just use the diagonal of this fock operator. 
+                #   Not ideal perhaps, but better than nothing at this stage
+                denom = np.zeros(len(pt_vector))
+                idx = 0
+                for f,c,v in pt_vector:
+                    e0_X = 0
+                    for ci in clustered_ham.clusters:
+                        e0_X += ci.ops['H_mf'][(f[ci.idx],f[ci.idx])][c[ci.idx],c[ci.idx]]
+                    denom[idx] = 1/(e0_mp - e0_X)
+                    idx += 1
+                end = time.time()
+                print(" Time spent in denomimator: %12.2f" %( end - start), flush=True)
+            
+            pt_vector_v = pt_vector.get_vector()
+            pt_vector_v.shape = (pt_vector_v.shape[0])
+
+            e2 = np.multiply(denom,pt_vector_v)
+            pt_vector.set_vector(e2)
+            e2 = np.dot(pt_vector_v,e2)
+
+            print(" PT2 Energy Correction = %12.8f" %e2)
+            print(" PT2 Energy Total      = %12.8f" %(e0[rn]+e2))
+
+            all_pt_vecs.append(pt_vector)
+            e2_energies.append(e2)
+
+
+        if it >= max_iter:
+            print(" Maxcycles: TPSCI")
+            break
+
+        for pt_vector in all_pt_vecs:
+            print(" Choose which states to add to CI space", flush=True)
+            for fockspace,configs in pt_vector.items():
+                for config,coeff in configs.items():
+                    if coeff*coeff > thresh_cipsi:
+                        if fockspace in ci_vector:
+                            ci_vector[fockspace][config] = 0
+                        else:
+                            ci_vector.add_fockspace(fockspace)
+                            ci_vector[fockspace][config] = 0
+            
+            
+            print(" Dimension of next CI space: ", len(ci_vector))
+
+    return ci_vector, pt_vector, e0, e0+np.array(e2_energies)
+
+# }}}
+
 
