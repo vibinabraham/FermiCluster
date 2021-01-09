@@ -171,10 +171,13 @@ class ClusteredTerm:
             mats.append(d)
             #print(self.clusters[oi].ops[o][tuple([].extend(fock_bra[oi])).extend(fock_ket[oi]))].shape)
 
+        #print(self.clusters[self.active[0]])
+        #print(mats[0])
+        #print(mats[1])
         me = 0.0
         if len(mats) == 0:
             return 0 
-      
+    
         #print('sign2:',state_sign)
         #print()
         # todo:
@@ -560,6 +563,9 @@ class ClusteredOperator:
                     for cl in self.clusters:
                         if ci == cj and ci == ck and ci == cl:
                             continue
+                        
+                        #if ci != cj or ck != cl:
+                        #    continue
                         delta_aa = list(cp.deepcopy(delta_tmp)) 
                         delta_bb = list(cp.deepcopy(delta_tmp)) 
                         delta_ab = list(cp.deepcopy(delta_tmp)) 

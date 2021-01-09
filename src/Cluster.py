@@ -213,6 +213,7 @@ class Cluster(object):
 
             self.Hlocal = {}
             for na,nb in spaces:
+                #print(na,nb)
                 fock = (na,nb)
                 ci = ci_solver()
                 ci.init(H,na,nb,max_roots)
@@ -252,7 +253,8 @@ class Cluster(object):
                         ci.algorithm = "direct"
                     
                     
-                    Hci = ci.run(s2=True)
+                    Hci = ci.run()
+                    #Hci = ci.run(s2=True)
                     #self.basis[(na,nb)] = np.eye(ci.results_v.shape[0])
                     if iprint>0:
                         for i,ei in enumerate(ci.results_e):

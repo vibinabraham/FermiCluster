@@ -311,10 +311,10 @@ class ci_solver:
 
                                 for si in range_s:
                                     sig[K,si] += Iprqs * sign_a * sign_b * vec[L,si]
-                ket_a.incr()
+                #ket_a.incr()
                 #   end Ka 
 
-            ket_b.incr()
+            #ket_b.incr()
             #   end Kb 
 # }}}
     
