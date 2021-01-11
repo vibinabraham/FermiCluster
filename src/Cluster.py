@@ -138,6 +138,8 @@ class Cluster(object):
         print()
         print(h)
 
+        if iprint>0:
+            print(self)
 
         #local integrals
         hc = np.zeros([self.n_orb]*2)
@@ -257,6 +259,7 @@ class Cluster(object):
                     #Hci = ci.run(s2=True)
                     #self.basis[(na,nb)] = np.eye(ci.results_v.shape[0])
                     if iprint>0:
+                        print(" %4ia %4ib"%(na,nb))
                         for i,ei in enumerate(ci.results_e):
                             print(" Local State %5i: Local E: %12.8f Embedded E: %12.8f Total E: %12.8f" %(i, ei, ei+Eenv, ei+ecore+Eenv))
                     fock = (na,nb)

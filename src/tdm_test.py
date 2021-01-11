@@ -22,7 +22,7 @@ def test_1():
     ###     PYSCF INPUT
     molecule = '''
     H      0.00       0.00       0.00
-    H      1.00       0.00       0.00
+    H      1.00       0.40       0.00
     H      2.00       0.00       1.00
     H      3.00       0.00       1.00
     H      4.00       0.00       2.00
@@ -50,7 +50,7 @@ def test_1():
     init_fspace = ((1, 1), (1, 1), (1, 1))
     
     blocks = [[0,1,2,3],[4,5,6,7],[8,9],[10,11]]
-    init_fspace = ((2,2),(2,2),(0,1),(1,0))
+    init_fspace = ((2,2),(2,2),(1,1),(1,1))
     
     ###     TPSCI BASIS INPUT
     orb_basis = 'lowdin'
@@ -88,8 +88,8 @@ def test_1():
             print(d1)
         print(" FCI:        %12.8f Dim:%6d"%(efci,fci_dim))
     
-    clusters, clustered_ham, ci_vector, cmf_out = system_setup(h, g, ecore, blocks, init_fspace, cmf_maxiter = 0, max_roots=8)
-    print(clusters[0].basis[(2,2)])
+    clusters, clustered_ham, ci_vector, cmf_out = system_setup(h, g, ecore, blocks, init_fspace, cmf_maxiter = 0, max_roots=4)
+    print(clusters[1].basis[(2,2)])
     fock_bra = tuple([(3,2),(1,2),(1,1),(1,1)])
     fock_ket = tuple([(2,2),(2,2),(1,1),(1,1)])
     bra = (0,0,0,0)
@@ -106,8 +106,8 @@ def test_1():
 #    print(clustered_ham.terms[delta][0].matrix_element(fock_bra, bra, fock_ket, ket) )
 
 
-    ci_vector.add_fockspace(((3,2),(1,2),(0,1),(1,0)))
-    ci_vector.add_fockspace(((3,2),(2,2),(0,1),(0,0)))
+    #ci_vector.add_fockspace(((3,2),(1,2),(0,1),(1,0)))
+    #ci_vector.add_fockspace(((3,2),(2,2),(0,1),(0,0)))
     #ci_vector.add_fockspace(((2,3),(2,1),(1,1),(1,1)))
     ci_vector.expand_each_fock_space(clusters)
     
@@ -135,22 +135,27 @@ def test_1():
     e = e[idx]
     v = v[:,idx]
     for i,e in enumerate(e[0:min(10,len(e))]):
-        print(" %4i %12.8f"%(i+1,e.real))
+        print(" %4i %18.12f"%(i+1,e.real))
 
-    #print()
-    #print(H)
+    print()
+    for i in range(H.shape[1]):
+        pass
+        print("%18.12f"%H[i,0])
    
-#    fock_l = ((2,2),(2,2),(1,1),(1,1))
-#    fock_r = ((3,2),(1,2),(1,1),(1,1))
+#    fock_l = ((2,2),(2,2),(0,0),(0,0))
+#    fock_r = ((2,2),(2,2),(0,0),(0,0))
 #    delta_fock= tuple([(fock_l[ci][0]-fock_r[ci][0], fock_l[ci][1]-fock_r[ci][1]) for ci in range(len(clusters))])
-#    config_l = (1,0,0,0)
+#    config_l = (1,1,0,0)
 #    config_r = (0,0,0,0)
 #    terms = clustered_ham.terms[delta_fock]
+#    me = 0
 #    for term in terms:
-#        me = term.matrix_element(fock_l,config_l,fock_r,config_r)
-#        print(me)
-
-    #ci_vector.print_configs()
+#        me1 = term.matrix_element(fock_l,config_l,fock_r,config_r)
+#        print("%18.14f"%me1, term)
+#        me += me1
+#    print("  %18.14f"%me)
+#
+#    #ci_vector.print_configs()
 
 if __name__== "__main__":
     test_1() 

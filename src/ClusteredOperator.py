@@ -563,7 +563,21 @@ class ClusteredOperator:
                     for cl in self.clusters:
                         if ci == cj and ci == ck and ci == cl:
                             continue
-                        
+                       
+                        count = {}
+                        for i in [ci.idx, cj.idx, ck.idx, cl.idx]:
+                            count[i] = 0
+                        for i in [ci.idx, cj.idx, ck.idx, cl.idx]:
+                            count[i] += 1
+                        if len(count) > 2:
+                            continue
+                        skip = 0
+                        for key,val in count.items():
+                            if val > 2:
+                                skip = 1
+                        if skip == 1:
+                            continue
+
                         #if ci != cj or ck != cl:
                         #    continue
                         delta_aa = list(cp.deepcopy(delta_tmp)) 
@@ -766,7 +780,7 @@ class ClusteredOperator:
         if iprint > 2:
             print(self.print_terms_header())
             for ti,t in self.terms.items():
-                print(ti)
+                #print(ti)
                 for tt in t:
                     print(tt)
 # }}}
