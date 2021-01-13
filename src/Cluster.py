@@ -760,12 +760,12 @@ class Cluster(object):
         self.ops['ab'] = {}
         self.ops['AAa'] = {}
         self.ops['BBb'] = {}
+        self.ops['Aaa'] = {}
+        self.ops['Bbb'] = {}
         self.ops['ABb'] = {}
         self.ops['BAa'] = {}
         self.ops['BAb'] = {}
         self.ops['ABa'] = {}
-        self.ops['Aaa'] = {}
-        self.ops['Bbb'] = {}
         self.ops['Aab'] = {}
         self.ops['Bba'] = {}
         self.ops['Aba'] = {}
@@ -1009,7 +1009,7 @@ class Cluster(object):
         for na in range(1,self.n_orb+1):
             for nb in range(1,self.n_orb+1):
                 try:
-                    self.ops['Aab'][(na,nb-1),(na,nb)] = build_caa_os(self.n_orb, (na,nb-1),(na,nb),self.basis,'aab')
+                    self.ops['Aab'][(na,nb-1),(na,nb)] = 0*build_caa_os(self.n_orb, (na,nb-1),(na,nb),self.basis,'aab')
                 except KeyError:
                     continue
         stop = time.time()
@@ -1022,7 +1022,7 @@ class Cluster(object):
         for na in range(1,self.n_orb+1):
             for nb in range(1,self.n_orb+1):
                 try:
-                    self.ops['Bba'][(na-1,nb),(na,nb)] = build_caa_os(self.n_orb, (na-1,nb),(na,nb),self.basis,'bba')
+                    self.ops['Bba'][(na-1,nb),(na,nb)] = 0*build_caa_os(self.n_orb, (na-1,nb),(na,nb),self.basis,'bba')
                 except KeyError:
                     continue
         stop = time.time()
@@ -1035,7 +1035,7 @@ class Cluster(object):
         for na in range(1,self.n_orb+1):
             for nb in range(1,self.n_orb+1):
                 try:
-                    self.ops['Aba'][(na,nb-1),(na,nb)] = build_caa_os(self.n_orb, (na,nb-1),(na,nb),self.basis,'aba')
+                    self.ops['Aba'][(na,nb-1),(na,nb)] = 0*build_caa_os(self.n_orb, (na,nb-1),(na,nb),self.basis,'aba')
                 except KeyError:
                     continue
         stop = time.time()
@@ -1048,7 +1048,7 @@ class Cluster(object):
         for na in range(1,self.n_orb+1):
             for nb in range(1,self.n_orb+1):
                 try:
-                    self.ops['Bab'][(na-1,nb),(na,nb)] = build_caa_os(self.n_orb, (na-1,nb),(na,nb),self.basis,'bab')
+                    self.ops['Bab'][(na-1,nb),(na,nb)] = 0*build_caa_os(self.n_orb, (na-1,nb),(na,nb),self.basis,'bab')
                 except KeyError:
                     continue
         stop = time.time()
@@ -1069,6 +1069,18 @@ class Cluster(object):
             print(" Time spent making data contiguous: %12.2f" %(stop-start))
 
 
+        self.ops['AAa'] = {}
+        self.ops['BBb'] = {}
+        self.ops['Aaa'] = {}
+        self.ops['Bbb'] = {}
+        self.ops['ABb'] = {}
+        self.ops['BAa'] = {}
+        self.ops['BAb'] = {}
+        self.ops['ABa'] = {}
+        self.ops['Aab'] = {}
+        self.ops['Bba'] = {}
+        self.ops['Aba'] = {}
+        self.ops['Bab'] = {}
         stop_tot = time.time()
         print(" Time spent building TDMs Total %12.2f" %(stop_tot-start_tot))
 # }}}

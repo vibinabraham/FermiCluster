@@ -21,19 +21,19 @@ print(label)
 def test_1():
     ###     PYSCF INPUT
     molecule = '''
-    H      0.00       0.00       0.00
-    H      1.00       0.40       0.00
-    H      2.00       0.00       1.00
-    H      3.00       0.00       1.00
-    H      4.00       0.00       2.00
-    H      5.00       0.00       2.00
-    H      6.00       0.00       3.00
-    H      7.00       0.00       3.00
-    H      8.00       0.00       0.00
-    H      9.00       0.00       0.00
-    H      10.00      0.00       0.00
-    H      11.00      0.00       0.00
+    H           0.00     0.00    0.00       
+    H           0.00     1.00    0.00       
+    H           0.00     0.00    2.00       
+    H           0.00     0.00    3.00       
+    H           0.00     0.40    4.00       
+    H           0.00     0.00    5.00       
+    H           0.00     0.00    6.00       
+    H           0.00     0.00    7.00       
     '''
+#    H           0.00     0.00    8.00       
+#    H           0.00     0.00    9.00       
+#    H           0.00     0.00    10.00      
+#    H           0.00     0.00    11.00      
     charge = 0
     spin  = 0
     basis_set = '6-31g'
@@ -51,8 +51,14 @@ def test_1():
     
     blocks = [[0,1,2,3],[4,5,6,7],[8,9],[10,11]]
     init_fspace = ((2,2),(2,2),(1,1),(1,1))
+    blocks = [[0,1,2,3],[4,5,6,7]]
+    init_fspace = ((1,0),(0,1))
+    
+    blocks = [[0,1,2,3],[4,5],[6,7]]
+    init_fspace = ((2,1),(0,0),(0,0))
     
     ###     TPSCI BASIS INPUT
+    orb_basis = 'scf'
     orb_basis = 'lowdin'
     cas = False
     #cas_nstart = 2
@@ -72,7 +78,7 @@ def test_1():
     ecore = pmol.ecore
     
 
-    do_fci = 0
+    do_fci = 1
     if do_fci:
         from pyscf import fci
         cisolver = fci.direct_spin1.FCI()
@@ -86,14 +92,9 @@ def test_1():
         [print("%4i %12.8f"%(i,occs[i])) for i in range(len(occs))]
         with np.printoptions(precision=6, suppress=True):
             print(d1)
-        print(" FCI:        %12.8f Dim:%6d"%(efci,fci_dim))
+        print(" FCI:        %12.8f %12.8f Dim:%6d"%(efci,efci-ecore,fci_dim))
     
-    clusters, clustered_ham, ci_vector, cmf_out = system_setup(h, g, ecore, blocks, init_fspace, cmf_maxiter = 0, max_roots=4)
-    print(clusters[1].basis[(2,2)])
-    fock_bra = tuple([(3,2),(1,2),(1,1),(1,1)])
-    fock_ket = tuple([(2,2),(2,2),(1,1),(1,1)])
-    bra = (0,0,0,0)
-    ket = (1,0,0,0)
+    clusters, clustered_ham, ci_vector, cmf_out = system_setup(h, g, ecore, blocks, init_fspace, cmf_maxiter = 0, max_roots=1)
    
 #    print(fock_bra)
 #    ci_vector.add_fockspace(fock_bra)
@@ -106,10 +107,20 @@ def test_1():
 #    print(clustered_ham.terms[delta][0].matrix_element(fock_bra, bra, fock_ket, ket) )
 
 
+    #ci_vector.add_fockspace(((2,1),(2,3),(1,1),(1,1)))
+    #ci_vector.add_fockspace(((1,2),(3,2),(1,1),(1,1)))
+    #ci_vector.add_fockspace(((2,1),(2,3),(1,1),(1,1)))
+    #ci_vector.add_fockspace(((3,1),(1,3),(1,1),(1,1)))
+    #ci_vector.add_fockspace(((1,3),(3,1),(1,1),(1,1)))
+    #ci_vector.add_fockspace(((3,1),(2,2),(0,2),(1,1)))
+    #ci_vector.add_fockspace(((1,3),(2,2),(2,0),(1,1)))
+    #ci_vector.add_fockspace(((1,3),(2,1),(2,1),(1,1)))
+
     #ci_vector.add_fockspace(((3,2),(1,2),(0,1),(1,0)))
     #ci_vector.add_fockspace(((3,2),(2,2),(0,1),(0,0)))
     #ci_vector.add_fockspace(((2,3),(2,1),(1,1),(1,1)))
-    ci_vector.expand_each_fock_space(clusters)
+    ci_vector.expand_to_full_space(clusters)
+    #ci_vector.expand_each_fock_space(clusters)
     
 
     #for trans in clustered_ham.terms:
@@ -125,22 +136,24 @@ def test_1():
 
     print(" Build Hamiltonian. Space = ", len(ci_vector), flush=True)
     start = timer()
-    H = build_full_hamiltonian_parallel2(clustered_ham, ci_vector)
+    #H = build_full_hamiltonian_parallel2(clustered_ham, ci_vector)
+    H = build_full_hamiltonian(clustered_ham, ci_vector)
     stop = timer()
     print(" Time lapse: ",(stop-start))
     n_roots=10
     print(" Diagonalize Hamiltonian Matrix:",flush=True)
+
     e,v = np.linalg.eig(H)
     idx = e.argsort()
     e = e[idx]
     v = v[:,idx]
     for i,e in enumerate(e[0:min(10,len(e))]):
-        print(" %4i %18.12f"%(i+1,e.real))
+        print(" %4i %18.13f"%(i+1,e.real))
 
     print()
     for i in range(H.shape[1]):
         pass
-        print("%18.12f"%H[i,0])
+        #print("%18.12f"%H[i,0])
    
 #    fock_l = ((2,2),(2,2),(0,0),(0,0))
 #    fock_r = ((2,2),(2,2),(0,0),(0,0))

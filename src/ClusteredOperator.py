@@ -569,7 +569,7 @@ class ClusteredOperator:
                             count[i] = 0
                         for i in [ci.idx, cj.idx, ck.idx, cl.idx]:
                             count[i] += 1
-                        if len(count) > 2:
+                        if len(count) > 4:
                             continue
                         skip = 0
                         for key,val in count.items():
