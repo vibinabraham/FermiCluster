@@ -11,6 +11,8 @@ python:
 
 install: 
   - pip install -e .
+  - pip install pytest-cov
+  - pip install codecov
 script: 
   - pytest test/*.py
 
