@@ -8,3 +8,4 @@ coverage:
     patch: false
 codecov:
   token: 53a67d15-f4a0-4677-a938-672609bdb9f7
+  disable_default_path_fixes: false
