@@ -1079,7 +1079,7 @@ class CmfSolver:
         cmf_dm_guess = self.cmf_dm_guess
 
         rdm_a = cmf_dm_guess[0]
-        rdm_b = cmf_dm_guess[0]
+        rdm_b = cmf_dm_guess[1]
 
         # build cluster basis and operator matrices using CMF optimized density matrices
         for ci_idx, ci in enumerate(clustered_ham.clusters):

@@ -98,7 +98,7 @@ class Cluster(object):
         else:
             self.ops[op] = {}
 
-    def form_fockspace_eigbasis(self, hin, vin, spaces, max_roots=1000, rdm1_a=None, rdm1_b=None, ecore=0, iprint=0, subspace=False,cs_solver=0):
+    def form_fockspace_eigbasis(self, hin, vin, spaces, max_roots=1000, rdm1_a=None, rdm1_b=None, ecore=0, iprint=1, subspace=False,cs_solver=0):
         """
         Get matrices of local Hamiltonians embedded in the system 1rdm and diagonalize to form
         the cluster basis vectors. This is the main step in CMF

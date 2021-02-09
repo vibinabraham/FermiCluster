@@ -67,17 +67,6 @@ mf.run(max_cycle=200)
 
 h,ecore,g,C = get_pi_space(mol,mf,cas_norb,cas_nel,local=True)
 
-## Run a CAS-CI calculation for comparison
-from pyscf import fci
-cisolver = fci.direct_spin1.FCI()
-ecas, vcas = cisolver.kernel(h, g, cas_norb, nelec=cas_nel, ecore=ecore,nroots =1,verbose=100)
-print("CAS-CI:%10.8f"%(ecas))
-print(" CASCI           %12.8f      Dim:%6d" % (ecas,vcas.shape[0]*vcas.shape[1]))
-eixt()
-#print(ecore)
-
-
-
 ## TPSCI 
 
 # Reorder the orbitals for TPSCI. (optional, if u know exact cluster u are looking for)

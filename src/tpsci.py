@@ -1042,7 +1042,7 @@ def ex_tp_cipsi(ci_vector, clustered_ham,
             
             print(" Dimension of next CI space: ", len(ci_vector))
 
-    return ci_vector, pt_vector, e0, e0+np.array(e2_energies)
+    return all_vecs, all_pt_vecs, e0, e0+np.array(e2_energies)
 
 # }}}
 
