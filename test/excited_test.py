@@ -222,7 +222,7 @@ def test_1():
         assert(abs(e0[rn].real-e0[0].real - var_val[rn]) < 1e-7)
         assert(abs(e2[rn].real-e2[0].real - pt_val[rn]) < 1e-7)
 
-    assert(len(ci_vector) == 28)
+    assert(len(ci_vector[0]) == 28)
 
 if __name__== "__main__":
     test_1() 
