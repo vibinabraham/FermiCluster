@@ -317,6 +317,7 @@ def compute_pt2_correction(ci_vector, clustered_ham, e0,
         e2 = np.multiply(denom,pt_vector_v)
         pt_vector.set_vector(e2)
         e2 = np.dot(pt_vector_v,e2)
+        print(" Norm of pt_vector: %12.8f" %(pt_vector.dot(pt_vector)))
         
         ecore = clustered_ham.core_energy
         print(" PT2 Energy Correction = %12.8f" %e2)
