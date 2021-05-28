@@ -174,13 +174,17 @@ def cmf(clustered_ham, ci_vector, h, g,
                     #print("resid")
                     #print(resid)
                     # Solve Pulay equations, [Pulay:1980:393], Eqn. 6
-                    ci = np.linalg.solve(B, resid)
+                    try:
+                        ci = np.linalg.solve(B, resid)
 
-                    # Calculate new amplitudes
-                    dm_new_a[:] = 0
+                        # Calculate new amplitudes
+                        dm_new_a[:] = 0
 
-                    for num in range(diis_size_a):
-                        dm_new_a += ci[num] * diis_vals_dm_a[num + 1]
+                        for num in range(diis_size_a):
+                            dm_new_a += ci[num] * diis_vals_dm_a[num + 1]
+
+                    except:
+                        dm_new_a = 1.0*rdm_a
 
                     # End DIIS amplitude update
                     rdm_a = dm_new_a.copy()
@@ -212,13 +216,17 @@ def cmf(clustered_ham, ci_vector, h, g,
                     #print("resid")
                     #print(resid)
                     # Solve Pulay equations, [Pulay:1980:393], Eqn. 6
-                    ci = np.linalg.solve(B, resid)
+                    try:
+                        ci = np.linalg.solve(B, resid)
 
-                    # Calculate new amplitudes
-                    dm_new_b[:] = 0
+                        # Calculate new amplitudes
+                        dm_new_b[:] = 0
 
-                    for num in range(diis_size_b):
-                        dm_new_b += ci[num] * diis_vals_dm_b[num + 1]
+                        for num in range(diis_size_a):
+                            dm_new_b += ci[num] * diis_vals_dm_b[num + 1]
+
+                    except:
+                        dm_new_b = 1.0* rdm_b
 
                     # End DIIS amplitude update
                     rdm_b = dm_new_b.copy()
@@ -846,6 +854,7 @@ class CmfSolver:
 
         # store rdm
         self.cmf_dm_guess = (rdm_a,rdm_b)
+        self.e = e_curr
 
         print(" CMF In Init: %12.8f" %e_curr)
 
@@ -1056,7 +1065,7 @@ class CmfSolver:
         ecore = self.ecore
 
         x = np.zeros_like(h)
-        min_options = {'gtol': 1e-8, 'disp':False}
+        min_options = {'gtol': 1e-8, 'disp':True}
         opt_result = scipy.optimize.minimize(self.energy, x, jac=self.grad, method = 'BFGS', options=min_options )
         Kpq = opt_result.x.reshape(h.shape)
 

@@ -411,9 +411,9 @@ def mulliken_ordering(mol,norb,C):
         Cocc = C[:,i].reshape(C.shape[0],1)
         temp = Cocc @ Cocc.T @ S   
         for m,lb in enumerate(mol.ao_labels()):
-            print(lb)
+            #print(lb)
             v1,v2,v3 = lb.split()
-            print(v1)
+            #print(v1)
             mulliken[int(v1),i] += temp[m,m]
     print(mulliken)
     return mulliken
@@ -563,6 +563,7 @@ def get_pi_space(mol,mf,cas_norb,cas_nel,local=True):
     # reorder the orbitals to get docc,active,vir ordering  (Note:sort mo takes orbital ordering from 1)
     mycas = mcscf.CASCI(mf, cas_norb, cas_nel)
     C = mycas.sort_mo(cas_list+1,mo_coeff=C)
+    np.save('C.npy',C)
 
     # Get the active space integrals and the frozen core energy
     h, ecore = mycas.get_h1eff(C)

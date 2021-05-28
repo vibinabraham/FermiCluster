@@ -805,17 +805,24 @@ class ci_solver:
         ket_b = ci_string(self.no,self.neb)
         v = self.results_v
         v.shape = (ket_a.max(), ket_b.max())
+        print(v)
         from bisect import bisect
 
         fock_labels_a = [[None,None] for i in range(ket_a.max())]
         fock_labels_b = [[None,None] for i in range(ket_b.max())]
 
+        print(fock_labels_b)
         for I in range(ket_a.max()):
+            print(ket_a.config())
+            temp = bisect(ket_a.config(),norbs1-1)
+            print(temp)
             fock_labels_a[I] = bisect(ket_a.config(),norbs1-1)
             ket_a.incr()
         for I in range(ket_b.max()):
             fock_labels_b[I] = bisect(ket_b.config(),norbs1-1)
             ket_b.incr()
+        print(fock_labels_b)
+        print(fock_labels_a)
        
         for I in range(v.shape[0]):
             for J in range(v.shape[1]):
@@ -823,6 +830,8 @@ class ci_solver:
                     vector[fock_labels_a[I],fock_labels_b[J]].append(v[I,J])
                 except KeyError:
                     vector[fock_labels_a[I],fock_labels_b[J]] = [v[I,J]]
+        print(vector)
+        print(v)
 
         schmidt_basis = {}
         schmidt_basis_r = {}
@@ -831,28 +840,61 @@ class ci_solver:
             print()
             print(" Prepare fock space: ", fock)
             vector[fock] = np.array(vector[fock])
+
         
             ket_a1 = ci_string(norbs1,fock[0])
             ket_b1 = ci_string(norbs1,fock[1])
             ket_a2 = ci_string(norbs2,self.nea-fock[0])
             ket_b2 = ci_string(norbs2,self.neb-fock[1])
+
+            if 0:
+                temp_fvec = np.load("temp_fvec"+str(fock))
+                #temp_fvec.shape = (ket_a1.max()*ket_a2.max(),ket_b1.max()*ket_b2.max())
+                v11 =  1.0*vector[fock]
+                v11.shape = (ket_a1.max()*ket_a2.max(),ket_b1.max()*ket_b2.max())
+                print("YAYAYAYAYA")
+                print(temp_fvec- v11)
           
             # when swapping alpha2 and beta1 do we flip sign?
             sign = 1
             if (self.nea-fock[0]%2)==1 and (fock[1]%2)==1:
                 sign = -1
             print(" Dimensions: %5i x %-5i" %(ket_a1.max()*ket_b1.max(), ket_a2.max()*ket_b2.max()))
+            print(vector[fock])
+
+            if 0:
+                temp = np.load("fvec"+str(fock))
+                print("temp")
+                print(temp)
+                print("vec")
+                print(vector[fock])
+                print("diff")
+                if vector[fock][0] - temp[0] > 1e-2:
+                    print(vector[fock]+temp)
+                else:
+                    print(vector[fock]-temp)
+
             norm_curr = vector[fock].T @ vector[fock]
             print(" Norm: %12.8f"%(np.sqrt(norm_curr)))
             vector[fock].shape = (ket_a1.max(), ket_a2.max(), ket_b1.max(), ket_b2.max())
-            #vector[fock] = np.ascontiguousarray(np.swapaxes(vector[fock],1,2))
+
+            if 0:
+                temp = np.load("fvec2"+str(fock))
+                print("NAYA",fock)
+                print(temp+vector[fock])
+            
             vector[fock] = sign*np.ascontiguousarray(np.swapaxes(vector[fock],1,2))
             vector[fock].shape = (ket_a1.max()*ket_b1.max(), ket_a2.max()*ket_b2.max())
             norm += norm_curr
 
+
+            #print(vector[fock].shape)
+            #print(vector[fock])
             #rdm = vector[fock] @ vector[fock].T
             #print(" Diagonalize RDM of size:",rdm.shape)
             #print(" SVD current block of FCI vector with shape:",vector[fock].shape)
+            print("sign",sign)
+            #print(vector[fock])
             U,n,V = np.linalg.svd(vector[fock])
             #sort_ind = np.argsort(n)[::-1]
             #n = n[sort_ind]
@@ -867,8 +909,18 @@ class ci_solver:
                 else:
                     print("   %5i:    %12.8f*"%(ni_idx,ni), flush=True)
             
+            #print(U)
             if nkeep > 0:
                 schmidt_basis[fock] = U[:,:nkeep]
+
+                if 0:
+                    temp = np.load("fin_vec"+str(fock))
+                    print("FIN")
+                    print(fock)
+                    print(U[:,:nkeep])
+                    print(temp)
+                    print(temp.T @ U[:,:nkeep])
+
                 if both:
                     fock_r = (self.nea-fock[0],self.neb-fock[1])
                     schmidt_basis_r[fock_r] = V[:nkeep,:].T

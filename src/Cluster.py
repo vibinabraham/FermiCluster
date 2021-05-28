@@ -1161,6 +1161,8 @@ class Cluster(object):
         print("K2")
         print(K2)
         U,s,V = np.linalg.svd(K2)
+        print(V)
+        print(U)
         print("  %16s"%("Sing. Val."))
         nkeep = 0
         for si in s:
@@ -1243,6 +1245,7 @@ class Cluster(object):
         g2 = np.einsum("lmrs,rn->lmns",g2,C)
         g2 = np.einsum("lmns,so->lmno",g2,C)
 
+        print(denvt_a)
         # find closest idempotent density for the environment
         if do_embedding:
             if Cenvt.shape[1]>0:
@@ -1252,6 +1255,7 @@ class Cluster(object):
                 n = n[idx]
                 U = U[:,idx]
                 print(n)
+                print(U)
                 #we shouldn't ever have zero eigevanlues in our keep space
                 for i in range(nkeep):
                     assert(n[i]>1e-14)
@@ -1267,12 +1271,20 @@ class Cluster(object):
                     assert(n[i]>1e-14)
                 denvt_b = U[:,0:nb_envt] @ U[:,0:nb_envt].T
 
-            Eenv,h2,g2 = tools.build_1rdm_dressed_integrals(h2,g2,range(Cfrag.shape[1]+Cbath.shape[1]),denvt_a,denvt_b)
+            
+            print(h2)
+            #Eenv,h2,g2 = tools.build_1rdm_dressed_integrals(h2,g2,range(Cfrag.shape[1]+Cbath.shape[1]),denvt_a,denvt_b)
+            h2,g2 = tools.build_cas_integrals(h2,g2,range(Cfrag.shape[1]+Cbath.shape[1]),denvt_a,denvt_b)
+            print(range(Cfrag.shape[1]+Cbath.shape[1]))
+            print(denvt_b)
+            print("H2")
+            print(h2)
+            #print(Eenv)
         else:
             denvt_a *= 0
             denvt_b *= 0
             Eenv,h2,g2 = tools.build_1rdm_dressed_integrals(h2,g2,range(Cfrag.shape[1]+Cbath.shape[1]),denvt_a,denvt_b)
-
+    
 
         print(" Number of electrons in Environment system:")
         print("   Alpha: %12.8f"%(np.trace(denvt_a)))
@@ -1301,9 +1313,9 @@ class Cluster(object):
             ci.algorithm = "direct"
         Hci = ci.run()
 
-        if iprint>0:
-            for i,ei in enumerate(ci.results_e):
-                print(" Local State %5i: Local E: %12.8f Embedded E: %12.8f Total E: %12.8f" %(i, ei, ei+Eenv, ei+ecore+Eenv))
+        #if iprint>0:
+        #    for i,ei in enumerate(ci.results_e):
+        #        print(" Local State %5i: Local E: %12.8f Embedded E: %12.8f Total E: %12.8f" %(i, ei, ei+Eenv, ei+ecore+Eenv))
 
         # since we have made all the operators  invalid - remove the data so it will trigger
         # an error if we try to use it before rebuilding
@@ -1314,6 +1326,7 @@ class Cluster(object):
             print(" We will have these fock spaces present")
             for na,nb in self.basis:
                 print(na,nb)
+            #exit()
         # }}}
 
 

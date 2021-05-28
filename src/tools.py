@@ -573,6 +573,66 @@ def build_1rdm_dressed_integrals(hin, vin, orb_list, rdm1_a, rdm1_b, iprint=0):
     return Eenv,t,v 
 # }}}
 
+def build_cas_integrals(hin, vin, orb_list, rdm1_a, rdm1_b, iprint=0):
+    """
+    contract 2e ints with rdms to get dressed ints in a subspace
+    orb_list is the list of orbitals to construct the integrals in
+    """
+    # {{{
+    print(" Create CASCI hamiltonian matrix with 1rdm embedding")
+    norb_act = len(orb_list)
+    h = np.zeros([norb_act]*2)
+    f = np.zeros([norb_act]*2)
+    v = np.zeros([norb_act]*4)
+    da = np.zeros([norb_act]*2)
+    db = np.zeros([norb_act]*2)
+    
+    for pidx,p in enumerate(orb_list):
+        for qidx,q in enumerate(orb_list):
+            h[pidx,qidx] = hin[p,q]
+            da[pidx,qidx] = rdm1_a[p,q]
+            db[pidx,qidx] = rdm1_b[p,q]
+    
+    for pidx,p in enumerate(orb_list):
+        for qidx,q in enumerate(orb_list):
+            for ridx,r in enumerate(orb_list):
+                for sidx,s in enumerate(orb_list):
+                    v[pidx,qidx,ridx,sidx] = vin[p,q,r,s]
+
+
+    print(" Compute single particle embedding potential")
+    denv_a = 1*rdm1_a
+    denv_b = 1*rdm1_b
+    dact_a = 0*rdm1_a
+    dact_b = 0*rdm1_b
+    for pidx,p in enumerate(orb_list):
+        for qidx,q in enumerate(range(rdm1_a.shape[0])):
+            denv_a[p,q] = 0
+            denv_b[p,q] = 0
+            denv_a[q,p] = 0
+            denv_b[q,p] = 0
+            
+            dact_a[p,q] = rdm1_a[p,q] 
+            dact_b[p,q] = rdm1_b[p,q] 
+            dact_a[q,p] = rdm1_a[q,p]
+            dact_b[q,p] = rdm1_b[q,p]
+
+    denv = denv_a + denv_b
+    vin1 = cp.deepcopy(vin)
+    vin2 = cp.deepcopy(vin)
+    viirs =  vin1[orb_list,:,:,:]
+    viirs = viirs[:,orb_list,:,:]
+    viqri =  vin2[orb_list,:,:,:]
+    viqri = viqri[:,:,:,orb_list]
+    print(viirs.shape)
+    heff =   0.5 * np.einsum('pqrs,rs->pq',viirs,denv) 
+    heff -= 0.25 * np.einsum('pqrs,qr->ps',viqri,denv_a)
+    heff -= 0.25 * np.einsum('pqrs,qr->ps',viqri,denv_b)
+
+
+    return h+heff, v
+# }}}
+
 def run_hierarchical_sci(h,g,blocks,init_fspace,dimer_threshold,ecore):
     """
     compute a dimer calculation and figure out what states to retain for a larger calculation
