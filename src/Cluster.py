@@ -1161,8 +1161,6 @@ class Cluster(object):
         print("K2")
         print(K2)
         U,s,V = np.linalg.svd(K2)
-        print(V)
-        print(U)
         print("  %16s"%("Sing. Val."))
         nkeep = 0
         for si in s:
@@ -1245,7 +1243,6 @@ class Cluster(object):
         g2 = np.einsum("lmrs,rn->lmns",g2,C)
         g2 = np.einsum("lmns,so->lmno",g2,C)
 
-        print(denvt_a)
         # find closest idempotent density for the environment
         if do_embedding:
             if Cenvt.shape[1]>0:
@@ -1254,8 +1251,6 @@ class Cluster(object):
                 idx = n.argsort()[::-1]
                 n = n[idx]
                 U = U[:,idx]
-                print(n)
-                print(U)
                 #we shouldn't ever have zero eigevanlues in our keep space
                 for i in range(nkeep):
                     assert(n[i]>1e-14)
@@ -1272,14 +1267,8 @@ class Cluster(object):
                 denvt_b = U[:,0:nb_envt] @ U[:,0:nb_envt].T
 
             
-            print(h2)
-            #Eenv,h2,g2 = tools.build_1rdm_dressed_integrals(h2,g2,range(Cfrag.shape[1]+Cbath.shape[1]),denvt_a,denvt_b)
-            h2,g2 = tools.build_cas_integrals(h2,g2,range(Cfrag.shape[1]+Cbath.shape[1]),denvt_a,denvt_b)
-            print(range(Cfrag.shape[1]+Cbath.shape[1]))
-            print(denvt_b)
-            print("H2")
-            print(h2)
-            #print(Eenv)
+            Eenv,h2,g2 = tools.build_1rdm_dressed_integrals(h2,g2,range(Cfrag.shape[1]+Cbath.shape[1]),denvt_a,denvt_b)
+            #h2,g2 = tools.build_cas_integrals(h2,g2,range(Cfrag.shape[1]+Cbath.shape[1]),denvt_a,denvt_b)
         else:
             denvt_a *= 0
             denvt_b *= 0
