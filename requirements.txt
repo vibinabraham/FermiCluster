@@ -4,4 +4,4 @@ pathos
 pyscf==1.7.1
 opt_einsum
 pytest
-ray
+ray==1.1.0
