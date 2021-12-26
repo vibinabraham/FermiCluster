@@ -4,13 +4,12 @@
 language: python
 
 python:
-    - 3.6
+    - 3.8
 
 #before_script:
 #  - export PYTHONPATH=$PYTHONPATH:$(pwd)
 
 install: 
-  - pip install -U ray
   - pip install -e .
   - pip install pytest-cov
   - pip install codecov
