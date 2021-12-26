@@ -10,6 +10,7 @@ python:
 #  - export PYTHONPATH=$PYTHONPATH:$(pwd)
 
 install: 
+  - pip install -U ray
   - pip install -e .
   - pip install pytest-cov
   - pip install codecov
