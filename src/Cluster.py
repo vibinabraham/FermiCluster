@@ -1273,8 +1273,8 @@ class Cluster(object):
 
             
             print(h2)
-            #Eenv,h2,g2 = tools.build_1rdm_dressed_integrals(h2,g2,range(Cfrag.shape[1]+Cbath.shape[1]),denvt_a,denvt_b)
-            h2,g2 = tools.build_cas_integrals(h2,g2,range(Cfrag.shape[1]+Cbath.shape[1]),denvt_a,denvt_b)
+            Eenv,h2,g2 = tools.build_1rdm_dressed_integrals(h2,g2,range(Cfrag.shape[1]+Cbath.shape[1]),denvt_a,denvt_b)
+            #h2,g2 = tools.build_cas_integrals(h2,g2,range(Cfrag.shape[1]+Cbath.shape[1]),denvt_a,denvt_b)
             print(range(Cfrag.shape[1]+Cbath.shape[1]))
             print(denvt_b)
             print("H2")

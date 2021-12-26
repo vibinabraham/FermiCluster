@@ -528,11 +528,17 @@ def ordering_diatomics(mol,C,basis_set):
     return new_idx
 # }}}
 
-def get_pi_space(mol,mf,cas_norb,cas_nel,local=True):
+def get_pi_space(mol,mf,cas_norb,cas_nel,local=True,p3=False):
 # {{{
     from pyscf import mcscf, mo_mapping, lo, ao2mo
     # find the 2pz orbitals using mo_mapping
     ao_labels = ['C 2pz']
+
+    # get the 3pz and 2pz orbitals
+    if p3:
+        ao_labels = ['C 2pz','C 3pz']
+        cas_norb = 2 * cas_norb
+
     pop = mo_mapping.mo_comps(ao_labels, mol, mf.mo_coeff)
     cas_list = np.sort(pop.argsort()[-cas_norb:])  #take the 2z orbitals and resort in MO order
     print('Population for pz orbitals', pop[cas_list])

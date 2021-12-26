@@ -918,3 +918,78 @@ def build_sigma(clustered_ham,ci_vector,iprint=0, opt_einsum=True):
     return sigma_vec
 # }}}
 
+def cepa_full_ham(H00,Hdd,H0d,ci_vector,pt_vector,cepa_shift,cas_nel=0,n_blocks=0,cepa_mit=0):
+# {{{
+    ts = 0
+
+    #H00 = build_full_hamiltonian(clustered_ham,ci_vector,iprint=0)
+    
+    E0,V0 = np.linalg.eigh(H00)
+    E0 = E0[ts]
+  
+    Ec = 0.0
+
+    #cepa_shift = 'aqcc'
+    #cepa_shift = 'cisd'
+    #cepa_shift = 'acpf'
+    #cepa_shift = 'cepa0'
+    #cepa_mit = 1
+    #cepa_mit = 100
+    for cit in range(0,cepa_mit): 
+
+        #Hdd = cp.deepcopy(H[tb0.stop::,tb0.stop::])
+        #Hdd = build_full_hamiltonian(clustered_ham,pt_vector,iprint=0)
+
+        shift = 0.0
+        if cepa_shift == 'acpf1':
+            shift = Ec * 2.0 / cas_nel
+        if cepa_shift == 'acpf2':
+            shift = Ec * 2.0 / n_blocks
+            #shift = Ec * 2.0 / n_sites
+        elif cepa_shift == 'aqcc1':
+            shift = (1.0 - (cas_nel-3.0)*(cas_nel - 2.0)/(cas_nel * ( cas_nel-1.0) )) * Ec
+        elif cepa_shift == 'aqcc2':
+            shift = (1.0 - (n_blocks-3.0)*(n_blocks - 2.0)/(n_blocks * ( n_blocks-1.0) )) * Ec
+        elif cepa_shift == 'cisd':
+            shift = Ec
+        elif cepa_shift == 'cepa0':
+            shift = 0
+
+        Hdd_temp = 1.0*Hdd
+        Hdd_temp += -np.eye(Hdd.shape[0])*(E0 + shift)
+        #Hdd += -np.eye(Hdd.shape[0])*(E0 + -0.220751700895 * 2.0 / 8.0)
+        
+        
+        #H0d = build_block_hamiltonian(clustered_ham,ci_vector,pt_vector,iprint=0)
+        Hd0 = H0d.T
+        Hd0 = Hd0.dot(V0[:,ts])
+        
+        #Cd = -np.linalg.inv(Hdd-np.eye(Hdd.shape[0])*E0).dot(Hd0)
+        #Cd = np.linalg.inv(Hdd).dot(-Hd0)
+        
+        Cd = np.linalg.solve(Hdd_temp, -Hd0)
+        
+        print(" CEPA(0) Norm  : %16.12f"%np.linalg.norm(Cd))
+        
+        V0 = V0[:,ts]
+        V0.shape = (V0.shape[0],1)
+        Cd.shape = (Cd.shape[0],1)
+        C = np.vstack((V0,Cd))
+        H00d = 1.0*H0d  #copy
+        H00d = np.insert(H00d,0,E0,axis=1)
+        
+        #E = V0[:,ts].T.dot(H[tb0.start:tb0.stop,:]).dot(C)
+        E = V0[:,ts].T.dot(H00d).dot(C)
+        
+        cepa_last_vectors = C  
+        cepa_last_values  = E
+        
+        print(" CEPA(0) Energy: %16.12f"%E)
+        
+        if abs(E-E0 - Ec) < 1e-6:
+            print("Converged")
+            break
+        Ec = E - E0
+    print("Ec %16.8f"%Ec)
+    return Ec[0]
+# }}}
